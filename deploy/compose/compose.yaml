@@ -1,0 +1,333 @@
+# Compliance OS, Phase 0 local stack. From the repo root: `make up`, `make down`,
+# then `bash scripts/compose-check.sh`.
+#
+# Host ports: web 3000, Zitadel 8085, Grafana 3001, Tempo API 3200, OTLP 4317/4318,
+# MinIO console 9001. api-go (8080) is internal only.
+#
+# One Zitadel hostname, http://zitadel.localhost:8085, for browsers and containers alike:
+# browsers resolve *.localhost to loopback (port 8085 is published), containers resolve it
+# through the network alias below, and Zitadel listens on 8085 inside its container too.
+#
+# Every container runs as a non-root user. Images that would otherwise start as root get a
+# `user:`; where a non-root user needs a writable data directory that the upstream image
+# lacks, a one-line `dockerfile_inline` creates it with the right owner.
+name: compliance
+
+# The Zitadel project id is fixed (the bootstrap creates the project with this id), so
+# api-go's JWT audience is plain configuration: containers are created before the
+# bootstrap runs, so a generated value could not reach api-go's environment.
+x-zitadel-project-id: &zitadel_project_id "100000000000000001"
+
+x-healthcheck: &healthcheck
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 30s
+  start_interval: 2s
+
+services:
+  # ---------------------------------------------------------------- infrastructure
+  postgres:
+    image: postgres:17.6
+    user: postgres
+    environment:
+      POSTGRES_PASSWORD: pg
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      <<: *healthcheck
+      # TCP, not the socket: during first init the entrypoint runs a socket-only temporary
+      # server, and dependents must not start until the real server (and init.sql) is up.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+    mem_limit: 512m
+    restart: unless-stopped
+
+  nats:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM nats:2.11.17-alpine
+        RUN install -d -o 65532 -g 65532 -m 0750 /data
+    user: "65532:65532"
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes:
+      - natsdata:/data
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+    mem_limit: 256m
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:8.1.10-alpine
+    user: valkey
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "valkey-cli", "ping"]
+    mem_limit: 128m
+    restart: unless-stopped
+
+  minio:
+    # minio/minio and quay.io/minio/minio refuse anonymous pulls here (401); Bitnami's
+    # legacy image runs the same server as uid 1001.
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    user: "1001:0"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio_dev_pw
+      MINIO_CONSOLE_PORT_NUMBER: "9001"
+    ports:
+      - "9001:9001"
+    volumes:
+      - miniodata:/bitnami/minio/data
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD-SHELL", "MC_HOST_local=http://127.0.0.1:9000 mc --config-dir /tmp/.mc ready local"]
+    mem_limit: 256m
+    restart: unless-stopped
+
+  otel-lgtm:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM grafana/otel-lgtm:0.11.10
+        RUN install -d -o 10001 -g 10001 /data
+    user: "10001:10001"
+    # run-all.sh is a bash script that ends in `sleep infinity`; tini forwards SIGTERM.
+    init: true
+    ports:
+      - "3001:3000"
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    healthcheck:
+      <<: *healthcheck
+      start_period: 90s
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fsS -o /dev/null http://127.0.0.1:3200/ready &&
+          curl -fsS -o /dev/null http://127.0.0.1:13133/ready &&
+          curl -fsS -o /dev/null http://127.0.0.1:3000/api/health
+    mem_limit: 1g
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- identity
+  zitadel:
+    build:
+      context: .
+      # Adds an empty /machinekey owned by the image's zitadel user (uid 1000), so the
+      # fresh named volume mounted there is writable and Zitadel can write the PAT.
+      dockerfile_inline: |
+        FROM alpine:3.22.6 AS dirs
+        RUN install -d -o 1000 -g 1000 -m 0755 /machinekey
+        FROM ghcr.io/zitadel/zitadel:v4.3.0
+        COPY --from=dirs --chown=1000:1000 /machinekey /machinekey
+    user: "1000:1000"
+    command: >-
+      start-from-init --masterkey "MasterkeyNeedsToHave32Characters" --tlsMode disabled
+      --steps /zitadel-init.yaml
+    environment:
+      ZITADEL_EXTERNALDOMAIN: zitadel.localhost
+      ZITADEL_EXTERNALPORT: "8085"
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_PORT: "8085"
+      # `--tlsMode disabled` only reaches the server; the `zitadel ready` healthcheck reads
+      # config alone and would otherwise probe https://localhost:8085 and fail forever.
+      ZITADEL_TLS_ENABLED: "false"
+      ZITADEL_DATABASE_POSTGRES_HOST: postgres
+      ZITADEL_DATABASE_POSTGRES_PORT: "5432"
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel_dev_pw
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: postgres
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: pg
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      # v4 defaults new instances to Login V2, a separate Next.js container. Use the login
+      # UI built into Zitadel instead (one container; the e2e selectors target it).
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
+      # No "set up 2-factor" prompt after the password step.
+      ZITADEL_DEFAULTINSTANCE_LOGINPOLICY_MFAINITSKIPLIFETIME: 0s
+    ports:
+      - "8085:8085"
+    networks:
+      default:
+        aliases:
+          - zitadel.localhost
+    volumes:
+      - ./zitadel/zitadel-init.yaml:/zitadel-init.yaml:ro
+      - zitadel-machinekey:/machinekey
+    healthcheck:
+      <<: *healthcheck
+      retries: 30
+      start_period: 180s
+      test: ["CMD", "/app/zitadel", "ready"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 768m
+    restart: unless-stopped
+
+  zitadel-bootstrap:
+    build:
+      context: ./zitadel
+    image: zitadel-bootstrap:dev
+    # Non-root, as the host user by default, so it can also write the host copy of
+    # .env.generated into this directory (see .env.example for HOST_UID/HOST_GID).
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      ZITADEL_URL: http://zitadel.localhost:8085
+      ZITADEL_CONNECT_TO: zitadel.localhost:8085:zitadel:8085
+      ZITADEL_PAT_FILE: /machinekey/admin.pat
+      ZITADEL_PROJECT_ID: *zitadel_project_id
+      WEB_URL: http://localhost:3000
+      DATABASE_OWNER_URL: postgres://compliance_owner:owner_dev_pw@postgres:5432/compliance?sslmode=disable
+      ENV_FILE: /generated/.env.generated
+      HOST_ENV_FILE: /out/.env.generated
+    volumes:
+      - zitadel-machinekey:/machinekey:ro
+      - bootstrap-env:/generated
+      - .:/out
+    depends_on:
+      zitadel:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # ---------------------------------------------------------------- application
+  migrate:
+    build:
+      context: ../..
+      dockerfile: services/api-go/Dockerfile
+    image: api-go:dev
+    command: ["migrate"]
+    environment:
+      DATABASE_OWNER_URL: postgres://compliance_owner:owner_dev_pw@postgres:5432/compliance?sslmode=disable
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  validator-rs:
+    build:
+      context: ../..
+      dockerfile: services/validator-rs/Dockerfile
+    image: validator-rs:dev
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
+      OTEL_SERVICE_NAME: validator-rs
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "/bin/grpc_health_probe", "-addr=127.0.0.1:50051"]
+    mem_limit: 128m
+    restart: unless-stopped
+
+  ai-py:
+    build:
+      context: ../..
+      dockerfile: services/ai-py/Dockerfile
+    image: ai-py:dev
+    environment:
+      NATS_URL: nats://nats:4222
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
+      OTEL_SERVICE_NAME: ai-py
+    healthcheck:
+      <<: *healthcheck
+      test:
+        - CMD
+        - /app/.venv/bin/python
+        - -c
+        - "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=3).status == 200 else 1)"
+    depends_on:
+      nats:
+        condition: service_healthy
+    mem_limit: 256m
+    restart: unless-stopped
+
+  api-go:
+    build:
+      context: ../..
+      dockerfile: services/api-go/Dockerfile
+    image: api-go:dev
+    environment:
+      HTTP_ADDR: ":8080"
+      DATABASE_URL: postgres://compliance_app:app_dev_pw@postgres:5432/compliance?sslmode=disable
+      NATS_URL: nats://nats:4222
+      VALIDATOR_ADDR: http://validator-rs:50051
+      VALKEY_ADDR: valkey:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio_dev_pw
+      ZITADEL_ISSUER: http://zitadel.localhost:8085
+      ZITADEL_JWKS_URL: http://zitadel.localhost:8085/oauth/v2/keys
+      ZITADEL_AUDIENCE: *zitadel_project_id
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
+      OTEL_SERVICE_NAME: api-go
+    expose:
+      - "8080"
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "/api", "healthcheck"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      zitadel-bootstrap:
+        condition: service_completed_successfully
+      nats:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      validator-rs:
+        condition: service_healthy
+    mem_limit: 256m
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    image: web:dev
+    # The OIDC client is created at run time by zitadel-bootstrap, after this container was
+    # created, so it is read from the shared volume at start rather than from env_file
+    # (compose reads env_file when it loads the project, before anything runs).
+    command: ["/bin/sh", "-c", "set -a && . /run/bootstrap/.env.generated && set +a && exec node server.js"]
+    environment:
+      API_URL: http://api-go:8080
+      AUTH_SECRET: dev-only-secret-change-me-32chars!!
+      AUTH_TRUST_HOST: "true"
+      AUTH_URL: http://localhost:3000
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SERVICE_NAME: web
+    volumes:
+      - bootstrap-env:/run/bootstrap:ro
+    ports:
+      - "3000:3000"
+    healthcheck:
+      <<: *healthcheck
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/ar').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+    depends_on:
+      api-go:
+        condition: service_healthy
+      zitadel-bootstrap:
+        condition: service_completed_successfully
+    mem_limit: 384m
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  natsdata:
+  miniodata:
+  zitadel-machinekey:
+  bootstrap-env:

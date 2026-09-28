@@ -1,0 +1,16 @@
+# Zitadel setup steps for the first instance (`start-from-init --steps`).
+# Keys checked against cmd/setup/steps.yaml at zitadel v4.3.0.
+FirstInstance:
+  # The bootstrap machine user's PAT; zitadel-bootstrap reads it from the shared volume.
+  PatPath: /machinekey/admin.pat
+  Org:
+    Name: Platform
+    # Console admin (dev only): zitadel-admin@platform.zitadel.localhost / Password1!
+    Human:
+      PasswordChangeRequired: false
+    Machine:
+      Machine:
+        Username: bootstrap-admin
+        Name: Bootstrap Admin
+      Pat:
+        ExpirationDate: "2030-01-01T00:00:00Z"
