@@ -126,7 +126,7 @@ Money is stored as `numeric` in Postgres and handled as `rust_decimal`, `shopspr
 | Go | chi, pgx + sqlc, goose, connect-go, shopspring/decimal, OTel SDK |
 | Rust | tonic, quick-xml, rust_decimal, async-nats, tracing + OTel |
 | Python | uv, grpcio, nats-py, pydantic, polars, scikit-learn, OTel, Langfuse SDK |
-| Web | Next.js App Router, next-intl, shadcn/ui (RTL), TanStack Query |
+| Web | Next.js App Router, next-intl, Tailwind v4, shadcn/ui (RTL), Motion, TanStack Query/Table, Recharts, cmdk, Sonner (see `adr/016`) |
 
 ## Boundaries
 

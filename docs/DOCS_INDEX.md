@@ -19,6 +19,7 @@
 | adr | 013 | draft | Observability: OpenTelemetry, Grafana stack, Langfuse | OTel in all services; Prometheus/Loki/Tempo/Grafana; Langfuse for agent traces, cost and tokens. | 2026-09-27 | [013](docs/adr/013-observability.md) |
 | adr | 014 | draft | Quality gates: per-service CI, contract checks, agent evals, synthetic data | GitHub Actions per service, buf breaking, RLS tests, agent evals gating CI on synthetic + real data. | 2026-09-27 | [014](docs/adr/014-quality-ci-evals.md) |
 | adr | 015 | draft | Public monorepo, no licence yet, Claude writes the code | Single public monorepo layout; all rights reserved for now; code authored by Claude and reviewed by the owner. | 2026-09-27 | [015](docs/adr/015-repo-monorepo-public.md) |
+| adr | 016 | draft | Design system, visual identity and per-Firm theming | World-class fintech polish with a subtle UAE identity; light/dark plus white-label Firm theming; UI toolkit. | 2026-09-27 | [016](docs/adr/016-design-system-and-theming.md) |
 | design | 001 | draft | System Overview — Compliance OS | Architecture of Compliance OS: services, data flow, numbers, failure modes, boundaries. Start here. | 2026-09-27 | [001](docs/design/001-system-overview.md) |
 | roadmap | 001 | draft | Roadmap — Phases 0 to 7 | Ordered delivery phases with scope and hard exit criteria; a phase is done only when its exit criteria pass. | 2026-09-27 | [001](docs/roadmap/001-roadmap.md) |
 

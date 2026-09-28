@@ -28,6 +28,7 @@ Eight phases, done in strict order. **A phase is done only when all of its exit 
 **Scope:**
 - The monorepo layout and `proto/` with `buf`.
 - A minimal Go API, Rust validator (one Rule), Python worker (a stub agent) and Next.js page with ar/en and RTL.
+- The design foundation per `adr/016`: tokens, IBM Plex fonts, light/dark, per-Firm accent plumbing, the app shell (sidebar, header, Ctrl+K palette) and motion.
 - NATS, Postgres with RLS and one tenant table, Valkey, MinIO and Zitadel login.
 - Docker Compose for local development.
 - k3s on a VPS with Helm and Cloudflare.
@@ -42,6 +43,7 @@ Eight phases, done in strict order. **A phase is done only when all of its exit 
 
 ### Phase 1 — Ingestion and extraction
 **Scope:**
+- A public landing page (per `adr/016`).
 - Signed R2 upload and `sha256` deduplication.
 - Firm and ClientCompany management.
 - The Intake and Extraction agents on the in-house runtime, with the ModelGateway.
