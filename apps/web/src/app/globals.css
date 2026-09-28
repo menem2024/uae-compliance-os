@@ -1,0 +1,220 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Dark mode is class-driven (next-themes, attribute="class"). */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens (docs/adr/016, approved prototype). Components use these tokens
+ * only; no ad-hoc colour values outside this file.
+ */
+
+/* ---------- Light ---------- */
+:root {
+  --bg: #F6F5F1;
+  --sidebar: #FBFAF7;
+  --panel: #FFFFFF;
+  --panel-2: #F1EFE9;
+  --border: #E6E2D8;
+  --text: #14161A;
+  --muted: #5A6170;
+  --ok: #0F7A6E;
+  --warn: #A5580F;
+  --bad: #B42335;
+  --info: #1F5FBF;
+
+  /* Soft status fills (prototype: okSoft / warnSoft / badSoft / infoSoft). */
+  --ok-soft: rgb(15 122 110 / .12);
+  --warn-soft: rgb(165 88 15 / .10);
+  --bad-soft: rgb(180 35 53 / .09);
+  --info-soft: rgb(31 95 191 / .09);
+
+  /* Subtle bar/track tint and modal scrim. */
+  --track: rgb(20 22 26 / .08);
+  --scrim: rgb(5 6 8 / .35);
+  --shadow-color: rgb(20 22 26 / .10);
+
+  /*
+   * Platform default accent. Overridden per Firm by brandStyle() on <body>;
+   * these are the values brandStyle(null) produces.
+   */
+  --brand: #C8A45D;
+  --brand-soft: rgb(200 164 93 / .12);
+  --brand-foreground: #16110A;
+  --brand-ink-light: #8C7341;
+  --brand-ink-dark: #C8A45D;
+
+  --radius: 12px;
+
+  color-scheme: light;
+}
+
+/* ---------- Dark (default) ---------- */
+.dark {
+  --bg: #0A0C0F;
+  --sidebar: #0D1014;
+  --panel: #12151A;
+  --panel-2: #1A1E25;
+  --border: #222731;
+  --text: #ECEEF2;
+  --muted: #9AA3B2;
+  --ok: #3FB6A8;
+  --warn: #F0A04B;
+  --bad: #F07178;
+  --info: #7AA7FF;
+
+  --ok-soft: rgb(63 182 168 / .18);
+  --warn-soft: rgb(240 160 75 / .14);
+  --bad-soft: rgb(240 113 120 / .14);
+  --info-soft: rgb(122 167 255 / .14);
+
+  --track: rgb(255 255 255 / .08);
+  --scrim: rgb(5 6 8 / .55);
+  --shadow-color: rgb(0 0 0 / .45);
+
+  color-scheme: dark;
+}
+
+/*
+ * Brand-dependent aliases are declared on <body> (not :root) so they resolve
+ * against the Firm's brand set inline on <body>. Radix portals mount inside
+ * <body>, so dialogs and toasts inherit the Firm accent too.
+ */
+body {
+  --brand-ink: var(--brand-ink-light);
+  /* Deep end of brand gradients (avatar), prototype: gold -> #7A5A22. */
+  --brand-deep: color-mix(in oklab, var(--brand), #000 45%);
+
+  /* shadcn/ui variables mapped onto the design tokens. */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--panel);
+  --card-foreground: var(--text);
+  --popover: var(--panel);
+  --popover-foreground: var(--text);
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+  --secondary: var(--panel-2);
+  --secondary-foreground: var(--text);
+  --accent: var(--panel-2);
+  --accent-foreground: var(--text);
+  --muted-foreground: var(--muted);
+  --destructive: var(--bad);
+  --input: var(--border);
+  --ring: var(--brand);
+}
+
+.dark body {
+  --brand-ink: var(--brand-ink-dark);
+}
+
+@theme inline {
+  /* Fonts (next/font variables set on <html>, see src/lib/fonts.ts). */
+  --font-sans: var(--font-plex-arabic), var(--font-plex), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-heading: var(--font-sans);
+
+  /* Design tokens as Tailwind colours: bg-panel, text-muted, border-border ... */
+  --color-sidebar: var(--sidebar);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-border: var(--border);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-info: var(--info);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad-soft: var(--bad-soft);
+  --color-info-soft: var(--info-soft);
+  --color-track: var(--track);
+  --color-scrim: var(--scrim);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-deep: var(--brand-deep);
+
+  /*
+   * shadcn/ui colour names. Note the naming clash: shadcn's `muted` is a fill
+   * (-> panel-2) while our `--muted` token is text (-> muted-foreground).
+   */
+  --color-muted: var(--panel-2);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Radii: controls 12px, cards 16px, dialogs 18px, pills 999px. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: var(--radius);
+  --radius-xl: 16px;
+  --radius-2xl: 18px;
+  --radius-3xl: 24px;
+  --radius-pill: 999px;
+}
+
+/* Tabular Western digits for numbers, money and IDs (Latin face first, as in the prototype). */
+@utility num {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-plex), var(--font-plex-arabic), system-ui, sans-serif;
+}
+
+/* Card hover lift (prototype `.lift`). */
+@utility lift {
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -16px var(--shadow-color);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--brand-soft);
+  }
+}
+
+/* Reduced motion: no lifts, no transitions, no animations (Motion also honours this via MotionConfig). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .lift:hover {
+    transform: none;
+  }
+}

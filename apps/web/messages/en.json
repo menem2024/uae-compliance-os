@@ -1,0 +1,95 @@
+{
+  "Home": {
+    "title": "Compliance OS",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "demo": "Validation demo"
+  },
+  "Demo": {
+    "title": "Demo invoice validation",
+    "sellerTrn": "Seller TRN",
+    "submit": "Submit",
+    "status": "Status",
+    "issues": "Issues",
+    "traceId": "Trace ID",
+    "none": "No issues"
+  },
+  "Locale": {
+    "switch": "العربية"
+  },
+  "Metadata": {
+    "title": "Compliance OS",
+    "description": "UAE e-invoicing readiness for accounting firms"
+  },
+  "Shell": {
+    "brandLatin": "COMPLIANCE OS",
+    "mainNav": "Main navigation",
+    "firmWorkspace": "Firm workspace",
+    "switchFirm": "Switch firm",
+    "soon": "Soon",
+    "nav": {
+      "dashboard": "Dashboard",
+      "clients": "Client companies",
+      "invoices": "Invoices",
+      "review": "Awaiting review",
+      "demo": "Validation demo",
+      "legal": "Legal assistant",
+      "reports": "Reports",
+      "settings": "Settings"
+    },
+    "mandate": {
+      "label": "Mandatory e-invoicing",
+      "daysLeft": "days left",
+      "audience": "For SMEs",
+      "date": "1 July 2027"
+    },
+    "search": "Search a company, an invoice, or run a command…",
+    "searchShort": "Search",
+    "theme": {
+      "toggle": "Toggle theme",
+      "light": "Light theme",
+      "dark": "Dark theme"
+    },
+    "account": "Account"
+  },
+  "Palette": {
+    "label": "Command menu",
+    "placeholder": "Type a command or search…",
+    "empty": "No results",
+    "pages": "Pages",
+    "actions": "Commands",
+    "toggleTheme": "Toggle light / dark theme",
+    "switchLocale": "Switch to Arabic",
+    "esc": "Esc"
+  },
+  "Dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Your clients' e-invoicing readiness",
+    "countdownTitle": "Countdown to the mandate",
+    "countdownBody": "The mandatory phase for SMEs starts then. Get your clients ready ahead of it.",
+    "emptyBadge": "Start here",
+    "emptyTitle": "No client companies yet",
+    "emptyBody": "Try validating a demo invoice to see how the validator checks the TRN and reports issues with a trace ID.",
+    "emptyCta": "Try invoice validation",
+    "pipelineTitle": "Invoice pipeline",
+    "pipelineBody": "Every invoice moves through these stages until it is ready to export.",
+    "countdownDate": "Go-live",
+    "countdownScope": "Scope",
+    "countdownScopeValue": "SMEs"
+  },
+  "DemoPage": {
+    "subtitle": "Submit a demo invoice and follow the validation result live",
+    "resultTitle": "Validation result",
+    "ruleset": "pint-ae@0.0-skeleton",
+    "placeholderTitle": "Validation form in progress",
+    "placeholderBody": "The invoice form and validation result appear here once sign-in and the backend are wired up.",
+    "back": "Back to the dashboard"
+  },
+  "Status": {
+    "uploaded": "Uploaded",
+    "extracted": "Extracted",
+    "validated": "Validated",
+    "has_issues": "Has issues",
+    "ready": "Ready to export"
+  }
+}
