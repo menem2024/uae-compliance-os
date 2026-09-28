@@ -81,8 +81,8 @@ func (q *Queries) ListInvoiceIDs(ctx context.Context) ([]uuid.UUID, error) {
 	return items, nil
 }
 
-const setValidation = `-- name: SetValidation :exec
-UPDATE invoices SET status = $2, ruleset_version = $3, issues = $4, updated_at = now() WHERE id = $1
+const setValidation = `-- name: SetValidation :one
+UPDATE invoices SET status = $2, ruleset_version = $3, issues = $4, updated_at = now() WHERE id = $1 RETURNING id
 `
 
 type SetValidationParams struct {
@@ -92,12 +92,14 @@ type SetValidationParams struct {
 	Issues         []byte      `json:"issues"`
 }
 
-func (q *Queries) SetValidation(ctx context.Context, arg SetValidationParams) error {
-	_, err := q.db.Exec(ctx, setValidation,
+func (q *Queries) SetValidation(ctx context.Context, arg SetValidationParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, setValidation,
 		arg.ID,
 		arg.Status,
 		arg.RulesetVersion,
 		arg.Issues,
 	)
-	return err
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }

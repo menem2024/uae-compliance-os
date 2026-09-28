@@ -4,6 +4,7 @@ package db_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -117,5 +118,38 @@ func TestAppRoleCannotBypass(t *testing.T) {
 	}
 	if super || bypass {
 		t.Fatalf("app role has super=%v bypassrls=%v", super, bypass)
+	}
+	if _, err := app.Exec(ctx, `CREATE TEMP TABLE probe_t(x int)`); err == nil {
+		t.Fatal("app role can create temp tables; database privileges are not least-privilege")
+	}
+}
+
+func TestSetValidationCrossTenantIsNotFound(t *testing.T) {
+	ctx := context.Background()
+	app, a, b := setup(t)
+
+	var invA uuid.UUID
+	if err := db.WithFirm(ctx, app, a, func(q *sqlc.Queries) error {
+		inv, err := q.CreateInvoice(ctx, sqlc.CreateInvoiceParams{FirmID: a, Payload: []byte(`{}`)})
+		invA = inv.ID
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	err := db.WithFirm(ctx, app, b, func(q *sqlc.Queries) error {
+		_, err := q.SetValidation(ctx, sqlc.SetValidationParams{ID: invA, Status: db.StatusValidated})
+		return err
+	})
+	if !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("cross-tenant SetValidation: want ErrNotFound, got %v", err)
+	}
+
+	err = db.WithFirm(ctx, app, a, func(q *sqlc.Queries) error {
+		_, err := q.SetValidation(ctx, sqlc.SetValidationParams{ID: uuid.New(), Status: db.StatusValidated})
+		return err
+	})
+	if !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("missing-row SetValidation: want ErrNotFound, got %v", err)
 	}
 }
