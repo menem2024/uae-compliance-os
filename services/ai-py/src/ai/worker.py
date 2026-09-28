@@ -10,6 +10,7 @@ import logging
 import os
 
 import nats
+from google.protobuf import message
 from nats.js.api import ConsumerConfig
 from nats.js.errors import BadRequestError, FetchTimeoutError
 from opentelemetry import trace
@@ -26,6 +27,11 @@ STREAM_SUBJECT = "invoice.submitted"
 STREAM_DURABLE = "ai-extraction"
 MAX_DELIVER = 5
 DLQ_SUBJECT = "dlq.invoice.submitted"
+
+FETCH_TIMEOUT = 1.0
+DRAIN_TIMEOUT = 3.0
+DLQ_PUBLISH_ATTEMPTS = 3
+DLQ_PUBLISH_BACKOFF = 0.05
 
 tracer = trace.get_tracer(__name__)
 propagator = TraceContextTextMapPropagator()
@@ -68,12 +74,78 @@ async def _fail(js, msg) -> None:
     """
     try:
         if msg.metadata.num_delivered >= MAX_DELIVER:
-            await js.publish(DLQ_SUBJECT, msg.data, headers=dict(msg.headers or {}))
-            await msg.term()
+            await _dead_letter(js, msg)
         else:
             await msg.nak(delay=2)
     except Exception:
         logger.exception("failed to route failed invoice.submitted message to DLQ/nak")
+
+
+def _safe_invoice_id(data: bytes) -> str:
+    """Best-effort invoice_id for error logs. Never raises: a message that
+    failed processing may also fail to parse.
+    """
+    try:
+        ev = events_pb2.InvoiceSubmitted()
+        ev.ParseFromString(data)
+        return ev.invoice_id
+    except message.DecodeError as exc:
+        logger.debug("could not parse invoice_id for error log", exc_info=exc)
+        return "<unparseable>"
+
+
+def _safe_stream_seq(msg) -> object:
+    """Best-effort stream sequence number for error logs. Never raises."""
+    try:
+        return msg.metadata.sequence.stream
+    except AttributeError as exc:
+        logger.debug("could not read stream sequence for error log", exc_info=exc)
+        return None
+
+
+async def _dead_letter(js, msg) -> None:
+    """Publish a permanently-failed message to the DLQ, then term() it.
+
+    msg.term() is attempted unconditionally in a `finally`, regardless of
+    whether the DLQ publish ultimately succeeded: at MAX_DELIVER, JetStream
+    will not redeliver the message again, so skipping term() would strand it
+    forever (neither dead-lettered, acked, nor termed). The DLQ publish is
+    retried a few times with a short backoff before being treated as failed;
+    if it never succeeds, that is logged at ERROR with enough to locate the
+    message (subject, stream sequence, invoice_id) but never the payload
+    itself, which contains invoice data.
+    """
+    published = False
+    last_exc: Exception | None = None
+    try:
+        for attempt in range(DLQ_PUBLISH_ATTEMPTS):
+            try:
+                await js.publish(DLQ_SUBJECT, msg.data, headers=dict(msg.headers or {}))
+                published = True
+                break
+            except Exception as exc:
+                last_exc = exc
+                logger.debug("dlq publish attempt %d failed", attempt + 1, exc_info=exc)
+                if attempt < DLQ_PUBLISH_ATTEMPTS - 1:
+                    await asyncio.sleep(DLQ_PUBLISH_BACKOFF * (attempt + 1))
+
+        if not published:
+            try:
+                logger.error(
+                    "dead-letter publish failed after %d attempts subject=%s stream_seq=%s invoice_id=%s",
+                    DLQ_PUBLISH_ATTEMPTS,
+                    DLQ_SUBJECT,
+                    _safe_stream_seq(msg),
+                    _safe_invoice_id(msg.data),
+                    exc_info=last_exc,
+                )
+            except Exception:
+                logger.exception("failed to log dead-letter publish failure")
+    finally:
+        try:
+            await msg.term()
+        except Exception:
+            logger.exception("failed to term() dead-lettered message")
 
 
 async def _connect_with_retry(
@@ -98,6 +170,7 @@ async def _connect_with_retry(
                 connect_timeout=5,
                 max_reconnect_attempts=3,
                 reconnect_time_wait=2,
+                drain_timeout=int(DRAIN_TIMEOUT),
             )
         )
         stop_wait = asyncio.ensure_future(stop_event.wait())
@@ -147,13 +220,30 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
 
         while not stop_event.is_set():
             try:
-                msgs = await sub.fetch(10, timeout=5)
+                msgs = await sub.fetch(10, timeout=FETCH_TIMEOUT)
             except (FetchTimeoutError, TimeoutError):
                 continue
             for msg in msgs:
                 await _handle(js, msg)
     finally:
-        await nc.drain()
+        await _shutdown_nc(nc)
+
+
+async def _shutdown_nc(nc) -> None:
+    """Bound NATS shutdown so it can never block process exit under SIGTERM.
+
+    A plain `await nc.drain()` on a connection with an active JetStream pull
+    subscription has been observed to block for 20+ seconds (well past the
+    orchestrator's stop grace period), which stops the caller from ever
+    reaching `provider.shutdown()`. Give drain a short budget and fall back
+    to a hard close if it doesn't finish in time.
+    """
+    try:
+        await asyncio.wait_for(nc.drain(), timeout=DRAIN_TIMEOUT)
+    except Exception:
+        logger.exception("nc.drain() failed or timed out; closing connection instead")
+        with contextlib.suppress(Exception):
+            await nc.close()
 
 
 async def _handle_health(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
