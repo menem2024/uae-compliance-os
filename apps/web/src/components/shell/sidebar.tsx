@@ -69,18 +69,21 @@ export function Sidebar({ firm, mandateDays }: { firm: ShellFirm; mandateDays: n
       <Logo title={tHome("title")} latin={t("brandLatin")} />
 
       {/* Firm switcher (single Firm in Phase 0). */}
+      {/* No aria-label: the accessible name is the visible Firm name plus an sr-only action
+          suffix, so it always contains the visible label (WCAG 2.5.3 Label in Name). */}
       <button
         type="button"
-        aria-label={t("switchFirm")}
-        className="flex items-center gap-2.5 rounded-lg border bg-panel px-3 py-2.5 text-start text-foreground transition-colors hover:border-brand/40"
+        data-testid="firm-switcher"
+        className="lift flex items-center gap-2.5 rounded-lg border bg-panel px-3 py-2.5 text-start text-foreground hover:border-brand/40"
       >
-        <span className="flex size-[30px] shrink-0 items-center justify-center rounded-sm bg-brand-soft text-[13px] font-bold text-brand-ink">
+        <span aria-hidden className="flex size-[30px] shrink-0 items-center justify-center rounded-sm bg-brand-soft text-[13px] font-bold text-brand-ink">
           {initial}
         </span>
         <span className="flex min-w-0 grow flex-col gap-px">
           <span className="truncate text-[13px] font-semibold">{firm.name}</span>
           <span className="truncate text-[11px] text-muted-foreground">{t("firmWorkspace")}</span>
         </span>
+        <span className="sr-only">{` — ${t("switchFirmSuffix")}`}</span>
         <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
 

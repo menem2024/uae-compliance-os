@@ -20,7 +20,7 @@ export function MandateCard({ serverDays }: { serverDays: number }) {
   const t = useTranslations("Shell.mandate");
   const days = useDaysToMandate(serverDays);
   return (
-    <div className="relative flex flex-col gap-2.5 overflow-hidden rounded-xl border bg-panel p-4">
+    <div className="lift relative flex flex-col gap-2.5 overflow-hidden rounded-xl border bg-panel p-4">
       <svg
         width="160"
         height="160"
