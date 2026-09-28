@@ -1,0 +1,16 @@
+{
+  "name": "e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright smoke suite for the Phase 0 walking skeleton: web -> api-go -> NATS -> ai-py -> NATS -> api-go -> gRPC validator-rs, proved by one connected Tempo trace, plus firm-tenancy isolation.",
+  "scripts": {
+    "test": "playwright test",
+    "test:list": "playwright test --list",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.0",
+    "typescript": "5.9.3"
+  }
+}
