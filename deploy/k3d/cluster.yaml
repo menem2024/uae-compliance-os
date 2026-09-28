@@ -1,0 +1,31 @@
+# Local Kubernetes for Compliance OS (ADR 012): one k3s server, no agents.
+#   make k3d-up images-k3d helm-install && bash scripts/k3d-check.sh
+# Traefik (bundled with k3s) serves the two browser hostnames through the k3d
+# load balancer on host port 8081:
+#   http://compliance.localhost:8081          -> web
+#   http://zitadel.compliance.localhost:8081  -> zitadel
+# Browsers resolve *.localhost to loopback. api-go has no Ingress.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: compliance
+servers: 1
+agents: 0
+image: rancher/k3s:v1.35.5-k3s1
+ports:
+  - port: 8081:80
+    nodeFilters:
+      - loadbalancer
+options:
+  k3d:
+    wait: true
+    timeout: "180s"
+  k3s:
+    extraArgs:
+      # metrics-server is not needed locally; saves memory on a 7 GB host.
+      - arg: --disable=metrics-server
+        nodeFilters:
+          - server:*
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true

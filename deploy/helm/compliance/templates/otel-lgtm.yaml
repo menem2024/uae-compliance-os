@@ -1,0 +1,100 @@
+# grafana/otel-lgtm: a single-container OTel collector + Tempo + Loki +
+# Prometheus/Mimir + Grafana bundle, dev/local only (Phase 0 walking skeleton).
+# All four services export traces here; Tempo is asserted in the e2e smoke test.
+{{- $name := "otel-lgtm" -}}
+{{- $ctx := dict "root" $ "name" $name "component" "observability" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "compliance.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: grafana
+      port: 3000
+      targetPort: grafana
+      protocol: TCP
+    - name: tempo
+      port: 3200
+      targetPort: tempo
+      protocol: TCP
+    - name: otlp-grpc
+      port: 4317
+      targetPort: otlp-grpc
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "compliance.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "compliance.labels" $ctx | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 20
+      securityContext:
+        {{- include "compliance.podSecurityContext" (dict "uid" 1000) | nindent 8 }}
+      containers:
+        - name: {{ $name }}
+          image: {{ .Values.otelLgtm.image | quote }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grafana
+              containerPort: 3000
+              protocol: TCP
+            - name: tempo
+              containerPort: 3200
+              protocol: TCP
+            - name: otlp-grpc
+              containerPort: 4317
+              protocol: TCP
+            - name: otlp-http
+              containerPort: 4318
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: grafana
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: grafana
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.otelLgtm.resources | nindent 12 }}
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" false) | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: 1Gi
+        {{- include "compliance.tmpVolume" . | nindent 8 }}

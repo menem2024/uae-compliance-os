@@ -1,0 +1,9 @@
+dependencies:
+- name: nats
+  repository: https://nats-io.github.io/k8s/helm/charts/
+  version: 2.15.0
+- name: zitadel
+  repository: https://charts.zitadel.com
+  version: 10.0.6
+digest: sha256:f72ff480bd896b84c2aa8d248e6f58b8a9b4d5294db33e8aeb693b04b44d95de
+generated: "2026-09-28T08:22:18.718703016-07:00"

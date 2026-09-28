@@ -1,0 +1,78 @@
+{{- $name := "ai-py" -}}
+{{- $ctx := dict "root" $ "name" $name "component" "worker" -}}
+# ai-py is a NATS worker; the Service only exposes its health endpoint.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "compliance.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: health
+      port: 8081
+      targetPort: health
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.aiPy.replicas }}
+  selector:
+    matchLabels:
+      {{- include "compliance.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "compliance.labels" $ctx | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 20
+      securityContext:
+        {{- include "compliance.podSecurityContext" (dict "uid" 65532) | nindent 8 }}
+      containers:
+        - name: {{ $name }}
+          {{- include "compliance.serviceImage" $ctx | nindent 10 }}
+          ports:
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          env:
+            {{- range $k, $v := .Values.aiPy.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.aiPy.resources | nindent 12 }}
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" true) | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        {{- include "compliance.tmpVolume" . | nindent 8 }}

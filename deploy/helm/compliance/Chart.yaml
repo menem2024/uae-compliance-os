@@ -1,0 +1,17 @@
+apiVersion: v2
+name: compliance
+description: >-
+  Compliance OS Phase 0 walking skeleton: web, api-go, validator-rs and ai-py
+  with Postgres (CloudNativePG), NATS JetStream, Zitadel, Valkey and otel-lgtm.
+  Verified on k3d (ADR 012); the CloudNativePG operator is a prerequisite.
+type: application
+version: 0.1.0
+appVersion: "0.0.0-phase0"
+kubeVersion: ">=1.29.0-0"
+dependencies:
+  - name: nats
+    version: 2.15.0
+    repository: https://nats-io.github.io/k8s/helm/charts/
+  - name: zitadel
+    version: 10.0.6
+    repository: https://charts.zitadel.com

@@ -1,0 +1,10 @@
+# Values for the CloudNativePG operator (cnpg/cloudnative-pg), installed by
+# `make k3d-up` before the compliance chart (the chart's postgres Cluster CR
+# needs the CRDs). The chart's defaults already run the operator non-root with
+# a read-only root filesystem; this only bounds its memory for a 7 GB host.
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    memory: 256Mi

@@ -1,0 +1,112 @@
+{{- $name := "api-go" -}}
+{{- $ctx := dict "root" $ "name" $name "component" "api" -}}
+{{- $issuer := include "compliance.zitadelIssuer" . -}}
+# api-go is internal only: reached by web (BFF) through this ClusterIP
+# Service. It deliberately has no Ingress.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "compliance.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.apiGo.replicas }}
+  selector:
+    matchLabels:
+      {{- include "compliance.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "compliance.labels" $ctx | nindent 8 }}
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        {{- include "compliance.podSecurityContext" (dict "uid" 65532) | nindent 8 }}
+      {{- include "compliance.zitadelHostAliases" . | nindent 6 }}
+      containers:
+        - name: {{ $name }}
+          {{- include "compliance.serviceImage" $ctx | nindent 10 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            {{- range $k, $v := .Values.apiGo.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: compliance-db
+                  key: DATABASE_URL
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_SECRET_KEY
+            - name: ZITADEL_ISSUER
+              value: {{ $issuer | quote }}
+            - name: ZITADEL_JWKS_URL
+              value: {{ printf "%s/oauth/v2/keys" $issuer | quote }}
+            # Optional: the Zitadel project ID (not the OIDC client ID), so
+            # api-go can check the token audience; unset, the check is off.
+            # Written by the zitadel-bootstrap hook Job (files/bootstrap.sh),
+            # same Secret and CreateContainerConfigError wait as web's
+            # ZITADEL_CLIENT_ID/SECRET below.
+            - name: ZITADEL_AUDIENCE
+              valueFrom:
+                secretKeyRef:
+                  name: zitadel-oidc
+                  key: ZITADEL_AUDIENCE
+          # Startup waits for Postgres, NATS, MinIO and the Zitadel JWKS; the
+          # startup probe gives it up to 5 minutes before liveness applies.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.apiGo.resources | nindent 12 }}
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" true) | nindent 12 }}

@@ -5,7 +5,7 @@ K3D_VERSION := 5.9.0
 TF_VERSION := 1.16.4
 export PATH := $(BIN):$(HOME)/go/bin:$(PATH)
 
-.PHONY: tools gen proto-lint up down smoke test k3d-up k3d-down helm-install
+.PHONY: tools gen proto-lint up down smoke test k3d-up k3d-down helm-install images-k3d
 
 tools:
 	mkdir -p $(BIN)
@@ -41,3 +41,29 @@ test:
 	cd services/validator-rs && cargo test
 	cd services/api-go && go test ./...
 	cd services/ai-py && uv run pytest -q
+
+# Story 10: Helm umbrella chart on k3d (ADR 012). One k3d cluster or compose
+# stack at a time (7 GB RAM rule) — never run both together.
+k3d-up:
+	k3d cluster create --config deploy/k3d/cluster.yaml
+	helm repo add cnpg https://cloudnative-pg.github.io/charts
+	helm repo update cnpg
+	helm upgrade --install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace --wait -f deploy/k3d/cnpg-values.yaml
+
+k3d-down:
+	k3d cluster delete --config deploy/k3d/cluster.yaml
+
+# Builds the four service images plus the Zitadel bootstrap tools image, all
+# tagged :dev (values.yaml sets image.tag: dev, pullPolicy: Never), and
+# imports them into the running k3d cluster so nothing is pulled.
+images-k3d:
+	docker build -f services/api-go/Dockerfile -t api-go:dev .
+	docker build -f services/validator-rs/Dockerfile -t validator-rs:dev .
+	docker build -f services/ai-py/Dockerfile -t ai-py:dev .
+	docker build -f apps/web/Dockerfile -t web:dev .
+	docker build -t zitadel-bootstrap:dev deploy/k3d/bootstrap-tools
+	k3d image import api-go:dev validator-rs:dev ai-py:dev web:dev zitadel-bootstrap:dev -c compliance
+
+helm-install:
+	helm dependency build deploy/helm/compliance
+	helm upgrade --install compliance deploy/helm/compliance -n compliance --create-namespace --wait --timeout 10m

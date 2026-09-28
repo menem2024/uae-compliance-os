@@ -1,0 +1,47 @@
+# CloudNativePG Cluster: single instance, replaying deploy/compose/postgres/init.sql.
+# The operator (installed by `make k3d-up`) provides the postgresql.cnpg.io CRDs.
+#
+# CNPG creates the `compliance` database and its owner role itself, from
+# bootstrap.initdb.database/owner/secret (the Secret compliance-db-owner).
+# postInitSQL runs once, as superuser, connected to the `postgres` maintenance
+# database, right after initdb and BEFORE the compliance database/owner are
+# created: it carries the remaining role statements from init.sql (everything
+# but the compliance_owner/compliance role, which CNPG itself creates) plus the
+# zitadel database, since CNPG only creates one application database this way.
+# postInitApplicationSQL runs after, connected to `compliance`: the schema
+# grants from init.sql's `\connect compliance` section.
+{{- $ctx := dict "root" $ "name" "postgres" "component" "database" }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.postgres.clusterName }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  instances: {{ .Values.postgres.instances }}
+  imageName: {{ .Values.postgres.image | quote }}
+  # No exposed Postgres superuser in-cluster: every service connects as its
+  # own least-privilege role (compliance_app, compliance_owner or zitadel).
+  enableSuperuserAccess: false
+  storage:
+    size: {{ .Values.postgres.storageSize | quote }}
+  bootstrap:
+    initdb:
+      database: compliance
+      owner: compliance_owner
+      secret:
+        name: compliance-db-owner
+      postInitSQL:
+        - "CREATE ROLE compliance_app LOGIN PASSWORD '{{ .Values.secrets.postgres.appPassword }}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;"
+        - "CREATE ROLE zitadel LOGIN PASSWORD '{{ .Values.secrets.postgres.zitadelPassword }}' CREATEDB;"
+        - "CREATE DATABASE zitadel OWNER zitadel;"
+        - "REVOKE ALL ON DATABASE zitadel FROM PUBLIC;"
+        - "GRANT CONNECT, CREATE, TEMPORARY ON DATABASE zitadel TO zitadel;"
+      postInitApplicationSQL:
+        - "REVOKE ALL ON SCHEMA public FROM PUBLIC;"
+        - "GRANT USAGE, CREATE ON SCHEMA public TO compliance_owner;"
+        - "GRANT USAGE ON SCHEMA public TO compliance_app;"
+        - "REVOKE ALL ON DATABASE compliance FROM PUBLIC;"
+        - "GRANT CONNECT ON DATABASE compliance TO compliance_owner, compliance_app;"
+  resources:
+    {{- toYaml .Values.postgres.resources | nindent 4 }}

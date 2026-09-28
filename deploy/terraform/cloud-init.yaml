@@ -1,0 +1,6 @@
+#cloud-config
+# Installs k3s on first boot. Staging deploys the same deploy/helm/compliance
+# chart onto this k3s server that deploy/k3d/cluster.yaml runs locally.
+package_update: true
+runcmd:
+  - curl -sfL https://get.k3s.io | sh -

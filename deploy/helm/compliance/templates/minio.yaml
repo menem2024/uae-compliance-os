@@ -1,0 +1,102 @@
+# MinIO for k3d/local dev only: api-go always needs an S3-compatible endpoint
+# (it creates and /readyz-checks the `documents` bucket on startup) and has no
+# switch to run without one. minio/minio is no longer pullable (401), so this
+# uses bitnamilegacy/minio, a pinned image that is; staging replaces this
+# Deployment with Cloudflare R2 (set minio.enabled=false and point
+# apiGo.env.MINIO_ENDPOINT at R2 instead).
+{{- if .Values.minio.enabled }}
+{{- $name := "minio" -}}
+{{- $ctx := dict "root" $ "name" $name "component" "storage" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "compliance.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+      protocol: TCP
+    - name: console
+      port: 9001
+      targetPort: console
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "compliance.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "compliance.labels" $ctx | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 20
+      securityContext:
+        {{- include "compliance.podSecurityContext" (dict "uid" 1001) | nindent 8 }}
+      containers:
+        - name: {{ $name }}
+          image: {{ .Values.minio.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["minio", "server", "/data", "--console-address", ":9001"]
+          ports:
+            - name: api
+              containerPort: 9000
+              protocol: TCP
+            - name: console
+              containerPort: 9001
+              protocol: TCP
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.minio.resources | nindent 12 }}
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" false) | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: 1Gi
+{{- end }}

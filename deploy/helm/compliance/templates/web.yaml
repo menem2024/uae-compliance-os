@@ -1,0 +1,127 @@
+{{- $name := "web" -}}
+{{- $ctx := dict "root" $ "name" $name "component" "frontend" -}}
+{{- $webURL := include "compliance.webURL" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "compliance.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+---
+# The only Ingress for the application services: browsers reach web, and web
+# (BFF) reaches api-go in-cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.public.webHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $name }}
+                port:
+                  name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels:
+      {{- include "compliance.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "compliance.labels" $ctx | nindent 8 }}
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        {{- include "compliance.podSecurityContext" (dict "uid" 1000) | nindent 8 }}
+      {{- include "compliance.zitadelHostAliases" . | nindent 6 }}
+      containers:
+        - name: {{ $name }}
+          {{- include "compliance.serviceImage" $ctx | nindent 10 }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            {{- range $k, $v := .Values.web.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            - name: AUTH_URL
+              value: {{ $webURL | quote }}
+            - name: ZITADEL_ISSUER
+              value: {{ include "compliance.zitadelIssuer" . | quote }}
+            # Written by the zitadel-bootstrap hook Job; the pod waits in
+            # CreateContainerConfigError until the keys exist.
+            - name: ZITADEL_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: zitadel-oidc
+                  key: ZITADEL_CLIENT_ID
+            - name: ZITADEL_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: zitadel-oidc
+                  key: ZITADEL_CLIENT_SECRET
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: web-auth
+                  key: AUTH_SECRET
+          readinessProbe:
+            httpGet:
+              path: /ar
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /ar
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" true) | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: next-cache
+              mountPath: /app/.next/cache
+      volumes:
+        {{- include "compliance.tmpVolume" . | nindent 8 }}
+        - name: next-cache
+          emptyDir:
+            sizeLimit: 256Mi

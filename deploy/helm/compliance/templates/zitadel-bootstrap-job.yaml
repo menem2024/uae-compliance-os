@@ -1,0 +1,142 @@
+# Zitadel bootstrap: creates the "compliance" project, the "web" OIDC app and
+# the two demo firms/orgs, then writes the OIDC client into Secret zitadel-oidc.
+# See files/bootstrap.sh (adapted from Story 6's compose bootstrap.sh).
+{{- $name := "zitadel-bootstrap" -}}
+{{- $ctx := dict "root" $ "name" $name "component" "bootstrap" -}}
+{{- $issuer := include "compliance.zitadelIssuer" . -}}
+{{- $webURL := include "compliance.webURL" . }}
+---
+# Fixed-ClusterIP Service for the zitadel subchart's own pods, aliased by
+# hostAliases (see compliance.zitadelHostAliases in _helpers.tpl) to the
+# public hostname `zitadel.compliance.localhost`. This gives browsers, web,
+# api-go and this bootstrap Job the exact same issuer URL, with no Host
+# overrides — the in-cluster counterpart of the compose network alias.
+{{- if .Values.zitadelAlias.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: zitadel-public
+  labels:
+    {{- include "compliance.labels" (dict "root" $ "name" "zitadel" "component" "auth") | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: {{ .Values.zitadelAlias.clusterIP | quote }}
+  selector:
+    app.kubernetes.io/name: zitadel
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: start
+  ports:
+    - name: http2-server
+      port: {{ .Values.public.port }}
+      targetPort: 8080
+      protocol: TCP
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ $name }}
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+data:
+  bootstrap.sh: |-
+{{ .Files.Get "files/bootstrap.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "compliance.labels" $ctx | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: true
+      enableServiceLinks: false
+      securityContext:
+        {{- include "compliance.podSecurityContext" (dict "uid" 65532) | nindent 8 }}
+      {{- include "compliance.zitadelHostAliases" . | nindent 6 }}
+      containers:
+        - name: {{ $name }}
+          image: {{ printf "%s:%s" .Values.bootstrap.image .Values.image.tag | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["/scripts/bootstrap.sh"]
+          env:
+            - name: ZITADEL_URL
+              value: {{ $issuer | quote }}
+            - name: WEB_URL
+              value: {{ $webURL | quote }}
+            - name: NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: PAT_FILE
+              value: /secrets/pat
+            - name: DATABASE_OWNER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: compliance-db
+                  key: DATABASE_OWNER_URL
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+            - name: pat
+              mountPath: /secrets
+              readOnly: true
+          resources:
+            {{- toYaml .Values.bootstrap.resources | nindent 12 }}
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" true) | nindent 12 }}
+      volumes:
+        - name: script
+          configMap:
+            name: {{ $name }}
+            defaultMode: 0555
+        - name: pat
+          secret:
+            # Written by the zitadel subchart's setup Job machinekeyWriter
+            # sidecar, named after FirstInstance.Org.Machine.Machine.Username.
+            secretName: {{ .Values.bootstrap.patSecret }}

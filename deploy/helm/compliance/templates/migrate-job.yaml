@@ -1,0 +1,55 @@
+# Helm hook Job: `/api migrate` (goose migrations), using the owner DB role
+# for DDL. Runs post-install/post-upgrade, after the CNPG Cluster (a normal,
+# non-hook resource, so it is created before any hook runs) but before the
+# Zitadel bootstrap Job, which needs the `firms` table to exist.
+{{- $name := "migrate" -}}
+{{- $ctx := dict "root" $ "name" $name "component" "migrate" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "compliance.labels" $ctx | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- include "compliance.podSecurityContext" (dict "uid" 65532) | nindent 8 }}
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.postgres.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - until pg_isready -h {{ .Values.postgres.clusterName }}-rw -p 5432 -d compliance; do sleep 2; done
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" true) | nindent 12 }}
+          resources:
+            {{- toYaml .Values.waitForPostgres.resources | nindent 12 }}
+      containers:
+        - name: {{ $name }}
+          {{- include "compliance.serviceImage" (dict "root" $ "name" "api-go") | nindent 10 }}
+          args: ["migrate"]
+          env:
+            - name: DATABASE_OWNER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: compliance-db
+                  key: DATABASE_OWNER_URL
+          resources:
+            {{- toYaml .Values.migrate.resources | nindent 12 }}
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" true) | nindent 12 }}

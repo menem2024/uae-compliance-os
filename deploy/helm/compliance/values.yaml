@@ -1,0 +1,422 @@
+# Compliance OS umbrella chart: default values target the local k3d cluster
+# (deploy/k3d/cluster.yaml). Env names match deploy/compose/compose.yaml.
+# Every image is pinned; the four service images are built locally with the
+# `dev` tag and imported into k3d (`make images-k3d`), so they are never pulled.
+
+# Label on every pod and object this chart owns (k3d-check waits on it).
+partOf: compliance
+
+# The four service images (api-go, validator-rs, ai-py, web) and the bootstrap
+# tools image. Built from the repo root; see the Makefile target images-k3d.
+image:
+  tag: dev
+  pullPolicy: Never
+
+# Browser-facing entrypoint: Traefik behind the k3d load balancer (host port
+# 8081). Both hostnames are *.localhost, which browsers resolve to loopback.
+# Must agree with zitadel.zitadel.configmapConfig.External* (checked at render).
+public:
+  secure: false
+  port: 8081
+  webHost: compliance.localhost
+  zitadelHost: zitadel.compliance.localhost
+
+ingress:
+  className: traefik
+
+# Server-side callers (web, api-go, zitadel-bootstrap) reach Zitadel under its
+# public name through a Service with a fixed ClusterIP (inside k3s's default
+# 10.43.0.0/16 service range) listening on the public port, plus hostAliases.
+# Disable where the public hostname resolves from inside the cluster (staging).
+zitadelAlias:
+  enabled: true
+  clusterIP: 10.43.200.81
+
+# Dev-only credentials, identical to compose and allowlisted in .gitleaks.toml.
+# Staging sets create=false and provides the same Secrets via sealed-secrets.
+secrets:
+  create: true
+  postgres:
+    ownerPassword: owner_dev_pw
+    appPassword: app_dev_pw
+    zitadelPassword: zitadel_dev_pw
+  minio:
+    rootUser: minio
+    rootPassword: minio_dev_pw
+  authSecret: "dev-only-secret-change-me-32chars!!"
+  zitadelMasterkey: MasterkeyNeedsToHave32Characters
+
+# CloudNativePG Cluster (operator installed by `make k3d-up`). Bootstrap
+# replays deploy/compose/postgres/init.sql: roles and the zitadel database via
+# postInitSQLRefs, compliance database grants via postInitApplicationSQL.
+postgres:
+  clusterName: postgres
+  image: ghcr.io/cloudnative-pg/postgresql:17.6-minimal-bookworm
+  instances: 1
+  storageSize: 1Gi
+  sslMode: require
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+apiGo:
+  replicas: 1
+  env:
+    HTTP_ADDR: ":8080"
+    NATS_URL: nats://nats:4222
+    VALIDATOR_ADDR: http://validator-rs:50051
+    VALKEY_ADDR: valkey:6379
+    MINIO_ENDPOINT: minio:9000
+    MINIO_USE_SSL: "false"
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
+    OTEL_SERVICE_NAME: api-go
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+validatorRs:
+  replicas: 1
+  env:
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
+    OTEL_SERVICE_NAME: validator-rs
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+aiPy:
+  replicas: 1
+  env:
+    NATS_URL: nats://nats:4222
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
+    OTEL_EXPORTER_OTLP_TIMEOUT: "2"
+    OTEL_SERVICE_NAME: ai-py
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+web:
+  replicas: 1
+  env:
+    API_URL: http://api-go:8080
+    AUTH_TRUST_HOST: "true"
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+    OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    OTEL_SERVICE_NAME: web
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+valkey:
+  image: valkey/valkey:8.1.10-alpine
+  storageSize: 256Mi
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+otelLgtm:
+  image: grafana/otel-lgtm:0.11.10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1280Mi
+
+# MinIO for k3d only: api-go has no switch to run without object storage (it
+# creates and /readyz-checks the `documents` bucket), and staging will use
+# Cloudflare R2 (set enabled=false and point apiGo.env.MINIO_ENDPOINT at R2).
+# The minio/minio release images are no longer pullable; bitnamilegacy/minio is.
+minio:
+  enabled: true
+  image: bitnamilegacy/minio:2025.7.23
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 384Mi
+
+# Helm hook Job `migrate`: `/api migrate` with DATABASE_OWNER_URL.
+migrate:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+# Helm hook Job `zitadel-bootstrap`: runs deploy/compose/zitadel/bootstrap.sh
+# (symlinked into files/) and stores the OIDC client in Secret zitadel-oidc.
+bootstrap:
+  image: zitadel-bootstrap
+  # Secret written by the chart's Zitadel setup job with the FirstInstance PAT.
+  patSecret: bootstrap-admin-pat
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+# Image used by init containers that wait for Postgres (pg_isready); the same
+# image as the database, so the node already has it.
+waitForPostgres:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# ---------------------------------------------------------------------------
+# Subchart: nats (JetStream, single node).
+nats:
+  fullnameOverride: nats
+  global:
+    labels:
+      app.kubernetes.io/part-of: compliance
+  config:
+    jetstream:
+      enabled: true
+      fileStore:
+        pvc:
+          size: 1Gi
+        maxSize: 1Gi
+  container:
+    image:
+      repository: nats
+      tag: 2.15.0-alpine
+    merge:
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+  podTemplate:
+    merge:
+      spec:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          fsGroup: 1000
+          seccompProfile:
+            type: RuntimeDefault
+  reloader:
+    enabled: false
+  natsBox:
+    enabled: false
+
+# ---------------------------------------------------------------------------
+# Subchart: zitadel, pointed at the CNPG Postgres. Its init/setup Jobs run as
+# post-install hooks (the database is a regular release resource, so pre-install
+# hooks would wait for a database that does not exist yet).
+zitadel:
+  fullnameOverride: zitadel
+  replicaCount: 1
+  image:
+    # Same Zitadel as compose (the e2e login selectors target it).
+    tag: v4.3.0
+  login:
+    # Single Zitadel container, as in compose: the hosted login v1 is served
+    # by Zitadel itself (LoginV2.Required=false below).
+    enabled: false
+  tools:
+    kubectl:
+      image:
+        tag: "1.35.5"
+    wait4x:
+      image:
+        tag: "3.6"
+  zitadel:
+    masterkeySecretName: zitadel-masterkey
+    configmapConfig:
+      ExternalDomain: zitadel.compliance.localhost
+      ExternalPort: 8081
+      ExternalSecure: false
+      TLS:
+        Enabled: false
+      Database:
+        Postgres:
+          Host: postgres-rw
+          Port: 5432
+          Database: zitadel
+          MaxOpenConns: 10
+          MaxIdleConns: 5
+          MaxConnLifetime: 30m
+          MaxConnIdleTime: 5m
+          User:
+            Username: zitadel
+            SSL:
+              Mode: require
+          # The init Job runs only `zitadel init zitadel` (schemas, as the
+          # zitadel role); the role and database come from the CNPG bootstrap.
+          Admin:
+            Username: zitadel
+            SSL:
+              Mode: require
+      FirstInstance:
+        Org:
+          Name: Platform
+          Machine:
+            Machine:
+              Username: bootstrap-admin
+              Name: Bootstrap Admin
+            MachineKey: null
+            Pat:
+              ExpirationDate: "2030-01-01T00:00:00Z"
+      DefaultInstance:
+        Features:
+          LoginV2:
+            Required: false
+    initContainers:
+      - name: wait-for-postgres
+        image: ghcr.io/cloudnative-pg/postgresql:17.6-minimal-bookworm
+        command: ["sh", "-c", "until pg_isready -h postgres-rw -p 5432 -d zitadel; do sleep 2; done"]
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+  env:
+    - name: ZITADEL_DATABASE_POSTGRES_USER_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: zitadel-db
+          key: password
+    - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: zitadel-db
+          key: password
+  podAdditionalLabels:
+    app.kubernetes.io/part-of: compliance
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    readOnlyRootFilesystem: true
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 768Mi
+  startupProbe:
+    enabled: true
+    periodSeconds: 5
+    failureThreshold: 60
+  ingress:
+    enabled: true
+    className: traefik
+    hosts:
+      - host: zitadel.compliance.localhost
+        paths:
+          - path: /
+            pathType: Prefix
+  initJob:
+    command: zitadel
+    activeDeadlineSeconds: 900
+    annotations:
+      helm.sh/hook: post-install,post-upgrade
+      helm.sh/hook-delete-policy: before-hook-creation
+      helm.sh/hook-weight: "-10"
+    podAdditionalLabels:
+      app.kubernetes.io/part-of: compliance
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+  setupJob:
+    activeDeadlineSeconds: 900
+    annotations:
+      helm.sh/hook: post-install,post-upgrade
+      helm.sh/hook-delete-policy: before-hook-creation
+      helm.sh/hook-weight: "-5"
+    podAdditionalLabels:
+      app.kubernetes.io/part-of: compliance
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 768Mi
+    machinekeyWriter:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+  cleanupJob:
+    podAdditionalLabels:
+      app.kubernetes.io/part-of: compliance
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
