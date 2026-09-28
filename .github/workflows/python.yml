@@ -27,7 +27,7 @@ jobs:
 
       # Python 3.14 is pinned by services/ai-py/.python-version; uv downloads
       # and manages the interpreter itself, so no actions/setup-python is needed.
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
           cache-dependency-glob: services/ai-py/uv.lock

@@ -6,12 +6,14 @@ on:
     paths:
       - "services/api-go/**"
       - "proto/**"
+      - "deploy/compose/postgres/init.sql"
       - ".github/workflows/go.yml"
   pull_request:
     branches: [main]
     paths:
       - "services/api-go/**"
       - "proto/**"
+      - "deploy/compose/postgres/init.sql"
       - ".github/workflows/go.yml"
 
 concurrency:
@@ -44,13 +46,10 @@ jobs:
           go-version-file: services/api-go/go.mod
           cache-dependency-path: services/api-go/go.sum
 
-      # golangci-lint is intentionally not wired up here. A local run of
-      # `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run ./...`
-      # against the current services/api-go code reports 5 pre-existing findings
-      # (2 errcheck in cmd/api/main.go and internal/db/migrate.go, 3 staticcheck
-      # SA1019 deprecations in internal/validator/client.go). Fixing Go source is
-      # out of scope for this CI story (see story-9-report.md). Re-add a
-      # golangci-lint step once those findings are cleared in services/api-go.
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: services/api-go
+          version: v2.14.0
 
       - name: go vet
         working-directory: services/api-go

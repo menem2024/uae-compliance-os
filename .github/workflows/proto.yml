@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - "proto/**"
+      - "Makefile"
       - ".github/workflows/proto.yml"
   pull_request:
     branches: [main]
     paths:
       - "proto/**"
+      - "Makefile"
       - ".github/workflows/proto.yml"
 
 concurrency:
@@ -30,6 +32,7 @@ jobs:
 
       - uses: bufbuild/buf-action@v1
         with:
+          version: 1.73.0
           input: proto
           lint: true
           format: true
@@ -49,7 +52,7 @@ jobs:
           go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
           cache-dependency-glob: services/ai-py/uv.lock
