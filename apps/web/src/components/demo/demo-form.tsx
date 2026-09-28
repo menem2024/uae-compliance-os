@@ -1,20 +1,20 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, CircleAlert, Copy, FlaskConical, Loader2, Send, TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useId, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { GeometricPattern } from "@/components/geometric-pattern";
 import { StatusPill, isInvoiceStatus } from "@/components/ui/status-pill";
-import { DEMO_FIXED, demoInvoice, isTerminalStatus, localDateISO, pollInterval } from "@/lib/demo";
+import { DEMO_FIXED, demoInvoice, isTerminalStatus, localDateISO, nextPoll, pollExhausted } from "@/lib/demo";
 import { HttpError, type InvoiceIssue, type InvoiceResult } from "@/lib/invoice";
 import { cn } from "@/lib/utils";
 
 type Submission = { id: string; status: string; traceId: string | null };
 
-/** Stop polling after ~2 minutes even if the pipeline never reaches a terminal state. */
-const MAX_POLLS = 120;
+/** Raised in the UI when the poll cap is reached before the validator decided. */
+class PollTimeoutError extends Error {}
 const VALID_TRN = "100000000000003";
 const INVALID_TRN = "123";
 
@@ -51,6 +51,7 @@ export function DemoForm() {
   // The viewer's local date; empty on the server so a prerender never shows a stale day.
   const today = useSyncExternalStore(noopSubscribe, () => localDateISO(new Date()), () => "");
 
+  const queryClient = useQueryClient();
   const submit = useMutation({ mutationFn: submitInvoice });
   const submission = submit.data;
 
@@ -60,16 +61,27 @@ export function DemoForm() {
     enabled: !!submission?.id,
     retry: false,
     staleTime: 0,
-    refetchInterval: (q) => {
-      if (q.state.dataUpdateCount >= MAX_POLLS) return false;
-      // A 404 right after the 202 is a read-your-write race: keep polling. Other errors stop.
-      if (q.state.error) return q.state.error instanceof HttpError && q.state.error.status === 404 ? 1000 : false;
-      return pollInterval(q.state.data?.status);
-    },
+    refetchInterval: (q) =>
+      nextPoll({
+        dataUpdateCount: q.state.dataUpdateCount,
+        errorUpdateCount: q.state.errorUpdateCount,
+        status: q.state.data?.status,
+        errorStatus: q.state.error ? (q.state.error instanceof HttpError ? q.state.error.status : 0) : null,
+      }),
   });
 
   const status = invoice.data?.status ?? submission?.status;
-  const error = submit.error ?? (invoice.error instanceof HttpError && invoice.error.status !== 404 ? invoice.error : null);
+  const timedOut =
+    !!submission &&
+    !isTerminalStatus(status) &&
+    pollExhausted({
+      dataUpdateCount: queryClient.getQueryState(["invoice", submission?.id])?.dataUpdateCount ?? 0,
+      errorUpdateCount: invoice.errorUpdateCount,
+    });
+  const error =
+    submit.error ??
+    (invoice.error instanceof HttpError && invoice.error.status !== 404 ? invoice.error : null) ??
+    (timedOut ? new PollTimeoutError("poll timeout") : null);
   const polling = !!submission && !error && !isTerminalStatus(status);
 
   const onSubmit = (e: FormEvent) => {
@@ -310,6 +322,9 @@ function PendingState({ status }: { status: string | undefined }) {
 function IssueList({ issues }: { issues: InvoiceIssue[] }) {
   const t = useTranslations("DemoPage");
   const tDemo = useTranslations("Demo");
+  const tRules = useTranslations("Rules");
+  // Localise known rules by id; fall back to the validator's (English) message.
+  const ruleMessage = (issue: InvoiceIssue) => (tRules.has(issue.rule_id) ? tRules(issue.rule_id) : issue.message);
   return (
     <div className="flex flex-col gap-2.5">
       <h3 className="flex items-center gap-2 text-[13px] font-semibold">
@@ -342,7 +357,7 @@ function IssueList({ issues }: { issues: InvoiceIssue[] }) {
                   {t(`severity.${warning ? "warning" : "error"}`)}
                 </span>
               </div>
-              <p className="text-sm leading-6 font-medium">{issue.message}</p>
+              <p className="text-sm leading-6 font-medium">{ruleMessage(issue)}</p>
               {issue.path && (
                 <p className="text-xs text-muted-foreground">
                   {t("path")}:{" "}
@@ -377,7 +392,7 @@ function ValidatedCard() {
 
 function ErrorCard({ error }: { error: Error }) {
   const t = useTranslations("DemoPage");
-  const code = error instanceof HttpError ? String(error.status) : "other";
+  const code = error instanceof PollTimeoutError ? "timeout" : error instanceof HttpError ? String(error.status) : "other";
   return (
     <div
       role="alert"

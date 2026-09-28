@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { demoInvoice, isTerminalStatus, localDateISO, pollInterval } from "./demo";
+import { MAX_POLLS, demoInvoice, isTerminalStatus, localDateISO, nextPoll, pollExhausted, pollInterval } from "./demo";
 
 describe("localDateISO", () => {
   it("formats the viewer's local calendar date as YYYY-MM-DD with Western digits", () => {
@@ -36,5 +36,25 @@ describe("isTerminalStatus / pollInterval", () => {
       expect(isTerminalStatus(s)).toBe(false);
       expect(pollInterval(s)).toBe(1000);
     }
+  });
+});
+
+describe("nextPoll / pollExhausted", () => {
+  const base = { dataUpdateCount: 0, errorUpdateCount: 0 };
+  it("keeps polling through a transient 404 (read-your-write race)", () => {
+    expect(nextPoll({ ...base, errorUpdateCount: 3, errorStatus: 404 })).toBe(1000);
+  });
+  it("stops on non-404 errors", () => {
+    expect(nextPoll({ ...base, errorUpdateCount: 1, errorStatus: 500 })).toBe(false);
+  });
+  it("caps total polls, counting errors as well as successes", () => {
+    expect(nextPoll({ dataUpdateCount: 0, errorUpdateCount: MAX_POLLS, errorStatus: 404 })).toBe(false);
+    expect(nextPoll({ dataUpdateCount: 60, errorUpdateCount: 60, status: "uploaded" })).toBe(false);
+    expect(pollExhausted({ dataUpdateCount: 60, errorUpdateCount: 60 })).toBe(true);
+    expect(pollExhausted({ dataUpdateCount: 60, errorUpdateCount: 59 })).toBe(false);
+  });
+  it("defers to the status when there is no error", () => {
+    expect(nextPoll({ ...base, dataUpdateCount: 2, status: "extracted" })).toBe(1000);
+    expect(nextPoll({ ...base, dataUpdateCount: 2, status: "validated" })).toBe(false);
   });
 });

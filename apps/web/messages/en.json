@@ -113,7 +113,7 @@
     "copied": "Copied",
     "live": "Live",
     "errorTitle": "The request failed",
-    "errorBody": "{code, select, 400 {api-go rejected the invoice payload.} 401 {Your session has expired. Sign in again.} 403 {Your account has no access to this Firm.} 404 {The invoice was not found.} 429 {Too many requests. Wait a moment and try again.} 502 {The API is unreachable right now.} other {Something went wrong. Try again.}}"
+    "errorBody": "{code, select, 400 {api-go rejected the invoice payload.} 401 {Your session has expired. Sign in again.} 403 {Your account has no access to this Firm.} 404 {The invoice was not found.} 429 {Too many requests. Wait a moment and try again.} 502 {The API is unreachable right now.} timeout {Timed out waiting for the result. A service may be down; try again later.} other {Something went wrong. Try again.}}"
   },
   "Status": {
     "uploaded": "Uploaded",
@@ -148,5 +148,8 @@
         "text": "Every change needs your approval and is audit-logged"
       }
     }
+  },
+  "Rules": {
+    "AE-TRN-001": "Seller TRN must be exactly 15 digits"
   }
 }

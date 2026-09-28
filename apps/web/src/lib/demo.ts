@@ -31,3 +31,28 @@ export function isTerminalStatus(status: string | undefined): boolean {
 export function pollInterval(status: string | undefined): number | false {
   return isTerminalStatus(status) ? false : 1000;
 }
+
+/** Hard cap on result polls (successes and errors combined): about 2 minutes at 1/s. */
+export const MAX_POLLS = 120;
+
+export type PollState = {
+  dataUpdateCount: number;
+  errorUpdateCount: number;
+  status?: string;
+  /** HTTP status of the last failed poll, if the last poll failed. */
+  errorStatus?: number | null;
+};
+
+export function pollExhausted(s: Pick<PollState, "dataUpdateCount" | "errorUpdateCount">): boolean {
+  return s.dataUpdateCount + s.errorUpdateCount >= MAX_POLLS;
+}
+
+/**
+ * TanStack `refetchInterval` for the demo result. A 404 right after the 202 is a
+ * read-your-write race, so it keeps polling; other errors stop. Everything is capped.
+ */
+export function nextPoll(s: PollState): number | false {
+  if (pollExhausted(s)) return false;
+  if (s.errorStatus != null) return s.errorStatus === 404 ? 1000 : false;
+  return pollInterval(s.status);
+}
