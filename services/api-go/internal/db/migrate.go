@@ -19,7 +19,7 @@ func Migrate(ctx context.Context, ownerURL string) error {
 	if err != nil {
 		return err
 	}
-	defer sqldb.Close()
+	defer func() { _ = sqldb.Close() }()
 	dir, err := fs.Sub(migrations, "migrations")
 	if err != nil {
 		return err

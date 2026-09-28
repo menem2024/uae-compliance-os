@@ -88,7 +88,7 @@ func healthcheck() error {
 	if err != nil {
 		return fmt.Errorf("healthcheck: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("healthcheck: readyz returned %d", resp.StatusCode)
 	}

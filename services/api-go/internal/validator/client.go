@@ -3,7 +3,6 @@ package validator
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
-	"golang.org/x/net/http2"
 
 	"github.com/menem2024/uae-platform/services/api-go/gen/compliance/v1/compliancev1connect"
 )
@@ -24,11 +22,13 @@ func New(addr string) (compliancev1connect.ValidatorServiceClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("otelconnect interceptor: %w", err)
 	}
+	var protocols http.Protocols
+	protocols.SetUnencryptedHTTP2(true)
 	httpClient := &http.Client{
 		Timeout: 15 * time.Second,
-		Transport: &http2.Transport{
-			AllowHTTP: true,
-			DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		Transport: &http.Transport{
+			Protocols: &protocols,
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, network, addr)
 			},
 		},
