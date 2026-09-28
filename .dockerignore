@@ -1,0 +1,10 @@
+.git
+.ship
+**/node_modules
+**/.next
+**/target
+**/.venv
+**/__pycache__
+e2e/test-results
+e2e/playwright-report
+deploy/terraform/.terraform
