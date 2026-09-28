@@ -4,7 +4,9 @@ package events
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -49,8 +51,13 @@ func Connect(url string) (*nats.Conn, jetstream.JetStream, error) {
 	return nc, js, nil
 }
 
+// streamManager creates streams; jetstream.JetStream satisfies it.
+type streamManager interface {
+	CreateOrUpdateStream(ctx context.Context, cfg jetstream.StreamConfig) (jetstream.Stream, error)
+}
+
 // EnsureStreams idempotently creates or updates the INVOICES and DLQ streams.
-func EnsureStreams(ctx context.Context, js jetstream.JetStream) error {
+func EnsureStreams(ctx context.Context, js streamManager) error {
 	for _, cfg := range []jetstream.StreamConfig{
 		{Name: InvoicesStream, Subjects: []string{"invoice.>"}, Storage: jetstream.FileStorage},
 		{Name: DLQStream, Subjects: []string{"dlq.>"}, Storage: jetstream.FileStorage},
@@ -67,11 +74,41 @@ type msgPublisher interface {
 	PublishMsg(ctx context.Context, msg *nats.Msg, opts ...jetstream.PublishOpt) (*jetstream.PubAck, error)
 }
 
+// streamRecoveringPublisher re-creates the streams and retries once when a
+// publish finds no stream (the server lost its JetStream state), so a lost
+// INVOICES or DLQ stream does not fail every publish until a restart.
+type streamRecoveringPublisher struct {
+	pub     msgPublisher
+	streams streamManager
+}
+
+func (p streamRecoveringPublisher) PublishMsg(ctx context.Context, msg *nats.Msg, opts ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
+	ack, err := p.pub.PublishMsg(ctx, msg, opts...)
+	if !errors.Is(err, jetstream.ErrNoStreamResponse) {
+		return ack, err
+	}
+	slog.WarnContext(ctx, "no stream for subject, re-creating streams", "subject", msg.Subject)
+	if serr := EnsureStreams(ctx, p.streams); serr != nil {
+		return nil, fmt.Errorf("%w (re-creating streams: %w)", err, serr)
+	}
+	return p.pub.PublishMsg(ctx, msg, opts...)
+}
+
+// withStreamRecovery adds stream re-creation to p when it can manage streams.
+func withStreamRecovery(p msgPublisher) msgPublisher {
+	if sm, ok := p.(streamManager); ok {
+		return streamRecoveringPublisher{pub: p, streams: sm}
+	}
+	return p
+}
+
 // Publisher publishes invoice events to JetStream.
 type Publisher struct{ js msgPublisher }
 
 // NewPublisher wraps a JetStream handle (or any PublishMsg implementation).
-func NewPublisher(js msgPublisher) *Publisher { return &Publisher{js: js} }
+// With a JetStream handle, a publish that finds its stream missing
+// re-creates the streams and retries once.
+func NewPublisher(js msgPublisher) *Publisher { return &Publisher{js: withStreamRecovery(js)} }
 
 // PublishSubmitted publishes invoice.submitted under a PRODUCER span and
 // injects its trace context into the NATS headers.

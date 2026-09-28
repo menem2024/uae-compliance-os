@@ -37,3 +37,24 @@ func TestLoadMissing(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestLoadAudience(t *testing.T) {
+	setAll(t)
+	t.Setenv("ZITADEL_AUDIENCE", "")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.ZitadelAudience) != 0 {
+		t.Errorf("unset ZITADEL_AUDIENCE: got %q, want none", c.ZitadelAudience)
+	}
+
+	t.Setenv("ZITADEL_AUDIENCE", " 312345678901234567 , client-web,, ")
+	c, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(c.ZitadelAudience, "|") != "312345678901234567|client-web" {
+		t.Errorf("got %q", c.ZitadelAudience)
+	}
+}

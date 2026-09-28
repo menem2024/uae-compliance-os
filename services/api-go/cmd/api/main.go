@@ -182,24 +182,30 @@ func serve(ctx context.Context) (err error) {
 		return startupAborted(err)
 	}
 
-	verifier, err := auth.NewJWKSVerifier(ctx, cfg.ZitadelIssuer, cfg.ZitadelJWKSURL)
+	if len(cfg.ZitadelAudience) == 0 {
+		slog.Warn("ZITADEL_AUDIENCE is unset: JWT audience validation is disabled")
+	}
+	verifier, err := auth.NewJWKSVerifier(ctx, cfg.ZitadelIssuer, cfg.ZitadelJWKSURL, auth.WithAudience(cfg.ZitadelAudience...))
 	if err != nil {
 		return startupAborted(err)
 	}
 
 	store := httpapi.PGStore{Pool: pool}
+	// The consumer re-creates its streams and durable whenever consumption
+	// stops (e.g. the durable was deleted or the server lost its state).
+	consumer := events.NewValidationConsumer(jsh, httpapi.HandleExtracted(store, vc), startupRetryInterval)
 	consumerCtx, stopConsumer := context.WithCancel(ctx)
 	defer stopConsumer()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		runConsumer(consumerCtx, jsh, httpapi.HandleExtracted(store, vc))
+		consumer.Run(consumerCtx)
 	}()
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewRouter(verifier, store, events.NewPublisher(jsh), ratelimit.New(rdb, cfg.RateLimitPerMinute), readiness(pool, nc, rdb, mc)),
+		Handler:           httpapi.NewRouter(verifier, store, events.NewPublisher(jsh), ratelimit.New(rdb, cfg.RateLimitPerMinute), readiness(pool, nc, rdb, mc, consumer)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	srvErr := make(chan error, 1)
@@ -251,31 +257,17 @@ func connectNATS(ctx context.Context, url string) (*nats.Conn, jetstream.JetStre
 	return nc, js, nil
 }
 
-// runConsumer keeps the validation consumer running until ctx is cancelled,
-// re-creating it if setup fails.
-func runConsumer(ctx context.Context, js jetstream.JetStream, h events.ExtractedHandler) {
-	for {
-		err := events.RunValidationConsumer(ctx, js, h)
-		if ctx.Err() != nil {
-			return
-		}
-		slog.Error("validation consumer stopped, restarting", "err", err)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(startupRetryInterval):
-		}
-	}
-}
-
 // readiness checks every dependency the API needs to serve traffic.
-func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.Client) func(context.Context) error {
+func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.Client, consumer *events.ValidationConsumer) func(context.Context) error {
 	return func(ctx context.Context) error {
 		if err := pool.Ping(ctx); err != nil {
 			return fmt.Errorf("postgres: %w", err)
 		}
 		if st := nc.Status(); st != nats.CONNECTED {
 			return fmt.Errorf("nats: status %s", st)
+		}
+		if err := consumer.Ready(ctx); err != nil {
+			return fmt.Errorf("nats: %w", err)
 		}
 		if err := rdb.Ping(ctx).Err(); err != nil {
 			return fmt.Errorf("valkey: %w", err)

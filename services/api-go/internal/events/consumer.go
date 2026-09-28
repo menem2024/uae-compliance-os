@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -36,9 +37,22 @@ var ErrPermanent = errors.New("permanent failure")
 // ExtractedHandler processes one invoice.extracted event.
 type ExtractedHandler func(ctx context.Context, ev *compliancev1.InvoiceExtracted) error
 
-// RunValidationConsumer consumes invoice.extracted with durable
-// api-validation until ctx is cancelled, then drains in-flight messages.
+// consumerCheckInterval is how often a running consumer confirms that its
+// durable still exists on the server (a backstop for a missed 409).
+var consumerCheckInterval = 10 * time.Second
+
+// RunValidationConsumer ensures the streams and the api-validation durable,
+// then consumes invoice.extracted until ctx is cancelled (drains in-flight
+// messages, returns nil) or consumption stops because the durable or stream
+// was lost (returns an error so the caller can recreate them).
 func RunValidationConsumer(ctx context.Context, js jetstream.JetStream, handle ExtractedHandler) error {
+	return runValidationSession(ctx, js, handle, nil)
+}
+
+func runValidationSession(ctx context.Context, js jetstream.JetStream, handle ExtractedHandler, running *atomic.Bool) error {
+	if err := EnsureStreams(ctx, js); err != nil {
+		return err
+	}
 	cons, err := js.CreateOrUpdateConsumer(ctx, InvoicesStream, jetstream.ConsumerConfig{
 		Durable:       ValidationDurable,
 		FilterSubject: ExtractedSubject,
@@ -49,22 +63,113 @@ func RunValidationConsumer(ctx context.Context, js jetstream.JetStream, handle E
 	if err != nil {
 		return fmt.Errorf("ensure consumer %s: %w", ValidationDurable, err)
 	}
+	// Any consume error (409, no responders, missed heartbeat) prompts a
+	// check that the durable still exists.
+	suspect := make(chan struct{}, 1)
+	onErr := jetstream.ConsumeErrHandler(func(_ jetstream.ConsumeContext, err error) {
+		slog.WarnContext(ctx, "validation consumer error", "durable", ValidationDurable, "err", err)
+		select {
+		case suspect <- struct{}{}:
+		default:
+		}
+	})
 	// Messages already being handled finish after shutdown starts.
 	msgCtx := context.WithoutCancel(ctx)
+	dlq := withStreamRecovery(js)
 	cc, err := cons.Consume(func(msg jetstream.Msg) {
-		processMessage(msgCtx, msg, js, handle)
-	})
+		processMessage(msgCtx, msg, dlq, handle)
+	}, onErr)
 	if err != nil {
 		return fmt.Errorf("consume %s: %w", ValidationDurable, err)
 	}
+	closed := cc.Closed()
+	if running != nil {
+		running.Store(true)
+		defer running.Store(false)
+	}
 	slog.InfoContext(ctx, "validation consumer started", "durable", ValidationDurable, "subject", ExtractedSubject)
-	<-ctx.Done()
-	cc.Drain()
-	select {
-	case <-cc.Closed():
-	case <-time.After(drainTimeout):
-		cc.Stop()
-		slog.Warn("validation consumer drain timed out")
+
+	ticker := time.NewTicker(consumerCheckInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			cc.Drain()
+			select {
+			case <-closed:
+			case <-time.After(drainTimeout):
+				cc.Stop()
+				slog.Warn("validation consumer drain timed out")
+			}
+			return nil
+		case <-closed: // nats.go stops consuming on 409 Consumer Deleted
+			return fmt.Errorf("consumer %s stopped unexpectedly (durable or stream deleted?)", ValidationDurable)
+		case <-suspect:
+		case <-ticker.C:
+		}
+		if err := durableLost(ctx, cons); err != nil {
+			cc.Stop()
+			select {
+			case <-closed:
+			case <-time.After(drainTimeout):
+			}
+			return fmt.Errorf("consumer %s lost: %w", ValidationDurable, err)
+		}
+	}
+}
+
+// durableLost returns an error only when the server says the durable or its
+// stream no longer exists; transient lookup failures (e.g. a reconnect) are
+// not treated as loss.
+func durableLost(ctx context.Context, cons jetstream.Consumer) error {
+	ictx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	_, err := cons.Info(ictx)
+	if errors.Is(err, jetstream.ErrConsumerNotFound) || errors.Is(err, jetstream.ErrStreamNotFound) {
+		return err
+	}
+	return nil
+}
+
+// ValidationConsumer keeps the api-validation consumer running: whenever
+// consumption stops it re-ensures the streams and the durable after
+// retryInterval. Ready reports its liveness for /readyz.
+type ValidationConsumer struct {
+	js            jetstream.JetStream
+	handle        ExtractedHandler
+	retryInterval time.Duration
+	running       atomic.Bool
+}
+
+// NewValidationConsumer returns a supervisor for the api-validation consumer.
+func NewValidationConsumer(js jetstream.JetStream, handle ExtractedHandler, retryInterval time.Duration) *ValidationConsumer {
+	return &ValidationConsumer{js: js, handle: handle, retryInterval: retryInterval}
+}
+
+// Run consumes until ctx is cancelled, restarting after any failure.
+func (c *ValidationConsumer) Run(ctx context.Context) {
+	for {
+		err := runValidationSession(ctx, c.js, c.handle, &c.running)
+		if ctx.Err() != nil {
+			return
+		}
+		slog.ErrorContext(ctx, "validation consumer stopped, restarting", "err", err, "retry_in", c.retryInterval)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(c.retryInterval):
+		}
+	}
+}
+
+// Ready returns nil only while the consumer is consuming and its durable
+// exists on the server.
+func (c *ValidationConsumer) Ready(ctx context.Context) error {
+	if !c.running.Load() {
+		return fmt.Errorf("consumer %s not running", ValidationDurable)
+	}
+	if _, err := c.js.Consumer(ctx, InvoicesStream, ValidationDurable); err != nil {
+		return fmt.Errorf("consumer %s: %w", ValidationDurable, err)
 	}
 	return nil
 }

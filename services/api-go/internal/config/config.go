@@ -20,6 +20,7 @@ type Config struct {
 	MinioUseSSL        bool
 	ZitadelIssuer      string
 	ZitadelJWKSURL     string
+	ZitadelAudience    []string // ZITADEL_AUDIENCE, comma-separated accepted aud values; empty disables the check
 	ServiceName        string
 	RateLimitPerMinute int64
 }
@@ -46,6 +47,7 @@ func Load() (Config, error) {
 		MinioUseSSL:        os.Getenv("MINIO_USE_SSL") == "true",
 		ZitadelIssuer:      req("ZITADEL_ISSUER"),
 		ZitadelJWKSURL:     req("ZITADEL_JWKS_URL"),
+		ZitadelAudience:    list(os.Getenv("ZITADEL_AUDIENCE")),
 		ServiceName:        env("OTEL_SERVICE_NAME", "api-go"),
 		RateLimitPerMinute: 60,
 	}
@@ -69,4 +71,15 @@ func env(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// list splits a comma-separated value, dropping blanks.
+func list(v string) []string {
+	var out []string
+	for _, p := range strings.Split(v, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
