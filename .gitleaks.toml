@@ -1,7 +1,12 @@
 [extend]
 useDefault = true
 
+# Only the known dev-only fixture values are allowlisted — never whole files.
 [allowlist]
 description = "dev-only fixtures"
-paths = ['''deploy/compose/compose\.yaml''', '''e2e/.*\.ts''']
-regexes = ['''Password1!''']
+regexes = [
+  '''Password1!''',
+  '''[a-z]+_dev_pw''',
+  '''dev-only-secret-change-me-32chars!!''',
+  '''MasterkeyNeedsToHave32Characters''',
+]
