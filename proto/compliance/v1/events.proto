@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package compliance.v1;
+
+import "compliance/v1/invoice.proto";
+
+// Published on subject invoice.submitted by api-go.
+message InvoiceSubmitted {
+  string invoice_id = 1;
+  string firm_id = 2;
+  Invoice invoice = 3;
+}
+
+// Published on subject invoice.extracted by ai-py.
+message InvoiceExtracted {
+  string invoice_id = 1;
+  string firm_id = 2;
+  Invoice invoice = 3;
+  double confidence = 4; // extraction confidence, not money
+}

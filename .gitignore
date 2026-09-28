@@ -1,0 +1,15 @@
+.ship/
+node_modules/
+.next/
+target/
+__pycache__/
+.venv/
+*.env
+.env*
+!.env.example
+deploy/compose/.env.generated
+deploy/compose/zitadel/*.pat
+deploy/terraform/.terraform/
+deploy/terraform/*.tfstate*
+e2e/test-results/
+e2e/playwright-report/

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package compliance.v1;
+
+// Invoice is the canonical invoice. Money is a decimal string, never a float.
+message Invoice {
+  string invoice_number = 1;
+  string issue_date = 2; // YYYY-MM-DD
+  string seller_trn = 3;
+  string buyer_trn = 4;
+  string currency = 5; // ISO 4217
+  string total_amount = 6; // decimal string, e.g. "1050.00"
+  string vat_amount = 7; // decimal string
+}

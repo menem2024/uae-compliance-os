@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package compliance.v1;
+
+import "compliance/v1/invoice.proto";
+
+service ValidatorService {
+  rpc Validate(ValidateRequest) returns (ValidateResponse);
+}
+
+message ValidateRequest {
+  Invoice invoice = 1;
+}
+
+message ValidateResponse {
+  ValidationRun run = 1;
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_ERROR = 1;
+  SEVERITY_WARNING = 2;
+}
+
+message ValidationIssue {
+  string rule_id = 1;
+  Severity severity = 2;
+  string path = 3;
+  string message = 4;
+}
+
+message ValidationRun {
+  string ruleset_version = 1;
+  repeated ValidationIssue issues = 2;
+}

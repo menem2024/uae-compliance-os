@@ -1,0 +1,35 @@
+[project]
+name = "ai"
+version = "0.1.0"
+description = "Compliance OS AI service: agents, RAG, data science"
+readme = "README.md"
+authors = [
+    { name = "Abdalmonem Khalel", email = "abdalmonemkhalel21@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "nats-py>=2.16.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.45.0",
+    "opentelemetry-sdk>=1.45.0",
+    "protobuf>=7.36.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "grpcio-tools>=1.84.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 110
+extend-exclude = ["src/ai/gen"]
