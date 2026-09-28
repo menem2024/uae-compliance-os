@@ -17,10 +17,11 @@ import (
 	"github.com/menem2024/uae-platform/services/api-go/internal/events"
 )
 
-// ValidationStore persists a validation outcome. It returns db.ErrNotFound
-// when the invoice is missing or hidden by RLS.
+// ValidationStore persists a validation outcome. SetValidation and Status
+// return db.ErrNotFound when the invoice is missing or hidden by RLS.
 type ValidationStore interface {
 	SetValidation(ctx context.Context, firmID, id uuid.UUID, status, rulesetVersion string, issues []byte) error
+	Status(ctx context.Context, firmID, id uuid.UUID) (string, error)
 }
 
 // ValidatorClient is the subset of compliancev1connect.ValidatorServiceClient used here.
@@ -39,6 +40,20 @@ func HandleExtracted(store ValidationStore, vc ValidatorClient) events.Extracted
 		id, err := uuid.Parse(ev.GetInvoiceId())
 		if err != nil {
 			return fmt.Errorf("%w: invoice_id %q: %w", events.ErrPermanent, ev.GetInvoiceId(), err)
+		}
+		// A redelivery of an already-terminal invoice (e.g. the retained
+		// INVOICES stream replays after the durable was recreated) is a
+		// no-op: skip and ack rather than re-validating and, on a permanent
+		// failure, re-publishing to the DLQ. If the status check itself
+		// can't find the invoice, fall through to the normal flow below,
+		// which fails the same way it always has.
+		switch cur, sErr := store.Status(ctx, firmID, id); {
+		case sErr == nil && db.IsTerminal(cur):
+			slog.InfoContext(ctx, "invoice already terminal, skipping redelivered invoice.extracted",
+				"invoice_id", id, "firm_id", firmID, "status", cur)
+			return nil
+		case sErr != nil && !errors.Is(sErr, db.ErrNotFound):
+			return fmt.Errorf("check invoice status %s: %w", id, sErr)
 		}
 		resp, err := vc.Validate(ctx, connect.NewRequest(&compliancev1.ValidateRequest{Invoice: ev.GetInvoice()}))
 		if err != nil {

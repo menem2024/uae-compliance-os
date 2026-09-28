@@ -28,5 +28,8 @@ func (h *handlers) me(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	if !h.checkRateLimit(w, r, f.ID) {
+		return
+	}
 	writeJSON(w, http.StatusOK, meResponse{FirmID: f.ID.String(), FirmName: f.Name, BrandColor: f.BrandColor})
 }

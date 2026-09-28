@@ -32,3 +32,14 @@ func TestMe(t *testing.T) {
 		t.Errorf("no token: %d", rec.Code)
 	}
 }
+
+// TestMeIsRateLimited: GET /v1/me does a DB query per call and was not
+// rate-limited; an authenticated caller could otherwise generate unbounded
+// backend load.
+func TestMeIsRateLimited(t *testing.T) {
+	firm := uuid.New()
+	h := NewRouter(fakeVerifier{}, fakeStore{firm: firm}, &fakePub{}, fakeLimiter{ok: false}, func(context.Context) error { return nil })
+	if rec := do(h, "GET", "/v1/me", "tok-a", ""); rec.Code != 429 {
+		t.Errorf("me: %d, want 429", rec.Code)
+	}
+}

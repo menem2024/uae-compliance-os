@@ -109,3 +109,14 @@ func TestInvoicesAPI(t *testing.T) {
 		t.Errorf("rate limit: %d published=%d", rec.Code, len(limited.got))
 	}
 }
+
+// TestGetInvoiceIsRateLimited: only POST /v1/invoices was rate-limited;
+// repeated GETs (each a DB transaction) could generate unbounded backend
+// load. GET must be limited too.
+func TestGetInvoiceIsRateLimited(t *testing.T) {
+	firm := uuid.New()
+	h := NewRouter(fakeVerifier{}, fakeStore{firm: firm}, &fakePub{}, fakeLimiter{ok: false}, func(context.Context) error { return nil })
+	if rec := do(h, "GET", "/v1/invoices/"+uuid.NewString(), "tok-a", ""); rec.Code != 429 {
+		t.Errorf("get invoice: %d, want 429", rec.Code)
+	}
+}

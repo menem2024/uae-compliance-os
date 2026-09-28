@@ -70,6 +70,79 @@ func TestVerify(t *testing.T) {
 	}
 }
 
+// signClaims builds a token with explicit exp/iat/nbf so tests can probe
+// skew tolerance precisely. A zero time.Time omits that claim.
+func signClaims(t *testing.T, key jwk.Key, iss string, exp, iat, nbf time.Time) string {
+	t.Helper()
+	b := jwt.NewBuilder().Issuer(iss).Subject("user-1").Claim(OrgClaim, "org-A")
+	if !exp.IsZero() {
+		b = b.Expiration(exp)
+	}
+	if !iat.IsZero() {
+		b = b.IssuedAt(iat)
+	}
+	if !nbf.IsZero() {
+		b = b.NotBefore(nbf)
+	}
+	tok, err := b.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := jwt.Sign(tok, jwt.WithKey(jwa.RS256(), key))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(s)
+}
+
+func TestVerifyRequiresExp(t *testing.T) {
+	srv, key := newIssuer(t)
+	v, err := NewJWKSVerifier(context.Background(), srv.URL, srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// No exp claim at all: must be rejected even though iss, org and iat are
+	// all otherwise valid (Zitadel always sets exp; this is defence in depth).
+	tok := signClaims(t, key, srv.URL, time.Time{}, time.Now(), time.Time{})
+	if _, err := v.Verify(context.Background(), tok); err == nil {
+		t.Fatal("token without exp accepted")
+	}
+}
+
+func TestVerifyAllowsSmallClockSkew(t *testing.T) {
+	srv, key := newIssuer(t)
+	v, err := NewJWKSVerifier(context.Background(), srv.URL, srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	const within = 15 * time.Second // inside the ~30s allowance
+	const beyond = 90 * time.Second // outside it
+	now := time.Now()
+
+	cases := []struct {
+		name   string
+		tok    string
+		wantOK bool
+	}{
+		{"exp just past, within skew", signClaims(t, key, srv.URL, now.Add(-within), now.Add(-time.Hour), time.Time{}), true},
+		{"exp far past, beyond skew", signClaims(t, key, srv.URL, now.Add(-beyond), now.Add(-time.Hour), time.Time{}), false},
+		{"iat just ahead, within skew", signClaims(t, key, srv.URL, now.Add(time.Hour), now.Add(within), time.Time{}), true},
+		{"iat far ahead, beyond skew", signClaims(t, key, srv.URL, now.Add(time.Hour), now.Add(beyond), time.Time{}), false},
+		{"nbf just ahead, within skew", signClaims(t, key, srv.URL, now.Add(time.Hour), now, now.Add(within)), true},
+		{"nbf far ahead, beyond skew", signClaims(t, key, srv.URL, now.Add(time.Hour), now, now.Add(beyond)), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := v.Verify(ctx, tc.tok)
+			if (err == nil) != tc.wantOK {
+				t.Fatalf("err = %v, want ok=%v", err, tc.wantOK)
+			}
+		})
+	}
+}
+
 func TestNewJWKSVerifierGivesUp(t *testing.T) {
 	old := jwksStartupTimeout
 	jwksStartupTimeout = 100 * time.Millisecond

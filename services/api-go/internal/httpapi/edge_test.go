@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
@@ -70,6 +72,33 @@ func TestEdgeCases(t *testing.T) {
 	}
 	if first, _ := issues[0].(map[string]any); first["rule_id"] != "AE-TRN-001" || first["severity"] != "error" {
 		t.Errorf("issue shape: %v", issues[0])
+	}
+}
+
+// TestReadyzIsCached: /readyz is unauthenticated and unrate-limited, and its
+// backend check pings Postgres, JetStream, Valkey and MinIO. Without
+// caching, a caller polling it can generate unbounded backend load. The
+// cached result must still be reused for calls inside the TTL, and the
+// backend must be re-checked once the TTL elapses.
+func TestReadyzIsCached(t *testing.T) {
+	old := readyzCacheTTL
+	readyzCacheTTL = 50 * time.Millisecond
+	t.Cleanup(func() { readyzCacheTTL = old })
+
+	var calls atomic.Int64
+	ready := func(context.Context) error { calls.Add(1); return nil }
+	h := NewRouter(fakeVerifier{}, fakeStore{firm: uuid.New()}, &fakePub{}, fakeLimiter{ok: true}, ready)
+
+	do(h, "GET", "/readyz", "", "")
+	do(h, "GET", "/readyz", "", "")
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("backend check called %d times for 2 immediate /readyz calls, want 1", got)
+	}
+
+	time.Sleep(readyzCacheTTL + 30*time.Millisecond)
+	do(h, "GET", "/readyz", "", "")
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("backend check not re-run after the cache TTL elapsed: got %d calls, want 2", got)
 	}
 }
 

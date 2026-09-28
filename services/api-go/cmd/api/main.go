@@ -40,6 +40,32 @@ const (
 	startupRetryInterval = 2 * time.Second
 )
 
+// HTTP server timeouts. Without them, net/http leaves ReadTimeout,
+// WriteTimeout and IdleTimeout at zero (no deadline): an unauthenticated
+// caller can open a connection and hold it (idle, or trickling a body)
+// indefinitely, exhausting file descriptors and goroutines.
+const (
+	httpReadHeaderTimeout = 5 * time.Second
+	// httpReadTimeout covers the whole request, including the body, so it
+	// must be generous enough for a slow client to upload the full
+	// httpapi.MaxBodyBytes (1 MiB) request body, not just send headers.
+	httpReadTimeout  = 20 * time.Second
+	httpWriteTimeout = 20 * time.Second
+	httpIdleTimeout  = 60 * time.Second
+)
+
+// newHTTPServer builds the api-go HTTP server with hardened timeouts.
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: httpReadHeaderTimeout,
+		ReadTimeout:       httpReadTimeout,
+		WriteTimeout:      httpWriteTimeout,
+		IdleTimeout:       httpIdleTimeout,
+	}
+}
+
 func main() {
 	slog.SetDefault(telemetry.NewLogger("api-go"))
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -203,11 +229,8 @@ func serve(ctx context.Context) (err error) {
 		consumer.Run(consumerCtx)
 	}()
 
-	srv := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewRouter(verifier, store, events.NewPublisher(jsh), ratelimit.New(rdb, cfg.RateLimitPerMinute), readiness(pool, nc, rdb, mc, consumer)),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	srv := newHTTPServer(cfg.HTTPAddr,
+		httpapi.NewRouter(verifier, store, events.NewPublisher(jsh), ratelimit.New(rdb, cfg.RateLimitPerMinute), readiness(pool, nc, rdb, mc, consumer)))
 	srvErr := make(chan error, 1)
 	go func() {
 		slog.Info("http server listening", "addr", cfg.HTTPAddr)

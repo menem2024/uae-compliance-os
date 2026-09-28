@@ -31,6 +31,12 @@ const (
 
 const tracerName = "github.com/menem2024/uae-platform/services/api-go/internal/events"
 
+// invoicesMaxAge bounds how long the INVOICES stream retains messages.
+// Recreating a lost api-validation durable redelivers everything JetStream
+// still retains (DeliverAllPolicy, the default for a fresh durable), so this
+// bounds how far back such a replay can reach.
+const invoicesMaxAge = 7 * 24 * time.Hour
+
 // Connect dials NATS and returns a JetStream handle. It fails fast if the
 // server is unreachable; callers retry.
 func Connect(url string) (*nats.Conn, jetstream.JetStream, error) {
@@ -59,7 +65,7 @@ type streamManager interface {
 // EnsureStreams idempotently creates or updates the INVOICES and DLQ streams.
 func EnsureStreams(ctx context.Context, js streamManager) error {
 	for _, cfg := range []jetstream.StreamConfig{
-		{Name: InvoicesStream, Subjects: []string{"invoice.>"}, Storage: jetstream.FileStorage},
+		{Name: InvoicesStream, Subjects: []string{"invoice.>"}, Storage: jetstream.FileStorage, MaxAge: invoicesMaxAge},
 		{Name: DLQStream, Subjects: []string{"dlq.>"}, Storage: jetstream.FileStorage},
 	} {
 		if _, err := js.CreateOrUpdateStream(ctx, cfg); err != nil {

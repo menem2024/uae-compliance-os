@@ -28,6 +28,11 @@ const (
 // kid, so a flood of forged tokens cannot hammer the IdP.
 var jwksMinRefreshInterval = 10 * time.Second
 
+// clockSkew is the acceptable difference between this server's clock and the
+// IdP's when checking exp, nbf and iat, so a token issued right at the edge
+// of validity is not spuriously rejected by clock drift between hosts.
+const clockSkew = 30 * time.Second
+
 // JWKSVerifier verifies RS256 tokens against a JWKS refreshed in the
 // background, and refetched on demand when a token names an unknown kid
 // (key rotation, or a key Zitadel created lazily after startup).
@@ -140,7 +145,8 @@ func (v *JWKSVerifier) Verify(ctx context.Context, raw string) (Principal, error
 }
 
 func (v *JWKSVerifier) parse(raw string) (jwt.Token, error) {
-	return jwt.Parse([]byte(raw), jwt.WithKeySet(v.keys), jwt.WithIssuer(v.issuer), jwt.WithValidate(true))
+	return jwt.Parse([]byte(raw), jwt.WithKeySet(v.keys), jwt.WithIssuer(v.issuer),
+		jwt.WithRequiredClaim("exp"), jwt.WithAcceptableSkew(clockSkew), jwt.WithValidate(true))
 }
 
 func (v *JWKSVerifier) hasKey(kid string) bool {

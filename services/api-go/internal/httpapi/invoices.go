@@ -19,7 +19,9 @@ import (
 	"github.com/menem2024/uae-platform/services/api-go/internal/db"
 )
 
-const maxBodyBytes = 1 << 20
+// MaxBodyBytes caps a request body. It also sizes the http.Server read
+// timeout in cmd/api (large enough for a slow client to upload it fully).
+const MaxBodyBytes = 1 << 20
 
 // Store is the persistence the handlers need. Get returns db.ErrNotFound
 // when the invoice is missing or hidden by RLS; FirmIDForOrg and Firm return
@@ -82,7 +84,7 @@ type handlers struct {
 
 func decodeInvoice(r *http.Request, w http.ResponseWriter) (invoiceRequest, error) {
 	var in invoiceRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&in); err != nil {
 		return in, fmt.Errorf("decode body: %w", err)
@@ -115,6 +117,25 @@ func (h *handlers) firmID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bo
 	return id, true
 }
 
+// checkRateLimit enforces the per-firm limit shared by every authenticated
+// route (not just POST /v1/invoices): unlimited GETs would still let an
+// authenticated caller generate unbounded backend load. It writes the
+// response and reports whether the caller should proceed.
+func (h *handlers) checkRateLimit(w http.ResponseWriter, r *http.Request, firmID uuid.UUID) bool {
+	allowed, err := h.limiter.Allow(r.Context(), firmID.String())
+	if err != nil {
+		slog.ErrorContext(r.Context(), "rate limiter", "firm_id", firmID, "err", err)
+		writeError(w, http.StatusServiceUnavailable, "rate limiter unavailable")
+		return false
+	}
+	if !allowed {
+		w.Header().Set("Retry-After", "60")
+		writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
+		return false
+	}
+	return true
+}
+
 func (h *handlers) createInvoice(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, err := decodeInvoice(r, w)
@@ -126,15 +147,7 @@ func (h *handlers) createInvoice(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	allowed, err := h.limiter.Allow(ctx, firmID.String())
-	if err != nil {
-		slog.ErrorContext(ctx, "rate limiter", "firm_id", firmID, "err", err)
-		writeError(w, http.StatusServiceUnavailable, "rate limiter unavailable")
-		return
-	}
-	if !allowed {
-		w.Header().Set("Retry-After", "60")
-		writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
+	if !h.checkRateLimit(w, r, firmID) {
 		return
 	}
 	payload, err := json.Marshal(in)
@@ -184,6 +197,9 @@ func (h *handlers) getInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	firmID, ok := h.firmID(w, r)
 	if !ok {
+		return
+	}
+	if !h.checkRateLimit(w, r, firmID) {
 		return
 	}
 	v, err := h.store.Get(ctx, firmID, id)

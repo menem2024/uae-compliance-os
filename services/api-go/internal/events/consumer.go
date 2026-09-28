@@ -2,6 +2,8 @@ package events
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -225,12 +227,16 @@ func processMessage(ctx context.Context, msg jetstream.Msg, dlq msgPublisher, ha
 	slog.ErrorContext(ctx, "dead-lettering invoice.extracted",
 		"invoice_id", ev.GetInvoiceId(), "firm_id", ev.GetFirmId(), "delivered", delivered,
 		"permanent", errors.Is(err, ErrPermanent), "err", err)
-	deadLetter(ctx, msg, hdr, dlq)
+	deadLetter(ctx, msg, hdr, dlq, ev.GetInvoiceId())
 }
 
 // deadLetter publishes the raw message to the DLQ and always terminates it,
-// even if the DLQ publish fails, so it is never stranded.
-func deadLetter(ctx context.Context, msg jetstream.Msg, hdr nats.Header, dlq msgPublisher) {
+// even if the DLQ publish fails, so it is never stranded. The publish carries
+// a deterministic Nats-Msg-Id so that redelivering the same invoice (e.g.
+// after the durable is recreated and the retained INVOICES stream replays)
+// dedupes within the DLQ stream's duplicate window instead of storing the
+// same dead letter again.
+func deadLetter(ctx context.Context, msg jetstream.Msg, hdr nats.Header, dlq msgPublisher, invoiceID string) {
 	out := &nats.Msg{Subject: DLQExtractedSubject, Data: msg.Data(), Header: nats.Header{}}
 	for k, v := range hdr {
 		if strings.HasPrefix(k, "Nats-") { // server-interpreted (dedupe, expectations)
@@ -238,6 +244,7 @@ func deadLetter(ctx context.Context, msg jetstream.Msg, hdr nats.Header, dlq msg
 		}
 		out.Header[k] = append([]string(nil), v...)
 	}
+	out.Header.Set(jetstream.MsgIDHeader, dlqMsgID(invoiceID, msg.Data()))
 	pubCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if _, err := dlq.PublishMsg(pubCtx, out); err != nil {
@@ -247,4 +254,16 @@ func deadLetter(ctx context.Context, msg jetstream.Msg, hdr nats.Header, dlq msg
 	if err := msg.Term(); err != nil {
 		slog.ErrorContext(ctx, "term failed", "err", err)
 	}
+}
+
+// dlqMsgID returns a deterministic dedup id for a dead-lettered message. It
+// keys on the invoice id when known; an undecodable payload has none, so it
+// falls back to a content hash (still deterministic across redelivery of the
+// identical bytes).
+func dlqMsgID(invoiceID string, data []byte) string {
+	if invoiceID != "" {
+		return DLQExtractedSubject + ":" + invoiceID
+	}
+	sum := sha256.Sum256(data)
+	return DLQExtractedSubject + ":undecodable:" + hex.EncodeToString(sum[:])
 }

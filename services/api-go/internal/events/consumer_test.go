@@ -105,8 +105,69 @@ func TestProcessMessage(t *testing.T) {
 				if d.Subject != DLQExtractedSubject || string(d.Data) != string(m.data) {
 					t.Errorf("dlq msg subject=%s data mismatch", d.Subject)
 				}
+				if d.Header.Get("Nats-Msg-Id") == "" {
+					t.Errorf("dlq msg missing Nats-Msg-Id header: %+v", d.Header)
+				}
 			}
 		})
+	}
+}
+
+// TestDeadLetterMsgIDIsDeterministic verifies redelivery of the same invoice
+// (e.g. after the durable is recreated and the retained stream replays)
+// dead-letters with the same Nats-Msg-Id, so JetStream's duplicate window
+// can suppress the second DLQ store.
+func TestDeadLetterMsgIDIsDeterministic(t *testing.T) {
+	ctx := context.Background()
+	permanent := fmt.Errorf("%w: invoice hidden", ErrPermanent)
+	handle := func(context.Context, *compliancev1.InvoiceExtracted) error { return permanent }
+
+	dlq := &fakeDLQ{}
+	processMessage(ctx, newMsg(t, 1), dlq, handle)
+	processMessage(ctx, newMsg(t, 2), dlq, handle) // redelivery of the same invoice (i1)
+	if len(dlq.got) != 2 {
+		t.Fatalf("dlq got %d messages, want 2", len(dlq.got))
+	}
+	id1, id2 := dlq.got[0].Header.Get("Nats-Msg-Id"), dlq.got[1].Header.Get("Nats-Msg-Id")
+	if id1 == "" || id1 != id2 {
+		t.Errorf("Nats-Msg-Id not deterministic across redelivery: %q vs %q", id1, id2)
+	}
+
+	// A different invoice must get a different id.
+	other, err := proto.Marshal(&compliancev1.InvoiceExtracted{InvoiceId: "i2", FirmId: "f1", Invoice: &compliancev1.Invoice{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m3 := newMsg(t, 1)
+	m3.data = other
+	processMessage(ctx, m3, dlq, handle)
+	if id3 := dlq.got[2].Header.Get("Nats-Msg-Id"); id3 == id1 {
+		t.Errorf("different invoices got the same Nats-Msg-Id: %q", id3)
+	}
+}
+
+// TestDeadLetterMsgIDForUndecodablePayloadIsDeterministic covers the case
+// where the InvoiceExtracted payload cannot be decoded, so there is no
+// invoice id to key on.
+func TestDeadLetterMsgIDForUndecodablePayloadIsDeterministic(t *testing.T) {
+	ctx := context.Background()
+	handle := func(context.Context, *compliancev1.InvoiceExtracted) error {
+		t.Fatal("handler called for undecodable payload")
+		return nil
+	}
+	garbage := []byte{0xff, 0xff, 0xff}
+
+	dlq := &fakeDLQ{}
+	m1, m2 := newMsg(t, 1), newMsg(t, 1)
+	m1.data, m2.data = garbage, garbage
+	processMessage(ctx, m1, dlq, handle)
+	processMessage(ctx, m2, dlq, handle)
+	if len(dlq.got) != 2 {
+		t.Fatalf("dlq got %d messages, want 2", len(dlq.got))
+	}
+	id1, id2 := dlq.got[0].Header.Get("Nats-Msg-Id"), dlq.got[1].Header.Get("Nats-Msg-Id")
+	if id1 == "" || id1 != id2 {
+		t.Errorf("Nats-Msg-Id not deterministic for identical undecodable payloads: %q vs %q", id1, id2)
 	}
 }
 
