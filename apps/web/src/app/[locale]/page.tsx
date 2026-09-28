@@ -1,6 +1,8 @@
 import { ArrowRight, FlaskConical } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Fragment } from "react";
+import { auth } from "@/auth";
+import { SignedOut } from "@/components/auth/signed-out";
 import { CountdownCard } from "@/components/dashboard/countdown-card";
 import { GeometricPattern } from "@/components/geometric-pattern";
 import { StatusPill, type InvoiceStatus } from "@/components/ui/status-pill";
@@ -8,20 +10,30 @@ import { Link } from "@/i18n/navigation";
 import { dirOf } from "@/i18n/routing";
 import { formatInt } from "@/lib/format";
 import { daysToMandate } from "@/lib/mandate";
+import { safeCallbackPath } from "@/lib/safe-callback";
 
 /** Invoice lifecycle; step 3 branches into validated / has_issues. */
 const PIPELINE: InvoiceStatus[][] = [["uploaded"], ["extracted"], ["validated", "has_issues"], ["ready"]];
 
-export default async function HomePage({ params }: PageProps<"/[locale]">) {
+export default async function HomePage({ params, searchParams }: PageProps<"/[locale]">) {
   const { locale } = await params;
   setRequestLocale(locale);
+
+  const session = await auth();
+  if (!session) {
+    const { callbackUrl } = await searchParams;
+    // Only carry a callback that is a safe same-origin path (no open redirect).
+    const target = callbackUrl ? safeCallbackPath(callbackUrl, locale) : undefined;
+    return <SignedOut locale={locale} callbackUrl={target} />;
+  }
+
   const t = await getTranslations("Dashboard");
 
   return (
     <>
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Empty state with the geometric star pattern (adr/016). */}
-        <section className="relative overflow-hidden rounded-xl border bg-panel lg:col-span-2">
+        <section className="lift relative overflow-hidden rounded-xl border bg-panel lg:col-span-2">
           <GeometricPattern focus={dirOf(locale) === "rtl" ? "15% 15%" : "85% 15%"} />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(90%_80%_at_85%_0%,var(--brand-soft),transparent_60%)] rtl:bg-[radial-gradient(90%_80%_at_15%_0%,var(--brand-soft),transparent_60%)]" />
           <div className="relative flex h-full flex-col items-start gap-5 p-6 md:p-8">
@@ -53,7 +65,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         <CountdownCard serverDays={daysToMandate()} />
       </div>
 
-      <section className="rounded-xl border bg-panel">
+      <section className="lift rounded-xl border bg-panel">
         <div className="flex flex-col gap-1 border-b px-5 py-[18px]">
           <h2 className="text-base font-semibold">{t("pipelineTitle")}</h2>
           <p className="text-[13px] text-muted-foreground">{t("pipelineBody")}</p>

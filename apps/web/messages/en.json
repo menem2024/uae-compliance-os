@@ -25,7 +25,6 @@
     "brandLatin": "COMPLIANCE OS",
     "mainNav": "Main navigation",
     "firmWorkspace": "Firm workspace",
-    "switchFirm": "Switch firm",
     "soon": "Soon",
     "nav": {
       "dashboard": "Dashboard",
@@ -50,7 +49,9 @@
       "light": "Light theme",
       "dark": "Dark theme"
     },
-    "account": "Account"
+    "account": "Account",
+    "firmFallback": "Your firm",
+    "switchFirmSuffix": "Switch firm"
   },
   "Palette": {
     "label": "Command menu",
@@ -81,9 +82,38 @@
     "subtitle": "Submit a demo invoice and follow the validation result live",
     "resultTitle": "Validation result",
     "ruleset": "pint-ae@0.0-skeleton",
-    "placeholderTitle": "Validation form in progress",
-    "placeholderBody": "The invoice form and validation result appear here once sign-in and the backend are wired up.",
-    "back": "Back to the dashboard"
+    "back": "Back to the dashboard",
+    "invoiceTitle": "Demo invoice",
+    "invoiceHint": "Fixed demo values; only the seller TRN is editable",
+    "trnHelp": "The validator expects 15 digits.",
+    "presets": "Try",
+    "presetInvalid": "Invalid",
+    "presetValid": "Valid",
+    "fields": {
+      "invoiceNumber": "Invoice number",
+      "issueDate": "Issue date",
+      "buyerTrn": "Buyer TRN",
+      "currency": "Currency",
+      "total": "Total",
+      "vat": "VAT"
+    },
+    "submitting": "Submitting…",
+    "idleTitle": "No result yet",
+    "idleBody": "Submit the demo invoice to run it through extraction and the validator.",
+    "pendingTitle": "Validating…",
+    "pendingBody": "The result updates live, every second.",
+    "validatedBody": "The invoice passed every rule in this ruleset.",
+    "severity": {
+      "error": "Error · blocks export",
+      "warning": "Warning"
+    },
+    "path": "Field",
+    "invoiceId": "Invoice ID",
+    "copy": "Copy",
+    "copied": "Copied",
+    "live": "Live",
+    "errorTitle": "The request failed",
+    "errorBody": "{code, select, 400 {api-go rejected the invoice payload.} 401 {Your session has expired. Sign in again.} 403 {Your account has no access to this Firm.} 404 {The invoice was not found.} 429 {Too many requests. Wait a moment and try again.} 502 {The API is unreachable right now.} other {Something went wrong. Try again.}}"
   },
   "Status": {
     "uploaded": "Uploaded",
@@ -91,5 +121,32 @@
     "validated": "Validated",
     "has_issues": "Has issues",
     "ready": "Ready to export"
+  },
+  "Auth": {
+    "welcome": "Welcome back",
+    "subtitle": "Sign in to your firm's workspace to follow your clients' readiness.",
+    "continueNotice": "Sign in to continue where you left off.",
+    "sso": "You will continue on your firm's secure sign-in page (SSO).",
+    "secured": "OpenID Connect · Zitadel",
+    "or": "Single sign-on",
+    "copyright": "© 2026 Compliance OS",
+    "badge": "Ready for the UAE e-invoicing system",
+    "heroLine1": "All your clients' invoices,",
+    "heroLine2": "ready before the deadline.",
+    "heroBody": "Smart agents read invoices in Arabic and English, a strict validator checks them against <ltr>PINT-AE</ltr>, and a legal assistant explains every error from official sources.",
+    "pillars": {
+      "read": {
+        "title": "Smart reading",
+        "text": "Accurate extraction from PDF, images and Excel"
+      },
+      "validate": {
+        "title": "Strict validation",
+        "text": "Deterministic rules, no guessing in compliance"
+      },
+      "human": {
+        "title": "Human decision",
+        "text": "Every change needs your approval and is audit-logged"
+      }
+    }
   }
 }

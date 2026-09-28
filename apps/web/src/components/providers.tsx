@@ -2,22 +2,32 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "motion/react";
+import type { Session } from "next-auth";
+import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 /**
- * Client-side providers. Story 7b wraps `children` in the Auth.js
- * <SessionProvider> here (see the SESSION PROVIDER SLOT below).
+ * Client-side providers. The Auth.js session handed to <SessionProvider> carries only the
+ * user's name/email (see auth.ts): the Zitadel access token never reaches browser JS.
  */
-export function Providers({ children, dir }: { children: ReactNode; dir: "rtl" | "ltr" }) {
+export function Providers({
+  children,
+  dir,
+  session,
+}: {
+  children: ReactNode;
+  dir: "rtl" | "ltr";
+  session: Session | null;
+}) {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } }),
   );
 
   return (
-    // SESSION PROVIDER SLOT (7b): <SessionProvider> goes outermost, around QueryClientProvider.
+    <SessionProvider session={session}>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
         {/* reducedMotion="user": Motion skips transform animations under prefers-reduced-motion. */}
@@ -41,5 +51,6 @@ export function Providers({ children, dir }: { children: ReactNode; dir: "rtl" |
         </MotionConfig>
       </ThemeProvider>
     </QueryClientProvider>
+    </SessionProvider>
   );
 }

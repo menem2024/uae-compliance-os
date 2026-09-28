@@ -1,12 +1,14 @@
 "use client";
 
-import { Search, User } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { LogOut, Search, User } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { signOutAction } from "@/app/actions/auth";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { LocaleSwitch } from "./locale-switch";
 import { LogoMark } from "./logo";
-import { control } from "./styles";
+import { control, iconButton } from "./styles";
 import { ThemeToggle } from "./theme-toggle";
 import type { ShellUser } from "./types";
 
@@ -24,6 +26,8 @@ function usePageHeading() {
 
 export function Topbar({ user, onOpenPalette }: { user?: ShellUser; onOpenPalette: () => void }) {
   const t = useTranslations("Shell");
+  const tHome = useTranslations("Home");
+  const locale = useLocale();
   const { title, subtitle } = usePageHeading();
   const initial = user ? Array.from(user.name.trim())[0]?.toUpperCase() : undefined;
 
@@ -64,6 +68,20 @@ export function Topbar({ user, onOpenPalette }: { user?: ShellUser; onOpenPalett
       >
         {initial ?? <User className="size-[18px]" strokeWidth={2} aria-hidden />}
       </span>
+
+      {user && (
+        <form action={signOutAction} className="contents">
+          <input type="hidden" name="locale" value={locale} />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="submit" data-testid="sign-out" aria-label={tHome("signOut")} className={iconButton}>
+                <LogOut className="size-[18px] rtl:-scale-x-100" strokeWidth={1.8} aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{tHome("signOut")}</TooltipContent>
+          </Tooltip>
+        </form>
+      )}
     </header>
   );
 }

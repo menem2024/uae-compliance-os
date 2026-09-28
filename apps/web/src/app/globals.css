@@ -183,6 +183,33 @@ body {
   }
 }
 
+/* Slow breathing of the auth-screen star pattern (prototype Login `.glow`). */
+@keyframes glow {
+  from { opacity: .55; }
+  to { opacity: .9; }
+}
+@utility glow {
+  animation: glow 8s ease-in-out infinite alternate;
+}
+
+/* Hero surface for the auth screen: a warm brand-tinted radial wash over the page background. */
+@utility auth-hero {
+  background: radial-gradient(
+    120% 90% at 80% 10%,
+    color-mix(in oklab, var(--brand) 26%, var(--bg)) 0%,
+    color-mix(in oklab, var(--brand) 9%, var(--bg)) 45%,
+    var(--bg) 100%
+  );
+  &:where([dir="rtl"] *) {
+    background: radial-gradient(
+      120% 90% at 20% 10%,
+      color-mix(in oklab, var(--brand) 26%, var(--bg)) 0%,
+      color-mix(in oklab, var(--brand) 9%, var(--bg)) 45%,
+      var(--bg) 100%
+    );
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
