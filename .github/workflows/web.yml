@@ -1,0 +1,52 @@
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/web.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/web.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: npm ci
+        working-directory: apps/web
+        run: npm ci
+
+      - name: lint
+        working-directory: apps/web
+        run: npm run lint
+
+      - name: typecheck
+        working-directory: apps/web
+        run: npx tsc --noEmit
+
+      - name: test
+        working-directory: apps/web
+        run: npm test
+
+      - name: build
+        working-directory: apps/web
+        run: npm run build

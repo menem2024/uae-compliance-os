@@ -1,0 +1,45 @@
+name: python
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/ai-py/**"
+      - ".github/workflows/python.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/ai-py/**"
+      - ".github/workflows/python.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Python 3.14 is pinned by services/ai-py/.python-version; uv downloads
+      # and manages the interpreter itself, so no actions/setup-python is needed.
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/ai-py/uv.lock
+
+      - name: uv sync
+        working-directory: services/ai-py
+        run: uv sync
+
+      - name: ruff check
+        working-directory: services/ai-py
+        run: uv run ruff check .
+
+      - name: pytest
+        working-directory: services/ai-py
+        run: uv run pytest -q

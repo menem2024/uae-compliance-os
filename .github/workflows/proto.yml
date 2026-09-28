@@ -1,0 +1,62 @@
+name: proto
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "proto/**"
+      - ".github/workflows/proto.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "proto/**"
+      - ".github/workflows/proto.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  buf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          input: proto
+          lint: true
+          format: true
+          breaking: ${{ github.event_name == 'pull_request' }}
+          breaking_against: .git#branch=main,subdir=proto
+          push: false
+          archive: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: services/api-go/go.mod
+          cache-dependency-path: services/api-go/go.sum
+
+      - name: Install Go protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/ai-py/uv.lock
+
+      - name: uv sync (ai-py, for grpc_tools python codegen)
+        working-directory: services/ai-py
+        run: uv sync
+
+      - name: make gen && git diff --exit-code
+        run: make gen && git diff --exit-code

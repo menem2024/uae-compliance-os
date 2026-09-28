@@ -1,0 +1,52 @@
+name: rust
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/validator-rs/**"
+      - "proto/**"
+      - ".github/workflows/rust.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/validator-rs/**"
+      - "proto/**"
+      - ".github/workflows/rust.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/validator-rs -> target
+
+      # build.rs compiles the proto files with protox (a pure-Rust FileDescriptorSet
+      # builder), reading ../../proto relative to the crate root. No system protoc
+      # is required.
+
+      - name: cargo fmt --check
+        working-directory: services/validator-rs
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        working-directory: services/validator-rs
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        working-directory: services/validator-rs
+        run: cargo test
