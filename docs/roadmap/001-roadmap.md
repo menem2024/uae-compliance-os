@@ -35,7 +35,7 @@ Eight phases, done in strict order. **A phase is done only when all of its exit 
 - CI per service, gitleaks, and OTel feeding Grafana.
 
 **Exit criteria:**
-- [ ] A logged-in FirmUser submits a fake invoice JSON in the UI. It flows web → Go → NATS → Python → gRPC Rust and back, and the UI shows the ValidationRun result.
+- [ ] A logged-in FirmUser submits a fake invoice JSON in the UI. It flows web → Go → NATS → Python → NATS → Go → gRPC Rust and back, and the UI shows the ValidationRun result.
 - [ ] That single request appears as **one connected trace** across all 4 services in Grafana Tempo.
 - [ ] The RLS test proves that Firm A cannot read Firm B.
 - [ ] `docker compose up` and a Helm deploy to k3s both work from a clean checkout.
