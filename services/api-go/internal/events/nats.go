@@ -62,11 +62,14 @@ type streamManager interface {
 	CreateOrUpdateStream(ctx context.Context, cfg jetstream.StreamConfig) (jetstream.Stream, error)
 }
 
-// EnsureStreams idempotently creates or updates the INVOICES and DLQ streams.
+// EnsureStreams idempotently creates or updates the INVOICES, DLQ, DOCUMENTS
+// and AGENTS streams (ai-py creates DOCUMENTS and AGENTS with identical settings).
 func EnsureStreams(ctx context.Context, js streamManager) error {
 	for _, cfg := range []jetstream.StreamConfig{
 		{Name: InvoicesStream, Subjects: []string{"invoice.>"}, Storage: jetstream.FileStorage, MaxAge: invoicesMaxAge},
 		{Name: DLQStream, Subjects: []string{"dlq.>"}, Storage: jetstream.FileStorage},
+		{Name: DocumentsStream, Subjects: []string{"document.>"}, Storage: jetstream.FileStorage, MaxAge: documentsMaxAge, Duplicates: duplicateWindow},
+		{Name: AgentsStream, Subjects: []string{"agent.>"}, Storage: jetstream.FileStorage, MaxAge: agentsMaxAge, Duplicates: duplicateWindow},
 	} {
 		if _, err := js.CreateOrUpdateStream(ctx, cfg); err != nil {
 			return fmt.Errorf("ensure stream %s: %w", cfg.Name, err)
