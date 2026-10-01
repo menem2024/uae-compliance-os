@@ -1,10 +1,11 @@
 import { headers } from "next/headers";
+import { cache } from "react";
 import { buildApiRequest } from "@/lib/api";
 import { parseMe, type Me } from "@/lib/me";
 import { getAccessToken } from "./access-token";
 
 /** Server-side `GET /v1/me` for the current session; null when signed out or api-go fails. */
-export async function fetchMe(): Promise<Me | null> {
+export const fetchMe = cache(async (): Promise<Me | null> => {
   const accessToken = await getAccessToken(await headers());
   if (!accessToken) return null;
   try {
@@ -21,4 +22,4 @@ export async function fetchMe(): Promise<Me | null> {
     console.warn("GET /v1/me failed", err instanceof Error ? err.message : err);
     return null;
   }
-}
+});

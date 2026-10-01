@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { auth } from "@/auth";
 import { DemoForm } from "@/components/demo/demo-form";
+import { requireSession } from "@/lib/server/session";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/demo">): Promise<Metadata> {
   const { locale } = await params;
@@ -14,12 +13,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/demo">):
 export default async function DemoPage({ params }: PageProps<"/[locale]/demo">) {
   const { locale } = await params;
   setRequestLocale(locale);
-
-  const session = await auth();
-  if (!session) {
-    // The signed-out landing offers sign-in and returns here afterwards.
-    redirect(`/${locale}?callbackUrl=${encodeURIComponent(`/${locale}/demo`)}`);
-  }
+  await requireSession(locale, "/demo");
 
   return <DemoForm />;
 }

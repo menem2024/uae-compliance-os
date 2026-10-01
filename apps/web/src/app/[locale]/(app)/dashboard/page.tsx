@@ -1,8 +1,6 @@
 import { ArrowRight, FlaskConical } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Fragment } from "react";
-import { auth } from "@/auth";
-import { SignedOut } from "@/components/auth/signed-out";
 import { CountdownCard } from "@/components/dashboard/countdown-card";
 import { GeometricPattern } from "@/components/geometric-pattern";
 import { StatusPill, type InvoiceStatus } from "@/components/ui/status-pill";
@@ -10,22 +8,15 @@ import { Link } from "@/i18n/navigation";
 import { dirOf } from "@/i18n/routing";
 import { formatInt } from "@/lib/format";
 import { daysToMandate } from "@/lib/mandate";
-import { safeCallbackPath } from "@/lib/safe-callback";
+import { requireSession } from "@/lib/server/session";
 
 /** Invoice lifecycle; step 3 branches into validated / has_issues. */
 const PIPELINE: InvoiceStatus[][] = [["uploaded"], ["extracted"], ["validated", "has_issues"], ["ready"]];
 
-export default async function HomePage({ params, searchParams }: PageProps<"/[locale]">) {
+export default async function DashboardPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
-
-  const session = await auth();
-  if (!session) {
-    const { callbackUrl } = await searchParams;
-    // Only carry a callback that is a safe same-origin path (no open redirect).
-    const target = callbackUrl ? safeCallbackPath(callbackUrl, locale) : undefined;
-    return <SignedOut locale={locale} callbackUrl={target} />;
-  }
+  await requireSession(locale, "/dashboard");
 
   const t = await getTranslations("Dashboard");
 

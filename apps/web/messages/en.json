@@ -151,5 +151,10 @@
   },
   "Rules": {
     "AE-TRN-001": "Seller TRN must be exactly 15 digits"
+  },
+  "P1Nav": {
+    "documents": "Documents",
+    "agents": "Agent activity",
+    "live": "Live"
   }
 }

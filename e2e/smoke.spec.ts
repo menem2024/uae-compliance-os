@@ -139,14 +139,14 @@ test.describe("mandate countdown (carried concern from Story 7b)", () => {
     // 2027-06-30T21:00:00Z = 2027-07-01 01:00 in Asia/Dubai (UTC+4): already past midnight on
     // the mandate's go-live calendar date, so the countdown must read 0.
     await page.clock.setFixedTime(new Date("2027-06-30T21:00:00.000Z"));
-    await page.goto("/en");
+    await page.goto("/en/dashboard");
     // Poll: the SSR text shows the server date until hydration recomputes from the fixed clock.
     await expect.poll(() => readCountdownDays(page), { timeout: 20_000 }).toBe(0);
 
     // 2026-09-27T12:00:00Z = 2026-09-27 16:00 in Asia/Dubai: 277 whole calendar days before
     // the 2027-07-01 go-live date.
     await page.clock.setFixedTime(new Date("2026-09-27T12:00:00.000Z"));
-    await page.goto("/en");
+    await page.goto("/en/dashboard");
     // Poll: the SSR text shows the server date until hydration recomputes from the fixed clock.
     await expect.poll(() => readCountdownDays(page), { timeout: 20_000 }).toBe(277);
   });
