@@ -9,21 +9,152 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AgentRun struct {
+	ID                uuid.UUID          `json:"id"`
+	FirmID            uuid.UUID          `json:"firm_id"`
+	ClientCompanyID   uuid.NullUUID      `json:"client_company_id"`
+	Workflow          string             `json:"workflow"`
+	SubjectType       string             `json:"subject_type"`
+	SubjectID         string             `json:"subject_id"`
+	Status            string             `json:"status"`
+	ErrorCode         string             `json:"error_code"`
+	DeliveryAttempt   int32              `json:"delivery_attempt"`
+	TraceID           string             `json:"trace_id"`
+	Plan              []byte             `json:"plan"`
+	Budget            []byte             `json:"budget"`
+	Steps             int32              `json:"steps"`
+	LlmCalls          int32              `json:"llm_calls"`
+	ResponseCacheHits int32              `json:"response_cache_hits"`
+	InputTokens       int64              `json:"input_tokens"`
+	OutputTokens      int64              `json:"output_tokens"`
+	CostMicroUsd      int64              `json:"cost_micro_usd"`
+	StartedAt         pgtype.Timestamptz `json:"started_at"`
+	FinishedAt        pgtype.Timestamptz `json:"finished_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AgentStep struct {
+	ID                       uuid.UUID          `json:"id"`
+	FirmID                   uuid.UUID          `json:"firm_id"`
+	RunID                    uuid.UUID          `json:"run_id"`
+	Seq                      int64              `json:"seq"`
+	NodeID                   string             `json:"node_id"`
+	DependsOn                []string           `json:"depends_on"`
+	Agent                    string             `json:"agent"`
+	Action                   string             `json:"action"`
+	Kind                     string             `json:"kind"`
+	Status                   string             `json:"status"`
+	Attempt                  int32              `json:"attempt"`
+	At                       pgtype.Timestamptz `json:"at"`
+	DurationMs               int64              `json:"duration_ms"`
+	Model                    string             `json:"model"`
+	PromptID                 string             `json:"prompt_id"`
+	PromptVersion            int32              `json:"prompt_version"`
+	InputTokens              int64              `json:"input_tokens"`
+	OutputTokens             int64              `json:"output_tokens"`
+	CacheReadInputTokens     int64              `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int64              `json:"cache_creation_input_tokens"`
+	CostMicroUsd             int64              `json:"cost_micro_usd"`
+	ResponseCacheHit         bool               `json:"response_cache_hit"`
+	LlmCalls                 int32              `json:"llm_calls"`
+	MessageKey               string             `json:"message_key"`
+	MessageArgs              []byte             `json:"message_args"`
+	ErrorCode                string             `json:"error_code"`
+	SubjectType              string             `json:"subject_type"`
+	SubjectID                string             `json:"subject_id"`
+	ClientCompanyID          uuid.NullUUID      `json:"client_company_id"`
+	CreatedAt                pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ClientCompany struct {
+	ID        uuid.UUID          `json:"id"`
+	FirmID    uuid.UUID          `json:"firm_id"`
+	Name      string             `json:"name"`
+	NameAr    string             `json:"name_ar"`
+	Trn       pgtype.Text        `json:"trn"`
+	Tin       pgtype.Text        `json:"tin"`
+	Emirate   pgtype.Text        `json:"emirate"`
+	Status    string             `json:"status"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Document struct {
+	ID               uuid.UUID          `json:"id"`
+	FirmID           uuid.UUID          `json:"firm_id"`
+	ClientCompanyID  uuid.UUID          `json:"client_company_id"`
+	Sha256           string             `json:"sha256"`
+	ObjectKey        string             `json:"object_key"`
+	Filename         string             `json:"filename"`
+	ContentType      string             `json:"content_type"`
+	SizeBytes        int64              `json:"size_bytes"`
+	Status           string             `json:"status"`
+	StatusReason     string             `json:"status_reason"`
+	Kind             string             `json:"kind"`
+	Direction        string             `json:"direction"`
+	Language         string             `json:"language"`
+	ExtractionMethod string             `json:"extraction_method"`
+	ReviewReasons    []string           `json:"review_reasons"`
+	InvoiceCount     int32              `json:"invoice_count"`
+	PublishAttempts  int32              `json:"publish_attempts"`
+	PublishedAt      pgtype.Timestamptz `json:"published_at"`
+	ReprocessNonce   string             `json:"reprocess_nonce"`
+	LatestRunID      uuid.NullUUID      `json:"latest_run_id"`
+	UploadedBy       string             `json:"uploaded_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Firm struct {
 	ID           uuid.UUID          `json:"id"`
 	ZitadelOrgID string             `json:"zitadel_org_id"`
 	Name         string             `json:"name"`
 	BrandColor   pgtype.Text        `json:"brand_color"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Invoice struct {
-	ID             uuid.UUID          `json:"id"`
-	FirmID         uuid.UUID          `json:"firm_id"`
-	Status         string             `json:"status"`
-	Payload        []byte             `json:"payload"`
-	RulesetVersion pgtype.Text        `json:"ruleset_version"`
-	Issues         []byte             `json:"issues"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ID                   uuid.UUID          `json:"id"`
+	FirmID               uuid.UUID          `json:"firm_id"`
+	Status               string             `json:"status"`
+	Payload              []byte             `json:"payload"`
+	RulesetVersion       pgtype.Text        `json:"ruleset_version"`
+	Issues               []byte             `json:"issues"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	ClientCompanyID      uuid.NullUUID      `json:"client_company_id"`
+	DocumentID           uuid.NullUUID      `json:"document_id"`
+	SourceOrdinal        pgtype.Int4        `json:"source_ordinal"`
+	SourceRef            string             `json:"source_ref"`
+	ExtractionConfidence pgtype.Numeric     `json:"extraction_confidence"`
+	ExtractionRunID      uuid.NullUUID      `json:"extraction_run_id"`
+}
+
+type Proposal struct {
+	ID              uuid.UUID          `json:"id"`
+	FirmID          uuid.UUID          `json:"firm_id"`
+	ClientCompanyID uuid.NullUUID      `json:"client_company_id"`
+	RunID           uuid.NullUUID      `json:"run_id"`
+	Agent           string             `json:"agent"`
+	Kind            string             `json:"kind"`
+	TargetType      string             `json:"target_type"`
+	TargetID        uuid.UUID          `json:"target_id"`
+	SummaryKey      string             `json:"summary_key"`
+	SummaryArgs     []byte             `json:"summary_args"`
+	Rationale       string             `json:"rationale"`
+	Confidence      pgtype.Numeric     `json:"confidence"`
+	Changes         []byte             `json:"changes"`
+	DetailType      string             `json:"detail_type"`
+	Detail          []byte             `json:"detail"`
+	Evidence        []byte             `json:"evidence"`
+	State           string             `json:"state"`
+	DecidedBy       pgtype.Text        `json:"decided_by"`
+	DecidedAt       pgtype.Timestamptz `json:"decided_at"`
+	DecisionReason  pgtype.Text        `json:"decision_reason"`
+	AppliedAt       pgtype.Timestamptz `json:"applied_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 }
