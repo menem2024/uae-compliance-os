@@ -21,6 +21,10 @@ dependencies = [
     "redis>=8.1",
 ]
 
+[project.entry-points."compliance.agents"]
+extraction = "ai.agents.extraction.plugin:register"
+intake = "ai.agents.intake.plugin:register"
+
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
