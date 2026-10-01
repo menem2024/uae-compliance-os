@@ -12,4 +12,9 @@ describe("nav items", () => {
     expect(activeNavItem("/")).toBeNull();
     expect(activeNavItem("/documents")).toBeNull(); // href null until Task 24
   });
+
+  it("enable clients and settings with their page headings (Task 11)", () => {
+    expect(activeNavItem("/clients")).toMatchObject({ key: "clients", titleKey: "P1Clients.title" });
+    expect(activeNavItem("/settings")).toMatchObject({ key: "settings", titleKey: "P1Settings.title" });
+  });
 });

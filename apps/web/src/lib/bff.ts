@@ -3,7 +3,7 @@ import { buildApiRequest } from "./api";
 type ForwardInit = {
   /** Must start with `/v1/` (enforced by buildApiRequest: the SSRF guard). */
   path: string;
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PATCH";
   body?: string;
   /** Read server-side from the Auth.js JWT; never comes from the browser. */
   accessToken: string | undefined;

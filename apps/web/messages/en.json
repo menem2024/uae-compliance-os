@@ -156,5 +156,66 @@
     "documents": "Documents",
     "agents": "Agent activity",
     "live": "Live"
+  },
+  "P1Clients": {
+    "title": "Client companies",
+    "subtitle": "The businesses your firm keeps books for",
+    "search": "Search by name or TRN",
+    "statusFilter": "Status",
+    "status": { "active": "Active", "archived": "Archived", "all": "All" },
+    "create": "New client company",
+    "createTitle": "New client company",
+    "editTitle": "Edit client company",
+    "formHint": "The TRN is the 15-digit UAE tax registration number. It is optional.",
+    "fields": {
+      "name": "Name",
+      "nameAr": "Name in Arabic",
+      "trn": "TRN",
+      "emirate": "Emirate",
+      "emirateNone": "Not set"
+    },
+    "emirates": {
+      "AUH": "Abu Dhabi", "DXB": "Dubai", "SHJ": "Sharjah", "UAQ": "Umm Al Quwain",
+      "FUJ": "Fujairah", "AJM": "Ajman", "RAK": "Ras Al Khaimah"
+    },
+    "columns": { "name": "Name", "trn": "TRN", "emirate": "Emirate", "documents": "Documents", "needsReview": "Needs review" },
+    "edit": "Edit",
+    "archive": "Archive",
+    "restore": "Restore",
+    "archived": "{name} archived",
+    "restored": "{name} restored",
+    "saved": "{name} saved",
+    "save": "Save",
+    "cancel": "Cancel",
+    "empty": "No client companies yet. Add the first one.",
+    "emptySearch": "No client company matches this search.",
+    "loadMore": "Load more",
+    "errors": {
+      "generic": "Something went wrong. Try again.",
+      "load": "Could not load client companies.",
+      "invalid_name": "Enter a name (up to 200 characters).",
+      "invalid_name_ar": "The Arabic name is too long (up to 200 characters).",
+      "invalid_trn": "A TRN has exactly 15 digits.",
+      "invalid_emirate": "Choose an emirate from the list.",
+      "trn_taken": "Another client company of your firm already has this TRN."
+    }
+  },
+  "P1Settings": {
+    "title": "Settings",
+    "subtitle": "Your firm's name and accent colour",
+    "fields": { "name": "Firm name", "brandColor": "Accent colour", "brandColorPicker": "Pick a colour" },
+    "brandHint": "Six-digit hex, for example #C8A45D. We adjust it so text stays readable in both themes.",
+    "useDefault": "Use default",
+    "save": "Save changes",
+    "saved": "Settings saved",
+    "preview": "Preview",
+    "mode": { "light": "Light theme", "dark": "Dark theme" },
+    "sampleLink": "Invoice INV-2026-00042",
+    "sampleButton": "Approve",
+    "errors": {
+      "generic": "Could not save. Try again.",
+      "load": "Could not load the firm settings.",
+      "invalid_brand_color": "Use a six-digit hex colour such as #C8A45D."
+    }
   }
 }

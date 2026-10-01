@@ -27,6 +27,15 @@ describe("forwardToApi", () => {
     expect(await req.text()).toBe('{"a":"1"}');
   });
 
+  it("forwards PATCH with its JSON body", async () => {
+    const fetchImpl = vi.fn<(req: Request) => Promise<Response>>(async () => new Response("{}", { status: 200 }));
+    await forwardToApi({ path: "/v1/firm", method: "PATCH", body: '{"name":"A"}', accessToken: "tok" }, fetchImpl);
+    const req = fetchImpl.mock.calls[0][0];
+    expect(req.method).toBe("PATCH");
+    expect(req.headers.get("content-type")).toBe("application/json");
+    expect(await req.text()).toBe('{"name":"A"}');
+  });
+
   it("passes through upstream status, body and X-Trace-Id", async () => {
     const fetchImpl = vi.fn(
       async () =>

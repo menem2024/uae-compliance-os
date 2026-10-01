@@ -22,7 +22,8 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { key: "dashboard", icon: House, href: "/dashboard", labelKey: "Shell.nav.dashboard",
     titleKey: "Dashboard.title", subtitleKey: "Dashboard.subtitle" },
-  { key: "clients", icon: Users, href: null, labelKey: "Shell.nav.clients" },
+  { key: "clients", icon: Users, href: "/clients", labelKey: "Shell.nav.clients",
+    titleKey: "P1Clients.title", subtitleKey: "P1Clients.subtitle" },
   { key: "documents", icon: FileUp, href: null, labelKey: "P1Nav.documents" },
   { key: "agents", icon: Bot, href: null, labelKey: "P1Nav.agents", live: true },
   { key: "invoices", icon: FileText, href: null, labelKey: "Shell.nav.invoices" },
@@ -31,7 +32,8 @@ export const NAV_ITEMS: NavItem[] = [
     titleKey: "Demo.title", subtitleKey: "DemoPage.subtitle" },
   { key: "legal", icon: Scale, href: null, labelKey: "Shell.nav.legal" },
   { key: "reports", icon: ChartLine, href: null, labelKey: "Shell.nav.reports" },
-  { key: "settings", icon: Settings, href: null, labelKey: "Shell.nav.settings" },
+  { key: "settings", icon: Settings, href: "/settings", labelKey: "Shell.nav.settings",
+    titleKey: "P1Settings.title", subtitleKey: "P1Settings.subtitle" },
 ];
 
 export function isActive(href: string, pathname: string): boolean {
