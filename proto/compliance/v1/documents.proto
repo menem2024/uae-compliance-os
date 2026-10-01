@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package compliance.v1;
+
+import "compliance/v1/agents.proto";
+import "compliance/v1/invoice.proto";
+
+// Document ingestion events. Contract: .ship/tasks/contracts/agent-runtime.md (owner Track B).
+
+message ClientCompanyRef {
+  string client_company_id = 1;
+  string name = 2;
+  string name_ar = 3;
+  string trn = 4;
+}
+
+// Subject document.uploaded (api-go -> ai-py), after the sha256 was verified server-side.
+message DocumentUploaded {
+  string document_id = 1;
+  string firm_id = 2;
+  string client_company_id = 3;
+  string sha256 = 4;
+  string object_key = 5;
+  string content_type = 6;
+  int64 size_bytes = 7;
+  string filename = 8;
+  repeated ClientCompanyRef candidates = 9;
+  string reprocess_nonce = 10;
+}
+
+message FieldConfidence {
+  string path = 1;
+  double confidence = 2;
+}
+
+message ExtractedInvoice {
+  int32 source_ordinal = 1;
+  string source_ref = 2;
+  Invoice invoice = 3;
+  double confidence = 4;
+  repeated FieldConfidence fields = 5;
+  VerifierVerdict verdict = 6;
+}
+
+// Subject document.extracted (ai-py -> api-go).
+message DocumentExtracted {
+  string document_id = 1;
+  string firm_id = 2;
+  string client_company_id = 3;
+  string run_id = 4;
+  string document_kind = 5;
+  string direction = 6;
+  string extraction_method = 7;
+  string language = 8;
+  repeated ExtractedInvoice invoices = 9;
+  bool needs_review = 10;
+  repeated string review_reasons = 11;
+}
+
+// Subject document.failed (ai-py -> api-go).
+message DocumentFailed {
+  string document_id = 1;
+  string firm_id = 2;
+  string run_id = 3;
+  string reason_code = 4;
+  string detail = 5;
+}
