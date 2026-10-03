@@ -30,6 +30,7 @@ import (
 	"github.com/menem2024/uae-platform/services/api-go/internal/ratelimit"
 	"github.com/menem2024/uae-platform/services/api-go/internal/storage"
 	"github.com/menem2024/uae-platform/services/api-go/internal/telemetry"
+	"github.com/menem2024/uae-platform/services/api-go/internal/trackb"
 	"github.com/menem2024/uae-platform/services/api-go/internal/validator"
 )
 
@@ -229,8 +230,29 @@ func serve(ctx context.Context) (err error) {
 		consumer.Run(consumerCtx)
 	}()
 
+	app, err := trackb.Build(ctx, trackb.Deps{
+		Pool: pool, NatsConn: nc, JS: jsh, Redis: rdb, InternalMinio: mc,
+		StoragePublicEndpoint: cfg.StoragePublicEndpoint, StorageAccessKey: cfg.MinioAccessKey,
+		StorageSecretKey: cfg.MinioSecretKey, StorageRegion: cfg.StorageRegion,
+		StorageBucket: storage.DocumentsBucket, StorageUseSSL: cfg.MinioUseSSL,
+		UploadPerMinute: cfg.UploadRateLimitPerMinute, WritePerMinute: cfg.BWriteRateLimitPerMinute,
+		ReadPerMinute: cfg.BReadRateLimitPerMinute, RetryInterval: startupRetryInterval,
+	})
+	if err != nil {
+		return err
+	}
+	appErr := make(chan error, 1)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if rerr := app.Run(consumerCtx); rerr != nil {
+			appErr <- rerr
+		}
+	}()
+
 	srv := newHTTPServer(cfg.HTTPAddr,
-		httpapi.NewRouter(verifier, store, events.NewPublisher(jsh), ratelimit.New(rdb, cfg.RateLimitPerMinute), readiness(pool, nc, rdb, mc, consumer)))
+		httpapi.NewRouter(verifier, store, events.NewPublisher(jsh), ratelimit.New(rdb, cfg.RateLimitPerMinute),
+			readiness(pool, nc, rdb, mc, consumer, app), httpapi.WithTrackB(app)))
 	srvErr := make(chan error, 1)
 	go func() {
 		slog.Info("http server listening", "addr", cfg.HTTPAddr)
@@ -245,10 +267,14 @@ func serve(ctx context.Context) (err error) {
 		slog.Info("shutdown signal received")
 	case err = <-srvErr:
 		slog.Error("http server failed", "err", err)
+	case err = <-appErr:
+		slog.Error("track b failed", "err", err)
 	}
 
-	// Stop HTTP and drain the consumer concurrently to stay within budget.
+	// Stop HTTP and drain the consumers concurrently to stay within budget. Track B closes its live
+	// SSE streams first, so no handler outlives the HTTP shutdown deadline.
 	stopConsumer()
+	app.Shutdown()
 	sctx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
 	defer cancel()
 	if serr := srv.Shutdown(sctx); serr != nil {
@@ -281,7 +307,7 @@ func connectNATS(ctx context.Context, url string) (*nats.Conn, jetstream.JetStre
 }
 
 // readiness checks every dependency the API needs to serve traffic.
-func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.Client, consumer *events.ValidationConsumer) func(context.Context) error {
+func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.Client, consumer *events.ValidationConsumer, app *trackb.App) func(context.Context) error {
 	return func(ctx context.Context) error {
 		if err := pool.Ping(ctx); err != nil {
 			return fmt.Errorf("postgres: %w", err)
@@ -291,6 +317,9 @@ func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.C
 		}
 		if err := consumer.Ready(ctx); err != nil {
 			return fmt.Errorf("nats: %w", err)
+		}
+		if err := app.Ready(ctx); err != nil {
+			return fmt.Errorf("track b: %w", err)
 		}
 		if err := rdb.Ping(ctx).Err(); err != nil {
 			return fmt.Errorf("valkey: %w", err)

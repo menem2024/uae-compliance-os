@@ -131,3 +131,33 @@ func TestHubCloseDuringConcurrentPublish(t *testing.T) {
 	close(stop)
 	wg.Wait()
 }
+
+func TestHubCloseAllClosesEveryStreamAndRefusesNew(t *testing.T) {
+	h := agents.NewHub(20, 64)
+	a, b := uuid.New(), uuid.New()
+	var subs []*agents.Subscriber
+	for _, f := range []uuid.UUID{a, a, b} {
+		s, err := h.Subscribe(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		subs = append(subs, s)
+	}
+	h.CloseAll()
+	h.CloseAll() // idempotent
+	for i, s := range subs {
+		select {
+		case _, ok := <-s.Events():
+			if ok {
+				t.Fatalf("sub %d: got an event, want a closed channel", i)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("sub %d: channel not closed", i)
+		}
+		s.Close() // safe after CloseAll
+	}
+	if _, err := h.Subscribe(a); err != agents.ErrHubClosed {
+		t.Fatalf("subscribe after CloseAll: got %v, want ErrHubClosed", err)
+	}
+	h.Publish(a, agents.Event{Type: "step"}) // no panic with no subscribers
+}

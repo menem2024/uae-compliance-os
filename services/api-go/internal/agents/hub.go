@@ -14,6 +14,9 @@ import (
 // maxPerFirm live subscribers (429 too_many_streams).
 var ErrTooManyStreams = errors.New("too many streams")
 
+// ErrHubClosed is returned by Hub.Subscribe after CloseAll (the server is shutting down).
+var ErrHubClosed = errors.New("hub closed")
+
 // Event is one item of the /v1/agents/activity feed: a run, step or proposal
 // projection, or a resync marker telling the client its buffer overflowed and
 // it must re-read via the backfill endpoints.
@@ -84,6 +87,7 @@ type Hub struct {
 	maxPerFirm int
 	buffer     int
 	subs       map[uuid.UUID]map[*Subscriber]struct{}
+	closed     bool
 }
 
 // NewHub returns a Hub capping each Firm at maxPerFirm subscribers, each with
@@ -97,6 +101,9 @@ func NewHub(maxPerFirm, buffer int) *Hub {
 func (h *Hub) Subscribe(firmID uuid.UUID) (*Subscriber, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.closed {
+		return nil, ErrHubClosed
+	}
 	set := h.subs[firmID]
 	if len(set) >= h.maxPerFirm {
 		return nil, ErrTooManyStreams
@@ -132,5 +139,23 @@ func (h *Hub) Publish(firmID uuid.UUID, ev Event) {
 	h.mu.Unlock()
 	for _, s := range subs {
 		s.deliver(ev)
+	}
+}
+
+// CloseAll closes every live subscriber, so each SSE handler returns, and makes later Subscribe calls
+// fail with ErrHubClosed. It is idempotent; call it before the HTTP server's shutdown deadline so no
+// stream handler outlives the server.
+func (h *Hub) CloseAll() {
+	h.mu.Lock()
+	h.closed = true
+	var all []*Subscriber
+	for _, set := range h.subs {
+		for s := range set {
+			all = append(all, s)
+		}
+	}
+	h.mu.Unlock()
+	for _, s := range all {
+		s.Close()
 	}
 }
