@@ -10,7 +10,13 @@ from fakeredis import FakeAsyncRedis
 from pydantic import BaseModel
 
 from ai.gateway.cache import CachingGateway, MemoryCache, ValkeyCache
-from ai.gateway.errors import RecordingMissing, SpendCapExceeded, TransientModelError
+from ai.gateway.errors import (
+    ModelRefusal,
+    OutputInvalid,
+    RecordingMissing,
+    SpendCapExceeded,
+    TransientModelError,
+)
 from ai.gateway.fake import FakeGateway, response_for
 from ai.gateway.limits import (
     ConcurrencyLimitedGateway,
@@ -20,7 +26,17 @@ from ai.gateway.limits import (
 )
 from ai.gateway.pricing import cost_micro_usd
 from ai.gateway.recorded import RecordingGateway, ReplayGateway
-from ai.gateway.types import HAIKU, OPUS, SONNET, DocumentPart, Message, ModelRequest, RequestMeta, TextPart
+from ai.gateway.types import (
+    HAIKU,
+    OPUS,
+    SONNET,
+    DocumentPart,
+    Message,
+    ModelRequest,
+    RequestMeta,
+    TextPart,
+    Usage,
+)
 
 
 class Out(BaseModel):
@@ -163,3 +179,45 @@ async def test_record_then_replay(tmp_path):
     assert replayed.parsed == Out(number="9") and replayed.usage.cost_micro_usd == 4000
     with pytest.raises(RecordingMissing):
         await ReplayGateway(tmp_path).complete(req(firm="other"))
+
+
+def _billed(exc: Exception, cost: int) -> Exception:
+    usage = Usage(model=SONNET, prompt_id="extraction.invoice", prompt_version=1, input_tokens=10,
+                  output_tokens=5, cost_micro_usd=cost, llm_calls=1)
+    exc.usage = usage  # type: ignore[attr-defined]
+    return exc
+
+
+async def test_a_billed_failure_counts_toward_the_cap_and_is_reraised():
+    """Concern P2 (Task 6): refusals, max_tokens stops and schema failures are billed; the cap counts them."""
+    day = "20260929"
+    inner = FakeGateway({"extraction.invoice": [_billed(ModelRefusal("cyber"), 60)]})
+    limiter = MemorySpendLimiter(cap_micro_usd=100)
+    gw = SpendLimitedGateway(inner, limiter, now=lambda: datetime(2026, 9, 29, 12, 0, tzinfo=UTC))
+    for _ in range(2):
+        with pytest.raises(ModelRefusal):
+            await gw.complete(req())
+    assert await limiter.spent("f1", day) == 120
+    with pytest.raises(SpendCapExceeded):
+        await gw.complete(req())
+    assert len(inner.calls) == 2
+
+
+async def test_an_unbilled_failure_adds_nothing():
+    limiter = MemorySpendLimiter(cap_micro_usd=100)
+    gw = SpendLimitedGateway(FakeGateway({"extraction.invoice": [TransientModelError("529")]}), limiter,
+                             now=lambda: datetime(2026, 9, 29, tzinfo=UTC))
+    with pytest.raises(TransientModelError):
+        await gw.complete(req())
+    assert await limiter.spent("f1", "20260929") == 0
+
+
+async def test_a_limiter_outage_while_charging_a_failure_keeps_the_original_error():
+    class AddFails(MemorySpendLimiter):
+        async def add(self, firm_id, day, micro_usd):
+            raise ConnectionError("down")
+
+    gw = SpendLimitedGateway(FakeGateway({"extraction.invoice": [_billed(OutputInvalid("schema"), 30)]}),
+                             AddFails(100))
+    with pytest.raises(OutputInvalid):
+        await gw.complete(req())

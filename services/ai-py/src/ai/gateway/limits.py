@@ -8,7 +8,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
-from ai.gateway.errors import SpendCapExceeded, TransientModelError
+from ai.gateway.errors import GatewayError, SpendCapExceeded, TransientModelError
 from ai.gateway.types import ModelGateway, ModelRequest, ModelResponse
 
 log = logging.getLogger(__name__)
@@ -73,6 +73,9 @@ class ValkeySpendLimiter:
 class SpendLimitedGateway:
     """Refuses a call when the Firm's counter for today is at or over the cap; adds the cost afterwards.
 
+    A call that the provider billed but that still failed (a GatewayError carrying `usage`: refusal,
+    max_tokens, context overflow, schema mismatch) is charged too, before the error is re-raised.
+
     A limiter outage raises TransientModelError (the node retries, then the message is nak'ed): the cap
     fails closed but recovers by itself.
     """
@@ -92,13 +95,22 @@ class SpendLimitedGateway:
             raise TransientModelError(f"spend limiter unavailable: {type(exc).__name__}") from None
         if spent >= self._limiter.cap_micro_usd:
             raise SpendCapExceeded(f"daily LLM spend cap reached for firm {firm}")
-        resp = await self._inner.complete(req)
-        if resp.usage.cost_micro_usd > 0:
-            try:
-                await self._limiter.add(firm, day, resp.usage.cost_micro_usd)
-            except Exception:  # the call already happened; never lose its result
-                log.warning("spend limiter add failed firm_id=%s", firm, exc_info=True)
+        try:
+            resp = await self._inner.complete(req)
+        except GatewayError as exc:
+            if exc.usage is not None:
+                await self._charge(firm, day, exc.usage.cost_micro_usd)
+            raise
+        await self._charge(firm, day, resp.usage.cost_micro_usd)
         return resp
+
+    async def _charge(self, firm: str, day: str, micro_usd: int) -> None:
+        if micro_usd <= 0:
+            return
+        try:
+            await self._limiter.add(firm, day, micro_usd)
+        except Exception:  # the call already happened; never lose its result or its error
+            log.warning("spend limiter add failed firm_id=%s", firm, exc_info=True)
 
 
 class ConcurrencyLimitedGateway:

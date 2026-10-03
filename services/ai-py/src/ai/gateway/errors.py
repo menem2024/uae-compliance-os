@@ -2,9 +2,14 @@
 
 from typing import ClassVar
 
+from ai.gateway.types import Usage
+
 
 class GatewayError(Exception):
     code: ClassVar[str] = "gateway_error"
+    # Provider usage of a call that was billed but still failed (refusal, max_tokens, context overflow, schema
+    # mismatch); None when no billable call completed. SpendLimitedGateway charges it before re-raising.
+    usage: Usage | None = None
 
 
 class TransientModelError(GatewayError):  # 429, 5xx, overloaded, connection, timeout

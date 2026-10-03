@@ -115,6 +115,12 @@ def _retry_after(exc: anthropic.APIStatusError) -> float | None:
         return None
 
 
+def _billed(exc: GatewayError, usage: Usage) -> GatewayError:
+    """A call the provider completed (and billed) that still failed: SpendLimitedGateway charges `usage`."""
+    exc.usage = usage
+    return exc
+
+
 def map_error(exc: anthropic.APIError) -> GatewayError:
     """SDK error -> gateway taxonomy. Messages are redacted and never carry request content."""
     name = type(exc).__name__
@@ -141,14 +147,27 @@ class AnthropicGateway:
             raise map_error(exc) from None  # `from None`: the SDK error may echo request content
         return self._to_response(req, msg, int((time.monotonic() - started) * 1000))
 
+    def _usage(self, req: ModelRequest, msg: Any) -> Usage:
+        u = msg.usage
+        read, write = u.cache_read_input_tokens or 0, u.cache_creation_input_tokens or 0
+        return Usage(model=req.model, prompt_id=req.prompt_id, prompt_version=req.prompt_version,
+                     input_tokens=u.input_tokens, output_tokens=u.output_tokens,
+                     cache_read_input_tokens=read, cache_creation_input_tokens=write,
+                     cost_micro_usd=cost_micro_usd(req.model, input_tokens=u.input_tokens,
+                                                   output_tokens=u.output_tokens,
+                                                   cache_read_input_tokens=read,
+                                                   cache_creation_input_tokens=write, pricing=self._pricing),
+                     llm_calls=1)
+
     def _to_response(self, req: ModelRequest, msg: Any, latency_ms: int) -> ModelResponse:
         stop = msg.stop_reason or ""
+        usage = self._usage(req, msg)  # billed even when the call fails below: the error carries it
         if stop == "refusal":
-            raise ModelRefusal(msg.stop_details.category if msg.stop_details else None)
+            raise _billed(ModelRefusal(msg.stop_details.category if msg.stop_details else None), usage)
         if stop == "max_tokens":
-            raise OutputInvalid(f"{req.prompt_id}: stop_reason max_tokens")
+            raise _billed(OutputInvalid(f"{req.prompt_id}: stop_reason max_tokens"), usage)
         if stop == "model_context_window_exceeded":
-            raise PermanentModelError(f"{req.prompt_id}: context window exceeded")
+            raise _billed(PermanentModelError(f"{req.prompt_id}: context window exceeded"), usage)
         # thinking blocks (adaptive thinking) and every other non-text block are ignored
         text = "".join(b.text for b in msg.content if b.type == "text")
         calls = tuple(ToolCall(b.id, b.name, dict(b.input)) for b in msg.content if b.type == "tool_use")
@@ -157,16 +176,9 @@ class AnthropicGateway:
             try:
                 parsed = req.output_model.model_validate_json(text)
             except ValidationError:
-                raise OutputInvalid(f"{req.prompt_id}: output does not match {req.output_model.__name__}") from None
-        u = msg.usage
-        read, write = u.cache_read_input_tokens or 0, u.cache_creation_input_tokens or 0
-        usage = Usage(model=req.model, prompt_id=req.prompt_id, prompt_version=req.prompt_version,
-                      input_tokens=u.input_tokens, output_tokens=u.output_tokens,
-                      cache_read_input_tokens=read, cache_creation_input_tokens=write,
-                      cost_micro_usd=cost_micro_usd(req.model, input_tokens=u.input_tokens,
-                                                    output_tokens=u.output_tokens, cache_read_input_tokens=read,
-                                                    cache_creation_input_tokens=write, pricing=self._pricing),
-                      llm_calls=1)
+                name = req.output_model.__name__
+                raise _billed(OutputInvalid(f"{req.prompt_id}: output does not match {name}"),
+                              usage) from None
         return ModelResponse(model=msg.model, text=text, parsed=parsed, tool_calls=calls, stop_reason=stop,
                              usage=usage, latency_ms=latency_ms, cache_key=cache_key(req),
                              provider_request_id=getattr(msg, "_request_id", None) or "")

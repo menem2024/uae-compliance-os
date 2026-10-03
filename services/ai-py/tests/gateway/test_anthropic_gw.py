@@ -146,3 +146,25 @@ async def test_error_mapping(exc, expected, retry_after):
 def test_client_never_retries_itself():
     c = make_client("sk-test-not-a-key")
     assert c.max_retries == 0 and c.timeout.connect == 5.0 and c.timeout.read == 120.0
+
+
+@pytest.mark.parametrize(("msg", "expected"), [
+    (sdk_message([], stop="refusal", stop_details={"type": "refusal", "category": "cyber"}), ModelRefusal),
+    (sdk_message([{"type": "text", "text": "{"}], stop="max_tokens"), OutputInvalid),
+    (sdk_message([], stop="model_context_window_exceeded"), PermanentModelError),
+    (sdk_message([{"type": "text", "text": '{"nope": 1}'}]), OutputInvalid),
+])
+async def test_a_billed_failure_carries_its_usage(msg, expected):
+    """Concern P2 (Task 6): the provider bills a refusal, a max_tokens stop, a context overflow and an output
+    that fails the schema; the error carries that usage so the spend cap can count it."""
+    with pytest.raises(expected) as ei:
+        await AnthropicGateway(StubClient(msg)).complete(req())
+    u = ei.value.usage
+    assert u is not None and u.llm_calls == 1 and (u.input_tokens, u.output_tokens) == (1000, 200)
+    assert u.cost_micro_usd == 2000 + 2000 + 100
+
+
+async def test_a_transport_error_was_never_billed():
+    with pytest.raises(TransientModelError) as ei:
+        await AnthropicGateway(StubClient(_status_error(anthropic.OverloadedError, 529))).complete(req())
+    assert ei.value.usage is None
