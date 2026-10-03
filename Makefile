@@ -5,7 +5,7 @@ K3D_VERSION := 5.9.0
 TF_VERSION := 1.16.4
 export PATH := $(BIN):$(HOME)/go/bin:$(PATH)
 
-.PHONY: tools gen proto-lint up down smoke test k3d-up k3d-down helm-install images-k3d
+.PHONY: tools gen proto-lint up down smoke test evals evals-live k3d-up k3d-down helm-install images-k3d
 
 tools:
 	mkdir -p $(BIN)
@@ -41,6 +41,16 @@ test:
 	cd services/validator-rs && cargo test
 	cd services/api-go && go test ./...
 	cd services/ai-py && uv run pytest -q
+
+# Evals (spec 5.6). `evals` is free: auto mode replays committed recordings when their manifest matches the
+# current prompt versions, else runs the fake gateway (never exit-criterion eligible). `evals-live` calls the
+# real model: it needs ANTHROPIC_API_KEY and EVALS_LIVE_CONFIRM=1, and is capped by --max-cost-usd (default 10).
+# Dataset binaries must exist: `cd services/ai-py && uv run python -m ai.synthetic build`.
+evals:
+	cd services/ai-py && uv run python -m ai.evals run --all --mode auto --subset full
+
+evals-live:
+	cd services/ai-py && uv run python -m ai.evals run --all --mode live --subset full
 
 # Story 10: Helm umbrella chart on k3d (ADR 012). One k3d cluster or compose
 # stack at a time (7 GB RAM rule) — never run both together.
