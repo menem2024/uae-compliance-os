@@ -7,6 +7,7 @@ pub mod pb {
 pub const FILE_DESCRIPTOR_SET: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/compliance_descriptor.bin"));
 
+pub mod canonical_json;
 pub mod conformance;
 pub mod rules;
 pub mod service;

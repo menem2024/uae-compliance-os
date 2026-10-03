@@ -1,0 +1,585 @@
+{
+  "invoice_number": "INV-001/2025",
+  "issue_date": "2025-01-30",
+  "seller_trn": "112345678900003",
+  "buyer_trn": "112345679000003",
+  "currency": "AED",
+  "total_amount": "15777.20",
+  "vat_amount": "115.70",
+  "uuid": "4b6000ca-0128-4bdc-99a6-406f2909247f",
+  "issue_time": "18:24:10+04:00",
+  "invoice_type_code": "380",
+  "transaction_type_code": "10001010",
+  "tax_point_date": "2025-01-29",
+  "payment_due_date": "2025-02-13",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "references": {
+    "buyer_reference": "BR-001/23",
+    "project_reference": "BR-001/23",
+    "contract_reference": "BR-001/23",
+    "contract_value": "AED200000",
+    "purchase_order_reference": "PO-001/23",
+    "sales_order_reference": "SO-001/23",
+    "receiving_advice_reference": "RAR-001/23",
+    "despatch_advice_reference": "DAR-001/23",
+    "tender_or_lot_reference": "LR-001/23",
+    "buyer_accounting_reference": "4025:123:4343"
+  },
+  "preceding_invoices": [
+    {
+      "id": "INV-1001/2022",
+      "issue_date": "2025-01-30"
+    }
+  ],
+  "seller": {
+    "name": "Supplier Legal Name",
+    "trading_name": "Supplier Trade Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "112345678900003",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Al Bateen Street",
+      "line2": "Additional Street Name",
+      "line3": "Additional Address line",
+      "city": "Abu Dhabi",
+      "post_code": "Postal Zone",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contct Name",
+      "telephone": "Contact Number",
+      "email": "Email Address"
+    }
+  },
+  "buyer": {
+    "name": "Buyer Legal Name",
+    "trading_name": "Buyer Trade Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "112345679000003",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Khalifa street",
+      "line2": "Additional Street Name",
+      "line3": "Additional Address Line",
+      "city": "Abu Dhabi",
+      "post_code": "Postal Zone",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email Address"
+    }
+  },
+  "beneficiary_id": "189098765401003",
+  "payee": {
+    "name": "Payee Party Name",
+    "identifier": {
+      "id": "132345679670003",
+      "scheme_id": "0060"
+    },
+    "legal_registration": {
+      "id": "112345679350001"
+    }
+  },
+  "tax_representative": {
+    "name": "Seller Tax Representative Party Name",
+    "vat_identifier": "123349792700003",
+    "postal_address": {
+      "line1": "Al Bateen Street",
+      "line2": "Additional Street Name",
+      "line3": "Address line",
+      "city": "Abu Dhabi",
+      "post_code": "Postal Zonw",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    }
+  },
+  "delivery": {
+    "party_name": "Delivery Party Name",
+    "location": {
+      "id": "112345679000003",
+      "scheme_id": "0060"
+    },
+    "actual_delivery_date": "2025-01-30",
+    "address": {
+      "line1": "Khalifa street",
+      "line2": "Additional Street Name",
+      "line3": "Text",
+      "city": "Abu Dhabi",
+      "post_code": "Postal Zone",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    }
+  },
+  "invoicing_period": {
+    "start_date": "2025-01-30",
+    "end_date": "2025-01-30"
+  },
+  "billing_frequency": "OTH",
+  "payment_instructions": [
+    {
+      "means_code": "55",
+      "means_text": "Debit Card",
+      "credit_transfer": {
+        "account": {
+          "id": "AE0000000001",
+          "scheme_id": "IBAN"
+        },
+        "account_name": "current account",
+        "service_provider_id": "236000"
+      },
+      "card": {
+        "primary_account_number": "XXXXXXXXXXXX1234",
+        "holder_name": "Card Holder Name",
+        "network_id": "VISA"
+      },
+      "direct_debit": {
+        "mandate_reference": "2025-01-30"
+      }
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "15 days"
+    }
+  ],
+  "allowances_charges": [
+    {
+      "amount": "273.75",
+      "base_amount": "18250",
+      "percentage": "1.5",
+      "reason": "Discount",
+      "reason_code": "95",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "amount": "2451.25",
+      "base_amount": "4902.5",
+      "percentage": "50",
+      "reason": "Discount",
+      "reason_code": "95",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "is_charge": true,
+      "amount": "79",
+      "base_amount": "1975",
+      "percentage": "4",
+      "reason": "Technical Modification",
+      "reason_code": "AAC",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "18307.50",
+    "allowance_total_amount": "2725",
+    "charge_total_amount": "79",
+    "tax_exclusive_amount": "15661.50",
+    "paid_amount": "10000",
+    "rounding_amount": "0.30",
+    "payable_amount": "5777.50"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "2314",
+      "tax_amount": "115.70",
+      "category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "taxable_amount": "3900",
+      "tax_amount": "0",
+      "category": {
+        "code": "E",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "taxable_amount": "4432.50",
+      "tax_amount": "0",
+      "category": {
+        "code": "O",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "taxable_amount": "3040",
+      "tax_amount": "0",
+      "category": {
+        "code": "AE",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "taxable_amount": "1975",
+      "tax_amount": "0",
+      "category": {
+        "code": "Z",
+        "rate": "0",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "supporting_documents": [
+    {
+      "reference": "DR-INV-001",
+      "description": "Invoice is enclosed",
+      "external_uri": "https://www.site.ae/invoices.pdf"
+    },
+    {
+      "reference": "DR-INV-02",
+      "attachment": {
+        "mime_code": "application/pdf",
+        "filename": "Sample_invoice.pdf"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "note": "Please check the invoice",
+      "quantity": "5",
+      "unit_code": "H87",
+      "net_amount": "4960",
+      "order_reference": "PO-001/23",
+      "order_line_reference": "st-nar-1",
+      "accounting_reference": "ABC-001",
+      "period": {
+        "start_date": "2025-01-30",
+        "end_date": "2025-01-30"
+      },
+      "allowances_charges": [
+        {
+          "amount": "50",
+          "base_amount": "5000",
+          "percentage": "1",
+          "reason": "Discount",
+          "reason_code": "95"
+        },
+        {
+          "is_charge": true,
+          "amount": "10",
+          "reason": "Technical Modification",
+          "reason_code": "AAC"
+        }
+      ],
+      "price": {
+        "net_price": "1000",
+        "discount": "0",
+        "gross_price": "1000",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "5208",
+      "vat_amount_aed": "248",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "seller_item_id": "art-p-001",
+        "buyer_item_id": "art-to-001",
+        "standard_id": {
+          "id": "04012345123456",
+          "scheme_id": "0160"
+        },
+        "classifications": [
+          {
+            "code": "88098432324",
+            "scheme_id": "HS",
+            "scheme_version": "1.0"
+          }
+        ],
+        "origin_country": "AE",
+        "attributes": [
+          {
+            "name": "colour",
+            "value": "red"
+          }
+        ]
+      }
+    },
+    {
+      "id": "2",
+      "quantity": "10",
+      "unit_code": "H87",
+      "net_amount": "3900",
+      "allowances_charges": [
+        {
+          "amount": "80",
+          "base_amount": "4000",
+          "percentage": "2",
+          "reason": "Discount",
+          "reason_code": "95"
+        },
+        {
+          "is_charge": true,
+          "amount": "20",
+          "reason": "Special Construction",
+          "reason_code": "AAV"
+        }
+      ],
+      "price": {
+        "net_price": "1980",
+        "discount": "20",
+        "gross_price": "2000",
+        "base_quantity": "5",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "E",
+        "tax_scheme": "VAT",
+        "exemption_reason_code": "DL8.46.2",
+        "exemption_reason_text": "Supply of residential units (lease or sale)"
+      },
+      "amount_aed": "3900",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "classifications": [
+          {
+            "code": "1101",
+            "scheme_id": "HS",
+            "scheme_version": "1.0"
+          }
+        ],
+        "origin_country": "AE"
+      }
+    },
+    {
+      "id": "3",
+      "note": "Please check the invoice",
+      "quantity": "15",
+      "unit_code": "H87",
+      "net_amount": "4432.50",
+      "order_reference": "PO-001/23",
+      "order_line_reference": "st-nar-1",
+      "accounting_reference": "CS-024",
+      "period": {
+        "start_date": "2025-01-30",
+        "end_date": "2025-01-30"
+      },
+      "allowances_charges": [
+        {
+          "amount": "135",
+          "reason": "Discount",
+          "reason_code": "95"
+        },
+        {
+          "is_charge": true,
+          "amount": "112.5",
+          "base_amount": "4500",
+          "percentage": "2.5",
+          "reason": "Technical Modification",
+          "reason_code": "AAC"
+        }
+      ],
+      "price": {
+        "net_price": "2970",
+        "discount": "30",
+        "gross_price": "3000",
+        "base_quantity": "10",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "O",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "4432.50",
+      "vat_amount_aed": "0",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "seller_item_id": "art-p-001",
+        "buyer_item_id": "art-to-001",
+        "classifications": [
+          {
+            "code": "3450",
+            "scheme_id": "HS",
+            "scheme_version": "1.0"
+          }
+        ],
+        "origin_country": "AE",
+        "attributes": [
+          {
+            "name": "Item Additional Name",
+            "value": "Item Additional Value"
+          }
+        ]
+      }
+    },
+    {
+      "id": "4",
+      "note": "Please check the invoice",
+      "quantity": "20",
+      "unit_code": "H87",
+      "net_amount": "3040",
+      "order_reference": "PO-001/23",
+      "order_line_reference": "st-nar-1",
+      "accounting_reference": "CS-024",
+      "period": {
+        "start_date": "2025-01-30",
+        "end_date": "2025-01-30"
+      },
+      "allowances_charges": [
+        {
+          "amount": "128",
+          "base_amount": "3200",
+          "percentage": "4",
+          "reason": "Discount",
+          "reason_code": "95"
+        }
+      ],
+      "price": {
+        "net_price": "158.4",
+        "discount": "0",
+        "gross_price": "158.4",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "AE",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "3040",
+      "vat_amount_aed": "0",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "goods_service_type": "DL8.48.3.1",
+        "seller_item_id": "art-p-001",
+        "buyer_item_id": "art-to-001",
+        "standard_id": {
+          "id": "04012345123456",
+          "scheme_id": "0160"
+        },
+        "classifications": [
+          {
+            "code": "5000",
+            "scheme_id": "HS",
+            "scheme_version": "1.0"
+          }
+        ],
+        "origin_country": "AE",
+        "attributes": [
+          {
+            "name": "Item Additional Name",
+            "value": "Item Additional Value"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5",
+      "note": "Please check the invoice",
+      "quantity": "25",
+      "unit_code": "H87",
+      "net_amount": "1975",
+      "order_reference": "PO-001/23",
+      "order_line_reference": "st-nar-1",
+      "accounting_reference": "CS-024",
+      "period": {
+        "start_date": "2025-01-30",
+        "end_date": "2025-01-30"
+      },
+      "allowances_charges": [
+        {
+          "amount": "625",
+          "reason": "Discount",
+          "reason_code": "95"
+        },
+        {
+          "is_charge": true,
+          "amount": "125",
+          "base_amount": "2500",
+          "percentage": "5",
+          "reason": "Technical Modification",
+          "reason_code": "AAC"
+        }
+      ],
+      "price": {
+        "net_price": "4950",
+        "discount": "50",
+        "gross_price": "5000",
+        "base_quantity": "50",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "Z",
+        "rate": "0",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "1975",
+      "vat_amount_aed": "0",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "seller_item_id": "art-p-001",
+        "buyer_item_id": "art-to-001",
+        "standard_id": {
+          "id": "04012345123456",
+          "scheme_id": "0160"
+        },
+        "classifications": [
+          {
+            "code": "8680",
+            "scheme_id": "HS",
+            "scheme_version": "1.0"
+          }
+        ],
+        "origin_country": "AE",
+        "attributes": [
+          {
+            "name": "Item Additional Name",
+            "value": "Item Additional Value"
+          }
+        ]
+      }
+    }
+  ]
+}

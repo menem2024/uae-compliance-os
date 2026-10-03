@@ -1,0 +1,154 @@
+{
+  "invoice_number": "AE-001DS-Test",
+  "issue_date": "2025-02-07",
+  "seller_trn": "124680135701003",
+  "buyer_trn": "178901234501003",
+  "currency": "AED",
+  "total_amount": "279.3",
+  "vat_amount": "13.3",
+  "uuid": "08b06931-4698-4ff9-9862-2ebd2901a00c",
+  "invoice_type_code": "380",
+  "transaction_type_code": "01000000",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "seller": {
+    "name": "Supplier Legal Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "1246801357",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Sharjah",
+      "country_subdivision": "SHJ",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email address"
+    }
+  },
+  "buyer": {
+    "name": "Buyer Legal Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "1012345678",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Dubai",
+      "country_subdivision": "DXB",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email Address"
+    }
+  },
+  "payment_instructions": [
+    {
+      "means_code": "1",
+      "means_text": "Instrument Not Defined"
+    }
+  ],
+  "allowances_charges": [
+    {
+      "amount": "14",
+      "base_amount": "280",
+      "percentage": "5",
+      "reason": "Special Rebate",
+      "reason_code": "100",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "280",
+    "allowance_total_amount": "14",
+    "tax_exclusive_amount": "266",
+    "payable_amount": "279.3"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "266",
+      "tax_amount": "13.3",
+      "category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "supporting_documents": [
+    {
+      "reference": "Sample-05",
+      "external_uri": "https://www.site.ae/Sample-05.pdf"
+    },
+    {
+      "reference": "Sample-05",
+      "attachment": {
+        "mime_code": "application/pdf",
+        "filename": "Sample_invoice.pdf"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "quantity": "2",
+      "unit_code": "H87",
+      "net_amount": "280",
+      "price": {
+        "net_price": "140",
+        "discount": "10",
+        "gross_price": "150",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "294",
+      "vat_amount_aed": "14",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "classifications": [
+          {
+            "code": "88098432",
+            "scheme_id": "HS",
+            "scheme_version": "1.0"
+          }
+        ],
+        "service_accounting_codes": [
+          {
+            "code": "Service",
+            "scheme_id": "SAC"
+          }
+        ]
+      }
+    }
+  ]
+}

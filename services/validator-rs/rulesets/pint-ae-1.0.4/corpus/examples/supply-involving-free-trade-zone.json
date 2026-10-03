@@ -1,0 +1,174 @@
+{
+  "invoice_number": "AE-001FTZ-TEST",
+  "issue_date": "2025-02-07",
+  "seller_trn": "124680135701003",
+  "buyer_trn": "178901234501003",
+  "currency": "AED",
+  "total_amount": "70523.25",
+  "vat_amount": "3358.25",
+  "uuid": "3666341e-86b7-4f4d-a14f-dd56d59b7606",
+  "invoice_type_code": "380",
+  "transaction_type_code": "10000000",
+  "payment_due_date": "2025-03-07",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "seller": {
+    "name": "Supplier Legal Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "1246801357",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Sharjah",
+      "country_subdivision": "SHJ",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email Address"
+    }
+  },
+  "buyer": {
+    "name": "Buyer Legal Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "1789012345",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Dubai",
+      "country_subdivision": "DXB",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email address"
+    }
+  },
+  "beneficiary_id": "189098765401003",
+  "payment_instructions": [
+    {
+      "means_code": "30",
+      "means_text": "Credit transfer",
+      "credit_transfer": {
+        "account": {
+          "id": "AE0000000001",
+          "scheme_id": "IBAN"
+        },
+        "account_name": "current account",
+        "service_provider_id": "236000"
+      }
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "1 month"
+    }
+  ],
+  "allowances_charges": [
+    {
+      "amount": "3535",
+      "base_amount": "70700",
+      "percentage": "5",
+      "reason": "Special Rebate",
+      "reason_code": "100",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "70700",
+    "allowance_total_amount": "3535",
+    "tax_exclusive_amount": "67165",
+    "payable_amount": "70523.25"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "67165",
+      "tax_amount": "3358.25",
+      "category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "supporting_documents": [
+    {
+      "reference": "Sample-04",
+      "external_uri": "https://www.site.ae/Sample-04.pdf"
+    },
+    {
+      "reference": "Sample-04",
+      "attachment": {
+        "mime_code": "application/pdf",
+        "filename": "Sample_04.pdf"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "note": "Invoice line note",
+      "quantity": "500",
+      "unit_code": "H87",
+      "net_amount": "70700",
+      "allowances_charges": [
+        {
+          "is_charge": true,
+          "amount": "700",
+          "base_amount": "70000",
+          "percentage": "1",
+          "reason": "Technical Modification",
+          "reason_code": "AAC"
+        }
+      ],
+      "price": {
+        "net_price": "140",
+        "discount": "10",
+        "gross_price": "150",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "74235",
+      "vat_amount_aed": "3535",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "classifications": [
+          {
+            "code": "112233",
+            "scheme_id": "HS",
+            "scheme_version": "1.0"
+          }
+        ]
+      }
+    }
+  ]
+}

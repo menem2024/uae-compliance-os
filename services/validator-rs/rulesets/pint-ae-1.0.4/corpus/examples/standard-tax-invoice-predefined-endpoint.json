@@ -1,0 +1,228 @@
+{
+  "invoice_number": "AE-01TEST",
+  "issue_date": "2025-02-06",
+  "seller_trn": "198765432102003",
+  "buyer_trn": "134567890123003",
+  "currency": "AED",
+  "total_amount": "11175.45",
+  "vat_amount": "532.16",
+  "uuid": "f12f329f-6430-4399-b661-7c5cd9c3a9e6",
+  "issue_time": "07:54:00+04:00",
+  "invoice_type_code": "380",
+  "transaction_type_code": "00000000",
+  "tax_point_date": "2025-01-30",
+  "payment_due_date": "2025-02-13",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "references": {
+    "buyer_reference": "PO-AE-220",
+    "project_reference": "Regular work",
+    "purchase_order_reference": "PO-AE-220",
+    "sales_order_reference": "Salesorder-2122",
+    "despatch_advice_reference": "Memo-1000",
+    "tender_or_lot_reference": "PO-AE-220",
+    "buyer_accounting_reference": "Regular sales"
+  },
+  "preceding_invoices": [
+    {
+      "id": "INV-234-2025",
+      "issue_date": "2025-02-06"
+    }
+  ],
+  "seller": {
+    "name": "Supplier Legal Name",
+    "trading_name": "Party Trade Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "1987654321",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Sharjah",
+      "country_subdivision": "SHJ",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Telephone number",
+      "email": "Email address"
+    }
+  },
+  "buyer": {
+    "name": "Noor Electronics",
+    "trading_name": "Buyer Trade Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "9900000098",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Abu Dhabi",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Telephone number",
+      "email": "Email address"
+    }
+  },
+  "payee": {
+    "name": "Payee Name",
+    "legal_registration": {
+      "id": "1122334455"
+    }
+  },
+  "invoicing_period": {
+    "start_date": "2025-01-31",
+    "end_date": "2025-02-06"
+  },
+  "payment_instructions": [
+    {
+      "means_code": "55",
+      "means_text": "Debit Card",
+      "card": {
+        "primary_account_number": "XXXXXXXXXXXX1234",
+        "holder_name": "Card Holder Name",
+        "network_id": "VISA"
+      }
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "Within a week"
+    }
+  ],
+  "allowances_charges": [
+    {
+      "amount": "262.15",
+      "base_amount": "10486",
+      "percentage": "2.5",
+      "reason": "Special Rebate",
+      "reason_code": "100",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "is_charge": true,
+      "amount": "419.44",
+      "base_amount": "10486",
+      "percentage": "4",
+      "reason": "Rush Delivery",
+      "reason_code": "AAT",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "10486",
+    "allowance_total_amount": "262.15",
+    "charge_total_amount": "419.44",
+    "tax_exclusive_amount": "10643.29",
+    "rounding_amount": "0.05",
+    "payable_amount": "11175.5"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "10643.29",
+      "tax_amount": "532.1645",
+      "category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "supporting_documents": [
+    {
+      "reference": "PO-AE-220",
+      "external_uri": "https://www.site.ae/PO-AE-220.pdf"
+    },
+    {
+      "reference": "PO-AE-220",
+      "attachment": {
+        "mime_code": "application/pdf",
+        "filename": "PO-AE-220.pdf"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "note": "All items",
+      "quantity": "2000",
+      "unit_code": "H87",
+      "net_amount": "10486",
+      "order_reference": "PO-AE-220",
+      "order_line_reference": "1",
+      "period": {
+        "start_date": "2025-01-31",
+        "end_date": "2025-01-31"
+      },
+      "allowances_charges": [
+        {
+          "amount": "294",
+          "base_amount": "9800",
+          "percentage": "3",
+          "reason": "Discount",
+          "reason_code": "95"
+        },
+        {
+          "is_charge": true,
+          "amount": "980",
+          "base_amount": "9800",
+          "percentage": "10",
+          "reason": "Technical Modification",
+          "reason_code": "AAC"
+        }
+      ],
+      "price": {
+        "net_price": "4.9",
+        "discount": "0.1",
+        "gross_price": "5",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "11010.3",
+      "vat_amount_aed": "524.3",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "seller_item_id": "Sales Goods",
+        "buyer_item_id": "Purchase goods",
+        "origin_country": "AE",
+        "attributes": [
+          {
+            "name": "Item details",
+            "value": "Item Value"
+          }
+        ]
+      }
+    }
+  ]
+}

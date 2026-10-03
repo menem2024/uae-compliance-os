@@ -1,0 +1,214 @@
+{
+  "invoice_number": "AE-001CS-TEST",
+  "issue_date": "2025-02-07",
+  "seller_trn": "132654987101003",
+  "buyer_trn": "145678945601003",
+  "currency": "AED",
+  "total_amount": "6056.25",
+  "vat_amount": "253.75",
+  "uuid": "2175fae7-7dc2-4aea-b78b-d358f8863919",
+  "invoice_type_code": "380",
+  "transaction_type_code": "00001000",
+  "tax_point_date": "2025-01-30",
+  "payment_due_date": "2025-03-07",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "references": {
+    "contract_reference": "ZXC-CS-03",
+    "contract_value": "AED 1000000"
+  },
+  "seller": {
+    "name": "Supplier Legal Name",
+    "trading_name": "Supplier Trade Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "1987654321",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Dubai",
+      "country_subdivision": "DXB",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email Address"
+    }
+  },
+  "buyer": {
+    "name": "Buyer Legal Name",
+    "trading_name": "Buyer Trade Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "1456789456",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Abu Dhabi",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email Address"
+    }
+  },
+  "invoicing_period": {
+    "start_date": "2025-01-31",
+    "end_date": "2025-02-07"
+  },
+  "payment_instructions": [
+    {
+      "means_code": "30",
+      "means_text": "Credit transfer",
+      "credit_transfer": {
+        "account": {
+          "id": "AE0000000001",
+          "scheme_id": "IBAN"
+        },
+        "account_name": "current account",
+        "service_provider_id": "236000"
+      }
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "1 month"
+    }
+  ],
+  "allowances_charges": [
+    {
+      "is_charge": true,
+      "amount": "75",
+      "base_amount": "5000",
+      "percentage": "1.5",
+      "reason": "Polyethylene wrap packing",
+      "reason_code": "ABU",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "5727.50",
+    "charge_total_amount": "75",
+    "tax_exclusive_amount": "5802.5",
+    "rounding_amount": "0.75",
+    "payable_amount": "6057"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "5075",
+      "tax_amount": "253.75",
+      "category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "taxable_amount": "727.5",
+      "tax_amount": "0",
+      "category": {
+        "code": "E",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "supporting_documents": [
+    {
+      "reference": "Cabbills",
+      "external_uri": "https://www.site.ae/cabbills.pdf"
+    },
+    {
+      "reference": "All signed cab bills",
+      "attachment": {
+        "mime_code": "application/pdf",
+        "filename": "Cabbills.pdf"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "quantity": "10",
+      "unit_code": "TIP",
+      "net_amount": "5000",
+      "period": {
+        "start_date": "2025-01-31",
+        "end_date": "2025-02-07"
+      },
+      "price": {
+        "net_price": "500",
+        "discount": "0",
+        "gross_price": "500",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "TIP"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "5250",
+      "vat_amount_aed": "250",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "classifications": [
+          {
+            "code": "23424",
+            "scheme_id": "HS"
+          }
+        ]
+      }
+    },
+    {
+      "id": "2",
+      "quantity": "1455",
+      "unit_code": "LN",
+      "net_amount": "727.5",
+      "period": {
+        "start_date": "2025-01-31",
+        "end_date": "2025-02-07"
+      },
+      "price": {
+        "net_price": "0.5",
+        "discount": "0",
+        "gross_price": "0.5",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "LN"
+      },
+      "tax": {
+        "code": "E",
+        "tax_scheme": "VAT",
+        "exemption_reason_code": "DL8.46.4",
+        "exemption_reason_text": "Local passenger transport"
+      },
+      "amount_aed": "727.5",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description"
+      }
+    }
+  ]
+}

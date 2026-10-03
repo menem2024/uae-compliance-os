@@ -1,0 +1,123 @@
+{
+  "invoice_number": "AE-CI-001Test",
+  "issue_date": "2025-02-07",
+  "seller_trn": "198765432112303",
+  "buyer_trn": "134567890123003",
+  "currency": "AED",
+  "total_amount": "150000",
+  "vat_amount": "0",
+  "uuid": "19e2c9a3-b000-4fb0-9bd5-a9c4ebda2358",
+  "issue_time": "17:38:00+04:00",
+  "invoice_type_code": "480",
+  "transaction_type_code": "00000000",
+  "payment_due_date": "2025-02-07",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "seller": {
+    "name": "Supplier Legal Name",
+    "trading_name": "Seller Trade Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "1987654321",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Sharjah",
+      "country_subdivision": "SHJ",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email address"
+    }
+  },
+  "buyer": {
+    "name": "Buyer Legal Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "1345678901",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Abu Dhabi",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email Address"
+    }
+  },
+  "payee": {
+    "name": "Payee Ltd.",
+    "legal_registration": {
+      "id": "CN12389045678121"
+    }
+  },
+  "payment_instructions": [
+    {
+      "means_code": "10",
+      "means_text": "In cash"
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "Cash payment"
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "150000",
+    "tax_exclusive_amount": "150000",
+    "payable_amount": "150000"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "150000",
+      "tax_amount": "0",
+      "category": {
+        "code": "O",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "quantity": "1000",
+      "unit_code": "H87",
+      "net_amount": "150000",
+      "price": {
+        "net_price": "150",
+        "discount": "1",
+        "gross_price": "151",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "O",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "150000",
+      "vat_amount_aed": "0",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description"
+      }
+    }
+  ]
+}

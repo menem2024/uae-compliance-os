@@ -1,0 +1,132 @@
+{
+  "invoice_number": "AE-001-Marginscheme-TEST",
+  "issue_date": "2025-02-11",
+  "seller_trn": "112345678900003",
+  "buyer_trn": "112345679000003",
+  "currency": "AED",
+  "total_amount": "1000",
+  "vat_amount": "0",
+  "uuid": "e59f130c-eb13-4476-bc18-2202915f48cf",
+  "invoice_type_code": "380",
+  "transaction_type_code": "00100000",
+  "payment_due_date": "2025-02-11",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "seller": {
+    "name": "Supplier Legal Name",
+    "trading_name": "Supplier Trade Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "112345678900003",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "line2": "Additional Street Name",
+      "line3": "Additional Address line",
+      "city": "Abu Dhabi",
+      "post_code": "Postal Zone",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Contact Email address"
+    }
+  },
+  "buyer": {
+    "name": "Buyer Legal Name",
+    "trading_name": "Buyer Trade Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "112345679000003",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "line2": "Additional Street Name",
+      "line3": "Additional Address Line",
+      "city": "Abu Dhabi",
+      "post_code": "Postal Zone",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Contact Email address"
+    }
+  },
+  "payment_instructions": [
+    {
+      "means_code": "55",
+      "means_text": "Debit Card",
+      "card": {
+        "primary_account_number": "XXXXXXXXXXXX1234",
+        "holder_name": "Card Holder Name",
+        "network_id": "VISA"
+      }
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "Instant Payment"
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "1000",
+    "tax_exclusive_amount": "1000",
+    "payable_amount": "1000"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "1000",
+      "tax_amount": "0",
+      "category": {
+        "code": "N",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "note": "Margin scheme goods",
+      "quantity": "1",
+      "unit_code": "H87",
+      "net_amount": "1000",
+      "price": {
+        "net_price": "1000",
+        "discount": "0",
+        "gross_price": "1000",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "N",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "1000",
+      "vat_amount_aed": "0",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description"
+      }
+    }
+  ]
+}
