@@ -312,7 +312,10 @@ func (s *fakeStore) ApplyFailed(_ context.Context, firm, id, runID uuid.UUID, re
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	d, ok := s.docs[id]
-	if !ok || d.FirmID != firm || (d.Status != "uploaded" && d.Status != "processing") {
+	if !ok || d.FirmID != firm {
+		return false, db.ErrNotFound
+	}
+	if d.Status != "uploaded" && d.Status != "processing" {
 		return false, nil
 	}
 	d.Status, d.StatusReason = "failed", reason

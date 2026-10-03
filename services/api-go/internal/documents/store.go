@@ -46,7 +46,9 @@ type Store interface {
 	// failure can never leave the Document 'extracted' without its invoices. The returned Invoices are the
 	// Document's authoritative invoice set read back in the same transaction.
 	ApplyExtractedResult(ctx context.Context, firm uuid.UUID, p ExtractedParams, items []InvoiceIn) (ApplyOutcome, error)
-	// ApplyFailed applies one document.failed result; applied has the same meaning as ApplyExtracted's.
+	// ApplyFailed applies one document.failed result. applied is false when the Document's status was no
+	// longer uploaded/processing; db.ErrNotFound when the Document is not visible to the Firm (missing, or
+	// another Firm's).
 	ApplyFailed(ctx context.Context, firm, id, runID uuid.UUID, reason string) (applied bool, err error)
 	// Reprocess moves a failed/not_invoice/needs_review(invoice_count=0) Document back to uploaded with
 	// a new nonce. ErrNotReprocessable when the Document's current status does not allow it.
@@ -306,6 +308,9 @@ func (s PGStore) ApplyExtractedResult(ctx context.Context, firm uuid.UUID, p Ext
 func (s PGStore) ApplyFailed(ctx context.Context, firm, id, runID uuid.UUID, reason string) (bool, error) {
 	var n int64
 	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
+		if _, err := q.LockDocument(ctx, id); err != nil {
+			return err // pgx.ErrNoRows: WithFirm maps it to db.ErrNotFound
+		}
 		var err error
 		n, err = q.ApplyDocumentFailed(ctx, sqlc.ApplyDocumentFailedParams{Reason: reason, RunID: nullUUID(runID), ID: id})
 		return err

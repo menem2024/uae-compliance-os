@@ -3,7 +3,12 @@
 package agents_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"log/slog"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -93,5 +98,66 @@ func TestConsumerIsOrderIndependentAndIdempotent(t *testing.T) {
 	q(`SELECT count(*) FROM proposals WHERE run_id = $1`, []any{run}, &n)
 	if n != 1 {
 		t.Fatalf("proposals %d", n)
+	}
+}
+
+// logCapture swaps slog's default handler for a buffer for the test.
+type logCapture struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (l *logCapture) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.Write(p)
+}
+
+func (l *logCapture) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.String()
+}
+
+func captureLogs(t *testing.T) *logCapture {
+	t.Helper()
+	lc := &logCapture{}
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(lc, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return lc
+}
+
+// Security review A, finding 8: a Firm B event naming a Firm A document is acked but now leaves a
+// log line carrying ids only, and a run-id collision with another Firm's row (an RLS violation on the
+// upsert's conflict path) is dead-lettered at once instead of retried.
+func TestConsumerIntegrationFirmMismatchIsLoggedAndCollisionIsPermanent(t *testing.T) {
+	env := dbtest.Setup(t)
+	ctx := context.Background()
+	c := &agents.Consumer{Pool: env.App}
+	cc := dbtest.ClientCompany(t, env, env.FirmA, "Oasis", "")
+	doc := uuid.New()
+	if _, err := dbtest.ExecFirm(ctx, env, env.FirmA, `INSERT INTO documents (id, firm_id, client_company_id, sha256, object_key, filename,
+		content_type, size_bytes, status) VALUES ($1::uuid, $2::uuid, $3, repeat('b', 64), 'firms/' || $2::text || '/docs/' || $1::text,
+		'a.pdf', 'application/pdf', 10, 'uploaded')`, doc, env.FirmA, cc); err != nil {
+		t.Fatal(err)
+	}
+	logs := captureLogs(t)
+	runA := uuid.NewString()
+	deliver(t, c, events.AgentRunStartedSubject, &compliancev1.AgentRunStarted{RunId: runA, FirmId: env.FirmA.String(),
+		Workflow: "w@1", SubjectType: "document", SubjectId: doc.String(), StartedAt: timestamppb.Now()})
+
+	deliver(t, c, events.AgentRunStartedSubject, &compliancev1.AgentRunStarted{RunId: uuid.NewString(), FirmId: env.FirmB.String(),
+		Workflow: "w@1", SubjectType: "document", SubjectId: doc.String(), StartedAt: timestamppb.Now()})
+	out := logs.String()
+	if !strings.Contains(out, "not owned") || !strings.Contains(out, env.FirmB.String()) || !strings.Contains(out, doc.String()) {
+		t.Fatalf("firm mismatch must be logged with ids: %q", out)
+	}
+
+	data, _ := proto.Marshal(&compliancev1.AgentRunStarted{RunId: runA, FirmId: env.FirmB.String(), Workflow: "w@1",
+		SubjectType: "document", SubjectId: uuid.NewString(), StartedAt: timestamppb.Now()})
+	err := c.Handle(ctx, fakeMsg{subject: events.AgentRunStartedSubject, data: data})
+	if !errors.Is(err, events.ErrPermanent) {
+		t.Fatalf("a cross-Firm id collision must be permanent, got %v", err)
 	}
 }

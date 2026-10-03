@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go/jetstream"
@@ -81,6 +83,8 @@ func (c *Consumer) Handle(ctx context.Context, msg jetstream.Msg) error {
 		return permanent("unexpected subject %s", msg.Subject())
 	}
 	if err != nil && !errors.Is(err, events.ErrPermanent) && proposals.IsPermanentPG(err) {
+		slog.WarnContext(ctx, "agents consumer: dead-lettering a result the database rejects for good",
+			"subject", msg.Subject(), "err", err)
 		return fmt.Errorf("%w: %w", events.ErrPermanent, err)
 	}
 	return err
@@ -115,9 +119,20 @@ func (c *Consumer) runStarted(ctx context.Context, m *compliancev1.AgentRunStart
 			return fmt.Errorf("abandon superseded runs: %w", err)
 		}
 		if docID, err := uuid.Parse(p.SubjectID); err == nil && p.SubjectType == "document" {
-			if _, err := q.MarkDocumentProcessing(ctx, sqlc.MarkDocumentProcessingParams{ID: docID,
-				RunID: uuid.NullUUID{UUID: p.ID, Valid: true}}); err != nil {
+			n, err := q.MarkDocumentProcessing(ctx, sqlc.MarkDocumentProcessingParams{ID: docID,
+				RunID: uuid.NullUUID{UUID: p.ID, Valid: true}})
+			if err != nil {
 				return fmt.Errorf("mark document processing: %w", err)
+			}
+			if n == 0 {
+				// A terminal Document is the normal reason. A Document this Firm cannot see is not: NATS
+				// carries no auth, so firm_id is a claim, and RLS made the write a no-op. Ack, but say so.
+				if _, err := q.GetDocument(ctx, docID); errors.Is(err, pgx.ErrNoRows) {
+					slog.WarnContext(ctx, "agents consumer: document not owned by the message's firm, ignored",
+						"subject", events.AgentRunStartedSubject, "firm_id", m.GetFirmId(), "document_id", docID)
+				} else if err != nil {
+					return fmt.Errorf("get document: %w", err)
+				}
 			}
 		}
 		return nil

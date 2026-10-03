@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go/jetstream"
@@ -11,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	compliancev1 "github.com/menem2024/uae-platform/services/api-go/gen/compliance/v1"
+	"github.com/menem2024/uae-platform/services/api-go/internal/db"
 	"github.com/menem2024/uae-platform/services/api-go/internal/events"
 	"github.com/menem2024/uae-platform/services/api-go/internal/proposals"
 )
@@ -65,6 +67,8 @@ func (c *Consumer) Handle(ctx context.Context, msg jetstream.Msg) error {
 		return permanent("unexpected subject %s", msg.Subject())
 	}
 	if err != nil && !errors.Is(err, events.ErrPermanent) && proposals.IsPermanentPG(err) {
+		slog.WarnContext(ctx, "documents consumer: dead-lettering a result the database rejects for good",
+			"subject", msg.Subject(), "err", err)
 		return fmt.Errorf("%w: %w", events.ErrPermanent, err)
 	}
 	return err
@@ -117,6 +121,10 @@ func (c *Consumer) extracted(ctx context.Context, m *compliancev1.DocumentExtrac
 	if err != nil {
 		return fmt.Errorf("apply extracted: %w", err)
 	}
+	if !out.Found {
+		logNotOwned(ctx, events.DocumentExtractedSubject, firm, id)
+		return nil
+	}
 	if !out.Applied && !out.Replay {
 		return nil
 	}
@@ -159,7 +167,19 @@ func (c *Consumer) failed(ctx context.Context, m *compliancev1.DocumentFailed) e
 		}
 	}
 	if _, err := c.Store.ApplyFailed(ctx, firm, id, runID, m.GetReasonCode()); err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			logNotOwned(ctx, events.DocumentFailedSubject, firm, id)
+			return nil
+		}
 		return fmt.Errorf("apply failed: %w", err)
 	}
 	return nil
+}
+
+// logNotOwned records a result whose firm_id does not own the Document (NATS carries no auth, so
+// firm_id is only a claim; RLS made the write a no-op). It is acked, not retried, but not silent:
+// ids only, never filenames or content.
+func logNotOwned(ctx context.Context, subject string, firm, document uuid.UUID) {
+	slog.WarnContext(ctx, "documents consumer: document not owned by the message's firm, result ignored",
+		"subject", subject, "firm_id", firm, "document_id", document)
 }

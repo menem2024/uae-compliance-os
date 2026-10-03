@@ -111,6 +111,14 @@ func TestIsPermanentPG(t *testing.T) {
 	if !proposals.IsPermanentPG(&pgconn.PgError{Code: "23503"}) || !proposals.IsPermanentPG(&pgconn.PgError{Code: "22P02"}) {
 		t.Fatal("integrity and data errors are permanent")
 	}
+	// Security review A, finding 8: an RLS violation (a cross-Firm id collision) can never succeed on retry,
+	// but a missing GRANT is an operational fault that may be fixed while the message is retried.
+	if !proposals.IsPermanentPG(&pgconn.PgError{Code: "42501", Message: "new row violates row-level security policy (USING expression) for table \"agent_runs\""}) {
+		t.Fatal("an RLS violation is permanent")
+	}
+	if proposals.IsPermanentPG(&pgconn.PgError{Code: "42501", Message: "permission denied for table agent_runs"}) {
+		t.Fatal("a missing privilege stays retryable")
+	}
 	if proposals.IsPermanentPG(&pgconn.PgError{Code: "40001"}) || proposals.IsPermanentPG(errors.New("x")) {
 		t.Fatal("serialization failures and plain errors are retryable")
 	}

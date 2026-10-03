@@ -1,8 +1,11 @@
 package documents_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -197,5 +200,37 @@ func TestConsumerDeadLettersWhatCanNeverSucceed(t *testing.T) {
 		if err := c.Handle(ctx, m); !errors.Is(err, events.ErrPermanent) {
 			t.Errorf("%s: %v", m.subject, err)
 		}
+	}
+}
+
+// Security review A, finding 8: a result whose firm_id does not own the Document is acked (nothing can
+// be applied to it) but is no longer silent: one log line with ids only, no filenames or content.
+func TestConsumerLogsWhenTheFirmDoesNotOwnTheDocument(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	r := newRig()
+	c := &documents.Consumer{Store: r.store, Bus: r.bus}
+	docID, stranger := uuid.New(), uuid.New()
+	r.store.docs[docID] = sqlcDoc(r.firm, docID, "uploaded")
+	extracted, _ := proto.Marshal(&compliancev1.DocumentExtracted{DocumentId: docID.String(), FirmId: stranger.String(),
+		ClientCompanyId: r.cc.String(), RunId: uuid.NewString(), DocumentKind: "invoice"})
+	failed, _ := proto.Marshal(&compliancev1.DocumentFailed{DocumentId: docID.String(), FirmId: stranger.String(),
+		RunId: uuid.NewString(), ReasonCode: "x"})
+	for subject, data := range map[string][]byte{events.DocumentExtractedSubject: extracted, events.DocumentFailedSubject: failed} {
+		buf.Reset()
+		if err := c.Handle(context.Background(), fakeMsg{subject: subject, data: data}); err != nil {
+			t.Fatalf("%s: %v", subject, err)
+		}
+		out := buf.String()
+		if !strings.Contains(out, "not owned") || !strings.Contains(out, docID.String()) || !strings.Contains(out, stranger.String()) ||
+			strings.Contains(out, "a.pdf") {
+			t.Fatalf("%s: %q", subject, out)
+		}
+	}
+	if r.store.docs[docID].Status != "uploaded" || len(r.bus.published) != 0 {
+		t.Fatal("a foreign Firm must not move the Document")
 	}
 }

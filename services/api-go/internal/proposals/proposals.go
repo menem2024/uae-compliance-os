@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -397,8 +398,18 @@ func appendRows(out *[]Proposal, rows []sqlc.Proposal) error {
 	return nil
 }
 
-// IsPermanentPG reports a Postgres error no retry can fix (integrity or data exception classes).
+// IsPermanentPG reports a Postgres error no retry can fix: the integrity and data exception classes,
+// and a row-level-security violation (SQLSTATE 42501 "new row violates row-level security policy"),
+// which is what a cross-Firm id collision on an upsert's conflict path raises. Other 42501 errors
+// ("permission denied for table ...": a missing GRANT) stay retryable: an operator can fix those while
+// the message is still being redelivered, so a bare 42501 must not mask them.
 func IsPermanentPG(err error) bool {
 	var pg *pgconn.PgError
-	return errors.As(err, &pg) && len(pg.Code) == 5 && (pg.Code[:2] == "23" || pg.Code[:2] == "22")
+	if !errors.As(err, &pg) || len(pg.Code) != 5 {
+		return false
+	}
+	if pg.Code == "42501" {
+		return strings.Contains(pg.Message, "row-level security")
+	}
+	return pg.Code[:2] == "23" || pg.Code[:2] == "22"
 }

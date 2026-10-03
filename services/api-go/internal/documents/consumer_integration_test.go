@@ -301,3 +301,30 @@ func TestConsumerIntegrationInvoicesFollowTheLockedDocument(t *testing.T) {
 		t.Fatalf("invoice cc=%s doc cc=%s (want %s) direction=%q (want received)", invCC, docCC, newCC, dir)
 	}
 }
+
+// Security review A, finding 8, against the real RLS: Firm B naming Firm A's Document is acked, changes
+// nothing, and does not trip over a database error.
+func TestConsumerIntegrationForeignFirmResultIsAckedAndHarmless(t *testing.T) {
+	env := dbtest.Setup(t)
+	ctx := context.Background()
+	store := documents.PGStore{Pool: env.App}
+	bus := &fakeBus{}
+	c := &documents.Consumer{Store: store, Bus: bus}
+	cc := dbtest.ClientCompany(t, env, env.FirmA, "Alpha", "")
+	docID := uploadedDocument(t, store, env, env.FirmA, cc)
+
+	ext, _ := proto.Marshal(&compliancev1.DocumentExtracted{DocumentId: docID.String(), FirmId: env.FirmB.String(),
+		ClientCompanyId: cc.String(), RunId: uuid.NewString(), DocumentKind: "invoice",
+		Invoices: []*compliancev1.ExtractedInvoice{{SourceOrdinal: 0, Invoice: &compliancev1.Invoice{}}}})
+	failed, _ := proto.Marshal(&compliancev1.DocumentFailed{DocumentId: docID.String(), FirmId: env.FirmB.String(),
+		RunId: uuid.NewString(), ReasonCode: "x"})
+	for subject, data := range map[string][]byte{events.DocumentExtractedSubject: ext, events.DocumentFailedSubject: failed} {
+		if err := c.Handle(ctx, fakeMsg{subject: subject, data: data}); err != nil {
+			t.Fatalf("%s: %v", subject, err)
+		}
+	}
+	doc, err := store.Get(ctx, env.FirmA, docID)
+	if err != nil || doc.Status != "uploaded" || len(bus.published) != 0 {
+		t.Fatalf("%+v %v %v", doc, err, bus.published)
+	}
+}
