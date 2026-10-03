@@ -43,3 +43,13 @@ jobs:
       - name: pytest
         working-directory: services/ai-py
         run: uv run pytest -q
+
+      # Dataset binaries under evals/datasets/*/files/ are gitignored; regenerate them.
+      - name: synthetic datasets (build)
+        working-directory: services/ai-py
+        run: uv run python -m ai.synthetic build
+
+      # auto mode only: replays recordings or uses the fake gateway; never a live LLM call.
+      - name: evals (auto mode)
+        working-directory: services/ai-py
+        run: uv run python -m ai.evals run --all --mode auto --subset full
