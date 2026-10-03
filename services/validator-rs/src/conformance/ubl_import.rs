@@ -831,6 +831,10 @@ impl Imp {
             };
             if let Some(b) = self.kid(a, Ns::Cac, "FinancialInstitutionBranch") {
                 ct.service_provider_id = self.tx(b, "ID");
+                // IBG-34 (IBT-169..IBT-175), the context of `ibr-sr-59`.
+                if let Some(addr) = self.kid(b, Ns::Cac, "Address") {
+                    ct.institution_address = self.address(addr);
+                }
             }
             out.credit_transfer = nz(ct);
         }
@@ -1033,6 +1037,78 @@ mod tests {
             let (inv, rep) = from_xml(&with_contract_value(text)).unwrap();
             assert_eq!(inv.references.unwrap().contract_value, text, "{text:?}");
             assert!(rep.ignored.is_empty(), "{text:?}: {:?}", rep.ignored);
+        }
+    }
+
+    /// What the exporter does not write by design: supporting-document attachments (spec 2,
+    /// non-goals), IBT-090 (no binding), the `@schemeAgencyName` qualifier the legal
+    /// registration type does not select, and the tax category of a line allowance (the model's
+    /// comment: "document level only").
+    fn exportable_part(mut x: pb::Invoice) -> pb::Invoice {
+        for d in &mut x.supporting_documents {
+            d.attachment = None;
+        }
+        for pi in &mut x.payment_instructions {
+            if let Some(dd) = &mut pi.direct_debit {
+                dd.creditor_identifier.clear();
+            }
+        }
+        for p in [&mut x.seller, &mut x.buyer].into_iter().flatten() {
+            if let Some(lr) = &mut p.legal_registration {
+                if lr.r#type == "PAS" {
+                    lr.authority_name.clear();
+                } else {
+                    lr.passport_issuing_country.clear();
+                }
+            }
+        }
+        for l in &mut x.lines {
+            for a in &mut l.allowances_charges {
+                a.tax_category = None;
+            }
+        }
+        x
+    }
+
+    /// The deferred Task 5 round trip (spec 5.3.4): for each imported example `x`,
+    /// `from_xml(to_xml(Doc::new(&x))) == x` up to what is not exported by design, and the
+    /// importer consumes everything the exporter writes.
+    #[test]
+    fn round_trip_of_every_example() {
+        let mut failures = Vec::new();
+        for (slug, x) in crate::conformance::examples() {
+            let xml = crate::export::testing::export_str(&x);
+            let (y, rep) = from_xml(&xml).unwrap_or_else(|e| panic!("{slug}: {e}"));
+            if !rep.ignored.is_empty() {
+                failures.push(format!("{slug}: ignored {:?}", rep.ignored));
+            }
+            if y != exportable_part(x.clone()) {
+                failures.push(format!("{slug}: round trip differs"));
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    /// Every field of the model set, both kinds and both legal-registration qualifiers: every
+    /// binding of the exporter is read back by the importer to the same field.
+    #[test]
+    fn round_trip_of_maximal_documents() {
+        for code in ["380", "480", "381", "81"] {
+            for lr_type in ["TL", "PAS"] {
+                let mut x = crate::export::testing::maximal(code);
+                for p in [&mut x.seller, &mut x.buyer].into_iter().flatten() {
+                    p.legal_registration.as_mut().unwrap().r#type = lr_type.into();
+                }
+                let xml = crate::export::testing::export_str(&x);
+                let (y, rep) = from_xml(&xml).unwrap();
+                assert_eq!(rep.ignored, Vec::<String>::new(), "{code} {lr_type}");
+                let want = exportable_part(x);
+                assert_eq!(
+                    crate::canonical_json::to_canonical_json_pretty(&y),
+                    crate::canonical_json::to_canonical_json_pretty(&want),
+                    "{code} {lr_type}"
+                );
+            }
         }
     }
 

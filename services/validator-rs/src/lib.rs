@@ -13,6 +13,7 @@ pub mod codelists;
 pub mod conformance;
 pub mod decimal;
 pub mod doc;
+pub mod export;
 pub mod rule;
 pub mod rules;
 pub mod ruleset;
