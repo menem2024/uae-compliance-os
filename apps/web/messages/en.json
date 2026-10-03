@@ -255,5 +255,80 @@
       "body": "Open a workspace for your firm and start validating invoices ahead of the mandate.",
       "button": "Sign in"
     }
+  },
+  "P1Documents": {
+    "title": "Documents",
+    "subtitle": "Upload invoices and watch them move through the agents",
+    "client": {
+      "label": "Client company",
+      "placeholder": "Choose a client company",
+      "none": "Add a client company first to upload documents.",
+      "add": "Add client company",
+      "loadError": "Could not load client companies."
+    },
+    "dropzone": {
+      "title": "Drop files here, or browse",
+      "hint": "PDF, PNG, JPEG, WebP, CSV or XLSX. Up to 20 MB each, 100 files at a time.",
+      "browse": "Choose files",
+      "needClient": "Choose a client company first."
+    },
+    "queue": {
+      "title": "This upload",
+      "clear": "Clear finished"
+    },
+    "state": {
+      "hashing": "Reading file",
+      "requesting": "Preparing upload",
+      "uploading": "Uploading",
+      "completing": "Verifying",
+      "processing": "Agents are working",
+      "extracted": "Extracted",
+      "needs_review": "Needs review",
+      "not_invoice": "Not an invoice",
+      "failed": "Failed",
+      "rejected": "Rejected",
+      "duplicate": "Already uploaded"
+    },
+    "status": {
+      "pending_upload": "Waiting for file",
+      "uploaded": "Queued",
+      "processing": "Agents are working",
+      "extracted": "Extracted",
+      "needs_review": "Needs review",
+      "not_invoice": "Not an invoice",
+      "failed": "Failed",
+      "rejected": "Rejected"
+    },
+    "columns": {
+      "file": "File",
+      "status": "Status",
+      "invoices": "Invoices",
+      "size": "Size",
+      "uploaded": "Uploaded"
+    },
+    "sort": {
+      "asc": "Sorted ascending",
+      "desc": "Sorted descending",
+      "none": "Not sorted"
+    },
+    "empty": "No documents yet. Drop the first file above.",
+    "loadMore": "Load more",
+    "errors": {
+      "load": "Could not load documents.",
+      "generic": "Upload failed. Try again.",
+      "invalid_content_type": "This file type is not supported.",
+      "invalid_size": "The file is empty or larger than 20 MB.",
+      "invalid_filename": "The file name is not valid.",
+      "invalid_sha256": "The file could not be read.",
+      "content_type_mismatch": "The content does not match the file type.",
+      "object_missing": "The file did not arrive.",
+      "size_mismatch": "The uploaded size did not match.",
+      "client_company_archived": "This client company is archived.",
+      "client_company_not_found": "Client company not found.",
+      "storage_unavailable": "Storage is busy. Try again.",
+      "upload_failed": "Upload failed. Try again.",
+      "http_429": "Too many uploads. Wait a minute and try again.",
+      "sha256_mismatch": "The uploaded content did not match."
+    }
   }
 }
