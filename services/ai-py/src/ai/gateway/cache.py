@@ -44,22 +44,25 @@ class MemoryCache:
 
 
 class ValkeyCache:
-    """Shared cache in Valkey, key llmcache:v1:<cache_key>. `client` is for tests (fakeredis)."""
+    """Shared cache in Valkey, key <prefix><cache_key> (llmcache:v1: by default). `client` is for tests
+    (fakeredis)."""
 
-    def __init__(self, url: str = "", ttl_s: int = 30 * 86400, *, client: Any = None) -> None:
+    def __init__(self, url: str = "", ttl_s: int = 30 * 86400, *, client: Any = None,
+                 prefix: str = VALKEY_PREFIX) -> None:
         if client is None:
             from redis.asyncio import Redis
 
             client = Redis.from_url(url)
         self._r = client
         self._ttl = ttl_s
+        self._prefix = prefix
 
     async def get(self, key: str) -> bytes | None:
-        value = await self._r.get(VALKEY_PREFIX + key)
+        value = await self._r.get(self._prefix + key)
         return bytes(value) if value is not None else None
 
     async def set(self, key: str, value: bytes) -> None:
-        await self._r.set(VALKEY_PREFIX + key, value, ex=self._ttl)
+        await self._r.set(self._prefix + key, value, ex=self._ttl)
 
     async def aclose(self) -> None:
         await self._r.aclose()

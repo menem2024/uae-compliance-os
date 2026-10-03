@@ -191,7 +191,8 @@ async def test_the_durable_matches_the_contract():
 
 async def test_a_clean_message_is_extracted_published_once_and_acked():
     msg = FakeMsg(upload().SerializeToString(), num_delivered=2)
-    out = await consume([msg], ScenarioGateway.from_file(DEFAULT_SCENARIO))  # the compose default
+    out = await consume([msg], ScenarioGateway.from_file(DEFAULT_SCENARIO),
+                        settings=Settings(fake_results="accept"))  # the hermetic harnesses' opt-out (AC-E2)
     assert msg.events == ["ack"] and msg.naks == []
     assert len(out.published) == 1
     ext = out.published[0]
@@ -202,6 +203,24 @@ async def test_a_clean_message_is_extracted_published_once_and_acked():
     assert identity.delivery_attempt == 2 and ext.run_id == identity.run_id
     assert [o.status for o in out.sink.finished] == [RunStatus.SUCCEEDED]
     assert out.js.published == []  # nothing dead-lettered
+
+
+async def test_the_fake_gateway_default_publishes_its_canned_result_for_review():
+    """Review B #5: Helm and compose deploy AI_GATEWAY=fake; a real upload got FAKE-0001, verdict accept."""
+    msg = FakeMsg(upload().SerializeToString())
+    out = await consume([msg], ScenarioGateway.from_file(DEFAULT_SCENARIO))  # Settings(): fake, review
+    ext, = out.published
+    assert isinstance(ext, documents_pb2.DocumentExtracted) and msg.events == ["ack"]
+    assert ext.needs_review and "extraction_failed" in ext.review_reasons
+    assert ext.invoices[0].verdict.verdict == agents_pb2.VERDICT_ESCALATE
+    assert ext.invoices[0].verdict.findings[-1].code == "provenance.fake_gateway"
+
+
+async def test_a_live_gateway_result_is_not_marked():
+    msg = FakeMsg(upload().SerializeToString())
+    out = await consume([msg], ScenarioGateway.from_file(DEFAULT_SCENARIO), settings=Settings(gateway="replay"))
+    ext, = out.published
+    assert isinstance(ext, documents_pb2.DocumentExtracted) and not ext.needs_review
 
 
 async def test_a_terminal_failure_is_published_and_acked_not_retried():

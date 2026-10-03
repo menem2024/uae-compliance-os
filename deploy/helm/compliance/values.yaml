@@ -6,6 +6,12 @@
 # Label on every pod and object this chart owns (k3d-check waits on it).
 partOf: compliance
 
+global:
+  # Where this release runs: local (k3d, the default), staging or production.
+  # Checked at render (templates/ai-py.yaml): any other value fails, and so does
+  # staging/production while ai-py would run the fake model gateway.
+  environment: local
+
 # The four service images (api-go, validator-rs, ai-py, web) and the bootstrap
 # tools image. Built from the repo root; see the Makefile target images-k3d.
 image:
@@ -110,6 +116,11 @@ aiPy:
   # keys api-go uses), not from here. AI_GATEWAY is left unset (= fake: a fresh
   # dev stack never calls a real model) and the Langfuse variables are unset
   # (tracing ships disabled).
+  # The fake gateway answers every document with canned output (FAKE-0001), not
+  # a reading of the file. ai-py publishes such results as needs_review
+  # (extraction_failed, invoices escalated; AI_FAKE_RESULTS=review, its default),
+  # and rendering fails when global.environment is staging or production while
+  # AI_GATEWAY is fake or unset: set AI_GATEWAY=anthropic there.
   env:
     NATS_URL: nats://nats:4222
     S3_ENDPOINT: minio:9000

@@ -131,3 +131,13 @@ async def test_the_compose_default_serves_and_caches(monkeypatch):
     second = await gw.complete(intake_req())
     assert isinstance(first.parsed, IntakeResult) and first.usage.llm_calls == 1
     assert second.usage.response_cache_hit and second.usage.llm_calls == 0
+
+
+def test_fake_responses_never_share_the_live_cache_namespace():
+    """A canned response cached under AI_GATEWAY=fake must not be served after switching to anthropic."""
+    def cache_prefix(gateway: str) -> str:
+        s = Settings(gateway=gateway, cache="valkey", valkey_url=UNREACHABLE_VALKEY)
+        return layers(build_gateway(s))[0]._cache._prefix  # type: ignore[attr-defined]
+
+    assert cache_prefix("anthropic") == cache_prefix("replay") == "llmcache:v1:"
+    assert cache_prefix("fake") == "llmcache:v1:fake:"

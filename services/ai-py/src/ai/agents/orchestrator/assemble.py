@@ -27,6 +27,7 @@ KINDS = frozenset({"invoice", "credit_note", "contract", "other"})
 DIRECTIONS = frozenset({"issued", "received", "unknown"})
 METHODS = frozenset({"llm", "xlsx", "csv"})
 LANGUAGES = frozenset({"ar", "en", "mixed", ""})  # "" = not determined (for example a spreadsheet)
+FAKE_GATEWAY_FINDING = "provenance.fake_gateway"
 _DETAIL_MAX = 200
 
 
@@ -82,6 +83,25 @@ def build_extracted(*, document_id: str, firm_id: str, client_company_id: str, r
     msg.review_reasons.extend(ordered)
     msg.needs_review = bool(ordered)
     return msg
+
+
+def mark_synthetic(msg: documents_pb2.DocumentExtracted) -> documents_pb2.DocumentExtracted:
+    """A result built from the fake gateway's canned model output (AI_GATEWAY=fake), never from reading the
+    document: a copy that needs review (`extraction_failed`, the contract has no fake-gateway reason) with every
+    invoice escalated, so api-go stores it as needs_review, never as a clean extracted invoice. The detail is a
+    block finding `provenance.fake_gateway` on each verdict. `extraction_method` keeps its contract value
+    (llm|xlsx|csv; api-go's documents table enforces the same set)."""
+    out = documents_pb2.DocumentExtracted()
+    out.CopyFrom(msg)
+    for ext in out.invoices:
+        ext.verdict.verdict = agents_pb2.VERDICT_ESCALATE
+        ext.verdict.findings.add(path="", code=FAKE_GATEWAY_FINDING, severity="block", observed="AI_GATEWAY=fake",
+                                 source="check")
+    reasons = [*out.review_reasons, "extraction_failed", *(["verifier_escalated"] if out.invoices else [])]
+    del out.review_reasons[:]
+    out.review_reasons.extend(order_reasons(reasons))
+    out.needs_review = True
+    return out
 
 
 def build_failed(*, document_id: str, firm_id: str, run_id: str, reason_code: str,

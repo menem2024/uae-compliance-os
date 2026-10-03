@@ -110,6 +110,15 @@ async def test_valkey_cache_key_prefix_and_ttl():
     assert stored is not None and PDF not in stored and 0 < await r.ttl(key) <= 60
 
 
+async def test_valkey_cache_prefix_namespaces_entries():
+    r = FakeAsyncRedis()
+    gw = CachingGateway(FakeGateway({"extraction.invoice": [Out(number="7")]}),
+                        ValkeyCache(client=r, prefix="llmcache:v1:fake:"))
+    resp = await gw.complete(req())
+    assert await r.get(f"llmcache:v1:fake:{resp.cache_key}") is not None
+    assert await r.get(f"llmcache:v1:{resp.cache_key}") is None
+
+
 async def test_spend_cap_blocks_before_the_call():
     inner = FakeGateway(lambda r: response_for(r, Out(number="1")))
     limiter = MemorySpendLimiter(cap_micro_usd=100)

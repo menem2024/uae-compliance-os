@@ -1,3 +1,13 @@
+{{- /* Render-time guard (values.yaml global.environment): the fake model gateway answers every
+document with canned output, so it is for local clusters only. AI_GATEWAY unset means fake. */ -}}
+{{- $environment := dig "environment" "local" (.Values.global | default dict) | toString -}}
+{{- if not (has $environment (list "local" "staging" "production")) }}
+{{- fail (printf "global.environment (%s) must be one of local, staging, production" $environment) }}
+{{- end }}
+{{- $gateway := .Values.aiPy.env.AI_GATEWAY | default "fake" | toString -}}
+{{- if and (ne $environment "local") (eq $gateway "fake") }}
+{{- fail (printf "aiPy.env.AI_GATEWAY is %q (unset means fake) while global.environment is %q: the fake gateway answers every document with canned output; set aiPy.env.AI_GATEWAY=anthropic" $gateway $environment) }}
+{{- end }}
 {{- $name := "ai-py" -}}
 {{- $ctx := dict "root" $ "name" $name "component" "worker" -}}
 # ai-py is a NATS worker; the Service only exposes its health endpoint.

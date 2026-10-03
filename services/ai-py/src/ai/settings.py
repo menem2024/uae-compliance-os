@@ -9,6 +9,10 @@ from ai.gateway.types import HAIKU, MODEL_IDS, OPUS, SONNET, ModelId
 
 type GatewayMode = Literal["anthropic", "replay", "fake"]
 type CacheMode = Literal["valkey", "memory", "none"]
+# What document.extracted says when the fake gateway produced it: `review` (the default) publishes it as
+# needs_review / extraction_failed with every invoice escalated, so canned output never lands as a clean
+# accepted invoice; `accept` keeps the scenario's verdicts, for hermetic harnesses only (the AC-E2 chaos test).
+type FakeResults = Literal["review", "accept"]
 
 
 def _choice[T: str](env: Mapping[str, str], key: str, default: T, allowed: tuple[str, ...]) -> T:
@@ -34,6 +38,7 @@ class Settings:
     gateway: GatewayMode = "fake"
     fake_scenario: str = ""
     fake_latency_ms: int = 0
+    fake_results: FakeResults = "review"
     recordings_dir: str = "evals/recordings"
     model_intake: ModelId = HAIKU
     model_extraction: ModelId = SONNET
@@ -70,6 +75,7 @@ class Settings:
             gateway=_choice(e, "AI_GATEWAY", d.gateway, ("anthropic", "replay", "fake")),
             fake_scenario=e.get("AI_FAKE_SCENARIO", ""),
             fake_latency_ms=_int(e, "AI_FAKE_LATENCY_MS", d.fake_latency_ms),
+            fake_results=_choice(e, "AI_FAKE_RESULTS", d.fake_results, ("review", "accept")),
             recordings_dir=e.get("AI_RECORDINGS_DIR", "") or d.recordings_dir,
             model_intake=model("AI_MODEL_INTAKE", d.model_intake),
             model_extraction=model("AI_MODEL_EXTRACTION", d.model_extraction),

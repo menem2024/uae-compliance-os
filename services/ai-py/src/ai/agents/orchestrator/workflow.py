@@ -39,7 +39,7 @@ from ai.agents.extraction.tabular.importer import (
     import_tabular,
 )
 from ai.agents.intake.schema import IntakeResult
-from ai.agents.orchestrator.assemble import InvoiceOutcome, build_extracted, build_failed
+from ai.agents.orchestrator.assemble import InvoiceOutcome, build_extracted, build_failed, mark_synthetic
 from ai.agents.orchestrator.attribute import attribute_node, client_company_trn, direction_of
 from ai.agents.orchestrator.fetch import AGENT, CSV, XLSX, FetchCode, Fetched, FetchFn, fetch_node
 from ai.agents.orchestrator.route import route_node
@@ -396,12 +396,20 @@ def _budget_stop(upload: documents_pb2.DocumentUploaded, outcome: RunOutcome) ->
                            language=intake.language if intake else "", invoices=(), review_reasons=reasons)
 
 
-def build_finalize(upload: documents_pb2.DocumentUploaded,
-                   publish: PublishFn) -> Callable[[RunOutcome], Awaitable[None]]:
+def build_finalize(upload: documents_pb2.DocumentUploaded, publish: PublishFn, *,
+                   synthetic: bool = False) -> Callable[[RunOutcome], Awaitable[None]]:
     """GraphExecutor's finalize hook: publishes exactly one of document.extracted / document.failed before
-    agent.run.finished, or raises RetryLater (nothing published) so the caller naks."""
+    agent.run.finished, or raises RetryLater (nothing published) so the caller naks.
+
+    `synthetic` (AI_GATEWAY=fake, AI_FAKE_RESULTS=review): a document.extracted that used any model response
+    (a call or a cache hit) is published through `mark_synthetic`; one made without the model (a spreadsheet,
+    a too-long PDF) is real and published as is."""
 
     async def finalize(outcome: RunOutcome) -> None:
-        await publish(result_message(upload, outcome))
+        msg = result_message(upload, outcome)
+        used_model = outcome.totals.llm_calls + outcome.totals.response_cache_hits > 0
+        if synthetic and used_model and isinstance(msg, documents_pb2.DocumentExtracted):
+            msg = mark_synthetic(msg)
+        await publish(msg)
 
     return finalize

@@ -162,7 +162,7 @@ async def _no_sleep(_s: float) -> None:
 
 
 async def ingest(data: bytes, gw_script: object, *, up: documents_pb2.DocumentUploaded | None = None,
-                 max_pdf_pages: int = 10, budget: Budget = BUDGET) -> Run:
+                 max_pdf_pages: int = 10, budget: Budget = BUDGET, synthetic: bool = False) -> Run:
     up = up or upload(data)
     run = Run(None, FakeGateway(gw_script), MemorySink(), Store({KEY: data}))  # type: ignore[arg-type]
 
@@ -170,7 +170,7 @@ async def ingest(data: bytes, gw_script: object, *, up: documents_pb2.DocumentUp
         run.finished_before_publish.append(len(run.sink.finished))
         run.published.append(msg)
 
-    finalize = build_finalize(up, publish)
+    finalize = build_finalize(up, publish, synthetic=synthetic)
 
     async def spy(outcome: RunOutcome) -> None:
         run.finalized.append(outcome)
@@ -323,6 +323,24 @@ async def test_a_27_digit_quantity_is_reviewed_not_a_failed_document():
     msg = run.extracted()
     assert msg.needs_review and "verifier_escalated" in msg.review_reasons
     assert msg.invoices[0].verdict.verdict == agents_pb2.VERDICT_ESCALATE
+
+
+async def test_a_synthetic_gateway_result_is_published_for_review():
+    truth = generate(11, "en", defect_rate=0.0).truth
+    data = pdf()
+    run = await ingest(data, script(intake_classify=intake(), extraction_invoice=extraction(truth)),
+                       up=upload(data, cc_trn=truth.seller_trn), synthetic=True)
+    msg = run.extracted()
+    assert msg.needs_review and "extraction_failed" in msg.review_reasons
+    assert msg.invoices[0].verdict.verdict == agents_pb2.VERDICT_ESCALATE
+
+
+async def test_a_synthetic_gateway_leaves_results_made_without_a_model_alone():
+    truths = [generate(700 + k, "en", defect_rate=0.0).truth for k in range(2)]
+    run = await ingest(write_csv(truths, "en"), script(), synthetic=True)
+    msg = run.extracted()
+    assert run.gateway.calls == [] and not msg.needs_review  # the importer never used the fake model
+    assert [e.verdict.verdict for e in msg.invoices] == [agents_pb2.VERDICT_ACCEPT] * 2
 
 
 # ------------------------------------------------------------------ tabular branch

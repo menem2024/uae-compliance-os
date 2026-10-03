@@ -8,6 +8,7 @@ from ai.agents.orchestrator.assemble import (
     build_extracted,
     build_failed,
     invoice_needs_review,
+    mark_synthetic,
     order_reasons,
 )
 from ai.gen.compliance.v1 import agents_pb2
@@ -62,3 +63,21 @@ def test_failed_detail_is_redacted_and_bounded():
     msg = build_failed(document_id="d", firm_id="f", run_id="r", reason_code="internal",
                        detail="boom for a@b.com " + "x" * 500)
     assert "a@b.com" not in msg.detail and len(msg.detail) == 200 and msg.reason_code == "internal"
+
+
+def test_a_fake_gateway_result_never_lands_as_a_clean_accepted_invoice():
+    """Review B #5: AI_GATEWAY=fake answers with canned output (FAKE-0001, verdict accept)."""
+    clean = build_extracted(**IDS, document_kind="invoice", direction="issued", extraction_method="llm",
+                            language="en", invoices=[_o(0, 0.97, ACCEPT), _o(1, 0.95, ACCEPT)])
+    msg = mark_synthetic(clean)
+    assert msg.needs_review and list(msg.review_reasons) == ["verifier_escalated", "extraction_failed"]
+    assert msg.extraction_method == "llm"  # the contract's value set (llm|xlsx|csv) has no synthetic method
+    for e in msg.invoices:
+        assert e.verdict.verdict == agents_pb2.VERDICT_ESCALATE  # api-go: invoice status needs_review
+        f = e.verdict.findings[-1]
+        assert (f.path, f.code, f.severity, f.observed, f.source) == (
+            "", "provenance.fake_gateway", "block", "AI_GATEWAY=fake", "check")
+    assert not clean.needs_review and clean.invoices[0].verdict.verdict == agents_pb2.VERDICT_ACCEPT  # a copy
+    none = mark_synthetic(build_extracted(**IDS, document_kind="contract", direction="unknown",
+                                          extraction_method="llm", language="en", invoices=[]))
+    assert none.needs_review and list(none.review_reasons) == ["extraction_failed"]

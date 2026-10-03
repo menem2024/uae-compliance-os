@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.gateway.cache import CachingGateway, MemoryCache, ResponseCache, ValkeyCache
+from ai.gateway.cache import VALKEY_PREFIX, CachingGateway, MemoryCache, ResponseCache, ValkeyCache
 from ai.gateway.fake import ScenarioGateway
 from ai.gateway.limits import (
     ConcurrencyLimitedGateway,
@@ -60,5 +60,8 @@ def build_gateway(settings: Settings) -> ModelGateway:
     gw = ConcurrencyLimitedGateway(gw, settings.max_concurrent_llm_calls)
     if settings.cache == "none":
         return gw
-    cache: ResponseCache = ValkeyCache(client=client) if client is not None else MemoryCache()
+    # Canned fake responses live under their own prefix: after a switch to a live gateway, a reprocessed
+    # document must never be served a cached fake extraction (Valkey keeps entries for 30 days).
+    prefix = f"{VALKEY_PREFIX}fake:" if settings.gateway == "fake" else VALKEY_PREFIX
+    cache: ResponseCache = ValkeyCache(client=client, prefix=prefix) if client is not None else MemoryCache()
     return CachingGateway(gw, cache)

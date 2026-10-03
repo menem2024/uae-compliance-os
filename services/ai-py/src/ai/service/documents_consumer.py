@@ -57,6 +57,12 @@ def consumer_config(settings: Settings) -> ConsumerConfig:
                           ack_wait=settings.ack_wait_s, max_ack_pending=settings.docs_max_ack_pending)
 
 
+def synthetic_results(settings: Settings) -> bool:
+    """AI_GATEWAY=fake answers every prompt with canned output: unless AI_FAKE_RESULTS=accept (hermetic
+    harnesses), results built from it are published for review (workflow.build_finalize)."""
+    return settings.gateway == "fake" and settings.fake_results == "review"
+
+
 class _Handler:
     def __init__(self, js: Any, executor: GraphExecutor, *, registry: AgentRegistry, verifier: VerifierAgent,
                  fetch: FetchFn, publish: workflow.PublishFn, settings: Settings, sleep: Sleep) -> None:
@@ -69,6 +75,7 @@ class _Handler:
         self._settings = settings
         self._sleep = sleep
         self._beat_s = bootstrap.heartbeat_interval_s(settings.ack_wait_s)
+        self._synthetic = synthetic_results(settings)
 
     async def __call__(self, msg: Any) -> None:
         attempt = msg.metadata.num_delivered
@@ -85,7 +92,8 @@ class _Handler:
                                              verifier=self._verifier,
                                              max_pdf_pages=self._settings.max_pdf_pages)
                 await self._executor.run(graph, identity, workflow.BUDGET,
-                                         finalize=workflow.build_finalize(upload, self._publish))
+                                         finalize=workflow.build_finalize(upload, self._publish,
+                                                                          synthetic=self._synthetic))
         except asyncio.CancelledError:  # shutdown: hand the message back now rather than after ack_wait
             await bootstrap.settle("nak", msg.nak())
             raise
@@ -119,6 +127,11 @@ async def run(js: Any, *, gateway: ModelGateway, registry: AgentRegistry, verifi
               sink: EventSink | None = None, sleep: Sleep = asyncio.sleep) -> None:
     """Consumes until stop_event is set. `sink` and `sleep` (heartbeat timer and node retry backoff) are test
     seams; production uses NatsSink(js) and asyncio.sleep."""
+    if settings.gateway == "fake":
+        logger.warning("AI_GATEWAY=fake: model output is canned, not read from the documents; results that used "
+                       "it are published %s (AI_FAKE_RESULTS=%s)",
+                       "as needs_review" if synthetic_results(settings) else "with the scenario's verdicts",
+                       settings.fake_results)
     sub = await js.pull_subscribe(DOCS_SUBJECT, durable=DOCS_DURABLE, stream=DOCS_STREAM,
                                   config=consumer_config(settings))
     executor = GraphExecutor(gateway=gateway, sink=sink if sink is not None else NatsSink(js),

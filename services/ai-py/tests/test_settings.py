@@ -22,3 +22,10 @@ def test_overrides_and_validation():
                 {"AI_ACK_WAIT_S": "abc"}):
         with pytest.raises(ValueError):
             Settings.from_env(bad)
+
+
+def test_fake_results_default_to_review():
+    assert Settings.from_env({}).fake_results == "review"
+    assert Settings.from_env({"AI_FAKE_RESULTS": "accept"}).fake_results == "accept"
+    with pytest.raises(ValueError):
+        Settings.from_env({"AI_FAKE_RESULTS": "yes"})

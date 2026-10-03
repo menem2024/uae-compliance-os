@@ -73,9 +73,10 @@ class ScenarioGateway:
 
     A response is raw text (a JSON string) or a structured JSON value; each prompt id's responses are used
     in order and the last one repeats. AI_FAKE_LATENCY_MS is slept before every call. The packaged default
-    answers every Phase 1 prompt id with a clean, high-confidence result that the Verifier accepts, so on the
-    compose stack and in the chaos test every document reaches `extracted` deterministically. No call leaves
-    the process.
+    answers every Phase 1 prompt id with a clean, high-confidence result that the Verifier accepts. The
+    document consumer still publishes it as needs_review (AI_FAKE_RESULTS=review, the default), so canned
+    output never lands as a clean invoice; the chaos test sets AI_FAKE_RESULTS=accept so every document
+    reaches `extracted` deterministically. No call leaves the process.
     """
 
     def __init__(self, script: Mapping[str, Sequence[object]], *, latency_ms: int = 0,
