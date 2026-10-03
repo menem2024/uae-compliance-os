@@ -43,6 +43,10 @@ func (t *LiveTap) handle(subject string, data []byte) {
 		if !t.unmarshal(subject, data, m) {
 			return
 		}
+		if _, err := uuid.Parse(m.GetRunId()); err != nil {
+			slog.Error("agents tap: bad run_id on step", "subject", subject)
+			return
+		}
 		t.publishStep(m.GetFirmId(), m.GetStepId(), stepViewFromProto(m), m.GetAt().AsTime())
 	case events.AgentRunFinishedSubject:
 		m := &compliancev1.AgentRunFinished{}
@@ -70,10 +74,26 @@ func (t *LiveTap) unmarshal(subject string, data []byte, m proto.Message) bool {
 	return true
 }
 
+// sseEventID builds the SSE `id:` from an id taken raw from NATS. NATS carries no auth, so an id with a
+// CR/LF would let a publisher inject frames into every subscribed Firm's stream: only a UUID (re-rendered
+// canonically) is accepted, anything else drops the event.
+func sseEventID(what, raw string, at time.Time) (string, bool) {
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		slog.Error("agents tap: dropping event, id is not a uuid", "kind", what, "len", len(raw))
+		return "", false
+	}
+	return EventID(id.String(), at), true
+}
+
 func (t *LiveTap) publishRun(firm, id string, v RunView, at time.Time) {
 	firmID, err := uuid.Parse(firm)
 	if err != nil {
 		slog.Error("agents tap: bad firm_id", "firm_id", firm)
+		return
+	}
+	eventID, ok := sseEventID("run", id, at)
+	if !ok {
 		return
 	}
 	data, err := json.Marshal(v)
@@ -81,7 +101,7 @@ func (t *LiveTap) publishRun(firm, id string, v RunView, at time.Time) {
 		slog.Error("agents tap: encode run view", "err", err)
 		return
 	}
-	t.Hub.Publish(firmID, Event{Type: "run", ID: EventID(id, at), Firm: firmID, Data: data})
+	t.Hub.Publish(firmID, Event{Type: "run", ID: eventID, Firm: firmID, Data: data})
 }
 
 func (t *LiveTap) publishStep(firm, id string, v StepView, at time.Time) {
@@ -90,12 +110,16 @@ func (t *LiveTap) publishStep(firm, id string, v StepView, at time.Time) {
 		slog.Error("agents tap: bad firm_id", "firm_id", firm)
 		return
 	}
+	eventID, ok := sseEventID("step", id, at)
+	if !ok {
+		return
+	}
 	data, err := json.Marshal(v)
 	if err != nil {
 		slog.Error("agents tap: encode step view", "err", err)
 		return
 	}
-	t.Hub.Publish(firmID, Event{Type: "step", ID: EventID(id, at), Firm: firmID, Data: data})
+	t.Hub.Publish(firmID, Event{Type: "step", ID: eventID, Firm: firmID, Data: data})
 }
 
 func (t *LiveTap) publishProposal(firm, id string, v proposals.Proposal, at time.Time) {
@@ -104,12 +128,16 @@ func (t *LiveTap) publishProposal(firm, id string, v proposals.Proposal, at time
 		slog.Error("agents tap: bad firm_id", "firm_id", firm)
 		return
 	}
+	eventID, ok := sseEventID("proposal", id, at)
+	if !ok {
+		return
+	}
 	data, err := json.Marshal(v)
 	if err != nil {
 		slog.Error("agents tap: encode proposal view", "err", err)
 		return
 	}
-	t.Hub.Publish(firmID, Event{Type: "proposal", ID: EventID(id, at), Firm: firmID, Data: data})
+	t.Hub.Publish(firmID, Event{Type: "proposal", ID: eventID, Firm: firmID, Data: data})
 }
 
 // ------------------------------------------------------------------ proto -> partial view (pure)

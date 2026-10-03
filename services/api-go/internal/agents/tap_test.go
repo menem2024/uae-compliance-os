@@ -89,3 +89,44 @@ func TestLiveTapIgnoresUndecodablePayload(t *testing.T) {
 		// expected: nothing published
 	}
 }
+
+// Security review A, finding 4: the SSE `id:` is built from ids taken raw from NATS (which has no auth);
+// a CR/LF there would inject frames such as a forged `event: proposal` into a Firm's stream. A tap event
+// whose run_id/step_id/proposal_id is not a UUID is dropped.
+func TestLiveTapDropsNonUUIDIdsBeforeTheySeeTheSSEStream(t *testing.T) {
+	hub, js := startTap(t)
+	firm := uuid.New()
+	sub, err := hub.Subscribe(firm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sub.Close()
+
+	evil := "x\n\nevent: proposal\ndata: {\"forged\":true}\n"
+	msgs := map[string]proto.Message{
+		events.AgentRunStartedSubject: &compliancev1.AgentRunStarted{RunId: evil, FirmId: firm.String(), StartedAt: timestamppb.Now()},
+		events.AgentRunStepSubject: &compliancev1.AgentStepEvent{RunId: uuid.NewString(), StepId: evil, FirmId: firm.String(),
+			At: timestamppb.Now()},
+		events.AgentRunFinishedSubject: &compliancev1.AgentRunFinished{RunId: "a\r\nb", FirmId: firm.String(),
+			FinishedAt: timestamppb.Now()},
+		events.AgentProposalCreatedSubject: &compliancev1.ProposalCreated{Proposal: &compliancev1.Proposal{
+			ProposalId: evil, FirmId: firm.String(), CreatedAt: timestamppb.Now()}},
+	}
+	for subject, m := range msgs {
+		data, err := proto.Marshal(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := js.Conn.Publish(subject, data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := js.Conn.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ev := <-sub.Events():
+		t.Fatalf("a non-UUID id must be dropped, got %+v", ev)
+	case <-time.After(300 * time.Millisecond):
+	}
+}
