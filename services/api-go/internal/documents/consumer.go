@@ -92,12 +92,12 @@ func (c *Consumer) extracted(ctx context.Context, m *compliancev1.DocumentExtrac
 	if status != "not_invoice" {
 		invoiceCount = int32(len(m.GetInvoices())) //nolint:gosec // bounded by the upload/extraction path
 	}
+	cc, err := uuid.Parse(m.GetClientCompanyId())
+	if err != nil && status != "not_invoice" {
+		return permanent("client_company_id %q", m.GetClientCompanyId())
+	}
 	var items []InvoiceIn
 	if status != "not_invoice" {
-		cc, err := uuid.Parse(m.GetClientCompanyId())
-		if err != nil {
-			return permanent("client_company_id %q", m.GetClientCompanyId())
-		}
 		items = make([]InvoiceIn, 0, len(m.GetInvoices()))
 		for _, ei := range m.GetInvoices() {
 			payload, err := protojson.Marshal(ei.GetInvoice())
@@ -106,12 +106,12 @@ func (c *Consumer) extracted(ctx context.Context, m *compliancev1.DocumentExtrac
 			}
 			items = append(items, InvoiceIn{SourceOrdinal: ei.GetSourceOrdinal(), SourceRef: ei.GetSourceRef(),
 				Payload: payload, Status: InvoiceStatus(ei.GetVerdict().GetVerdict(), ei.GetConfidence()),
-				Confidence: ei.GetConfidence(), ClientCompanyID: cc})
+				Confidence: ei.GetConfidence()})
 		}
 	}
 	// One transaction: the Document's status and its invoices commit together or not at all.
 	out, err := c.Store.ApplyExtractedResult(ctx, firm, ExtractedParams{
-		ID: id, RunID: runID, Status: status, Kind: m.GetDocumentKind(), Direction: m.GetDirection(),
+		ID: id, RunID: runID, ClientCompanyID: cc, Status: status, Kind: m.GetDocumentKind(), Direction: m.GetDirection(),
 		Language: m.GetLanguage(), ExtractionMethod: m.GetExtractionMethod(), ReviewReasons: reviewReasons,
 		InvoiceCount: invoiceCount}, items)
 	if err != nil {

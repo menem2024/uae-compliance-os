@@ -258,6 +258,12 @@ func (s PGStore) ApplyExtractedResult(ctx context.Context, firm uuid.UUID, p Ext
 			if p.ReviewReasons == nil {
 				p.ReviewReasons = []string{} // review_reasons is NOT NULL; nil would be sent as NULL
 			}
+			// The locked row is the truth for the owning ClientCompany: a document.attribution accepted
+			// before this result arrived moved it, and moved the direction with it. Only while the
+			// message still names the Document's company is its direction the current one.
+			if p.ClientCompanyID != doc.ClientCompanyID {
+				p.Direction = doc.Direction
+			}
 			if _, err := q.ApplyDocumentExtracted(ctx, sqlc.ApplyDocumentExtractedParams{
 				Status: p.Status, StatusReason: p.StatusReason, Kind: p.Kind, Direction: p.Direction,
 				Language: p.Language, ExtractionMethod: p.ExtractionMethod, ReviewReasons: p.ReviewReasons,
@@ -271,7 +277,7 @@ func (s PGStore) ApplyExtractedResult(ctx context.Context, firm uuid.UUID, p Ext
 			for _, it := range items {
 				if _, err := q.InsertExtractedInvoice(ctx, sqlc.InsertExtractedInvoiceParams{
 					FirmID: firm, Status: it.Status, Payload: it.Payload,
-					ClientCompanyID: nullUUID(it.ClientCompanyID), DocumentID: uuid.NullUUID{UUID: p.ID, Valid: true},
+					ClientCompanyID: nullUUID(doc.ClientCompanyID), DocumentID: uuid.NullUUID{UUID: p.ID, Valid: true},
 					SourceOrdinal: pgtype.Int4{Int32: it.SourceOrdinal, Valid: true}, SourceRef: it.SourceRef,
 					ExtractionConfidence: NumericFromFloat(it.Confidence)}); err != nil {
 					return fmt.Errorf("insert extracted invoice: %w", err)

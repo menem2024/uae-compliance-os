@@ -267,3 +267,37 @@ func TestConsumerIntegrationBadResultRollsBackTheDocument(t *testing.T) {
 		t.Fatalf("%+v", bus.published)
 	}
 }
+
+// P2 (finding 2): the invoices take the ClientCompany and direction of the locked Document row, so a
+// document.attribution accepted before document.extracted arrives is not undone by the late result.
+func TestConsumerIntegrationInvoicesFollowTheLockedDocument(t *testing.T) {
+	env := dbtest.Setup(t)
+	ctx := context.Background()
+	store := documents.PGStore{Pool: env.App}
+	c := &documents.Consumer{Store: store, Bus: &fakeBus{}}
+	oldCC := dbtest.ClientCompany(t, env, env.FirmA, "Old", "")
+	newCC := dbtest.ClientCompany(t, env, env.FirmA, "New", "")
+	docID := uploadedDocument(t, store, env, env.FirmA, oldCC)
+	if _, err := dbtest.ExecFirm(ctx, env, env.FirmA,
+		`UPDATE documents SET client_company_id = $1, direction = 'received' WHERE id = $2`, newCC, docID); err != nil {
+		t.Fatal(err)
+	}
+
+	data := extractedMsg(env, docID, oldCC, uuid.NewString(), 0) // the message still names the OLD company
+	if err := c.Handle(ctx, fakeMsg{subject: events.DocumentExtractedSubject, data: data}); err != nil {
+		t.Fatal(err)
+	}
+	var invCC, docCC uuid.UUID
+	var dir string
+	if err := dbtest.QueryRowFirm(ctx, env, env.FirmA,
+		`SELECT client_company_id FROM invoices WHERE document_id = $1`, docID).Scan(&invCC); err != nil {
+		t.Fatal(err)
+	}
+	if err := dbtest.QueryRowFirm(ctx, env, env.FirmA,
+		`SELECT client_company_id, direction FROM documents WHERE id = $1`, docID).Scan(&docCC, &dir); err != nil {
+		t.Fatal(err)
+	}
+	if invCC != newCC || docCC != newCC || dir != "received" {
+		t.Fatalf("invoice cc=%s doc cc=%s (want %s) direction=%q (want received)", invCC, docCC, newCC, dir)
+	}
+}

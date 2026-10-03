@@ -96,8 +96,11 @@ func InvoiceStatus(verdict compliancev1.Verdict, confidence float64) string {
 
 // ExtractedParams is the Document-level fields of one document.extracted result (Store.ApplyExtractedResult).
 type ExtractedParams struct {
-	ID               uuid.UUID
-	RunID            uuid.UUID
+	ID    uuid.UUID
+	RunID uuid.UUID
+	// ClientCompanyID is the company ai-py extracted for (it echoes document.uploaded). It is only
+	// compared with the locked Document's; the invoices always take the Document's, never this one.
+	ClientCompanyID  uuid.UUID
 	Status           string
 	StatusReason     string
 	Kind             string
@@ -110,12 +113,11 @@ type ExtractedParams struct {
 
 // InvoiceIn is one invoice to insert for a document.extracted result (Store.ApplyExtractedResult).
 type InvoiceIn struct {
-	SourceOrdinal   int32
-	SourceRef       string
-	Payload         []byte
-	Status          string
-	Confidence      float64
-	ClientCompanyID uuid.UUID
+	SourceOrdinal int32
+	SourceRef     string
+	Payload       []byte
+	Status        string
+	Confidence    float64
 }
 
 // InvoiceOut is one invoice of the Document's full invoice set, read back inside the same transaction as
