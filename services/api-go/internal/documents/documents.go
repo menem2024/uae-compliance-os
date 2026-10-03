@@ -159,15 +159,66 @@ type FileIn struct {
 	SHA256      string `json:"sha256"`
 }
 
-// CleanFilename strips control characters and surrounding space; filenames are display-only.
+// CleanFilename strips control characters, bidi/format controls and surrounding space; filenames are
+// display-only. Bidi controls (U+202A-202E, U+2066-2069, U+061C) and zero-width/direction marks
+// (U+200B-200F, U+FEFF) are removed because U+202E makes "invoice\u202Efdp.exe" render as "invoiceexe.pdf".
 func CleanFilename(s string) string {
 	s = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || r == utf8.RuneError {
+		switch {
+		case unicode.IsControl(r), r == utf8.RuneError:
+			return -1
+		case r >= 0x200B && r <= 0x200F, r >= 0x202A && r <= 0x202E, r >= 0x2066 && r <= 0x2069,
+			r == 0x061C, r == 0xFEFF:
 			return -1
 		}
 		return r
 	}, s)
 	return strings.TrimSpace(s)
+}
+
+// contentTypeExt is the canonical extension of each allowed content type.
+var contentTypeExt = map[string]string{
+	"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp",
+	ContentTypeCSV: "csv", ContentTypeXLSX: "xlsx",
+}
+
+// DownloadFilename is the name a Document is downloaded under: the stored name (cleaned again, in case an
+// older row predates CleanFilename's rules) with its extension forced to the verified content type's, so a
+// colleague never saves "invoice.hta" that is really text/csv. A name that already ends in an accepted
+// extension of that type is kept as is (".jpeg" for image/jpeg); a mismatching extension is replaced; a
+// name with no extension gets one appended.
+func DownloadFilename(name, contentType string) string {
+	name = CleanFilename(name)
+	want, ok := contentTypeExt[contentType]
+	if !ok {
+		return name
+	}
+	base, ext := name, ""
+	if i := strings.LastIndexByte(name, '.'); i >= 0 && isExtension(name[i+1:]) {
+		base, ext = name[:i], strings.ToLower(name[i+1:])
+	} else if i >= 0 && i == len(name)-1 {
+		base = name[:i] // "name." has an empty extension
+	}
+	if ext == want || (want == "jpg" && ext == "jpeg") {
+		return name
+	}
+	if base == "" {
+		base = "document"
+	}
+	return base + "." + want
+}
+
+// isExtension reports whether s looks like a file extension: 1-5 ASCII letters or digits.
+func isExtension(s string) bool {
+	if s == "" || len(s) > 5 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
+			return false
+		}
+	}
+	return true
 }
 
 // Validate returns the cleaned file or a per-item error code.

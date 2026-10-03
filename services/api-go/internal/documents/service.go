@@ -296,7 +296,7 @@ func (s *Service) Download(ctx context.Context, firmID, id uuid.UUID) (string, t
 	if doc.Status == "pending_upload" || doc.Status == "rejected" {
 		return "", time.Time{}, ErrNotDownloadable
 	}
-	u, err := s.Presigner.PresignGet(ctx, doc.ObjectKey, doc.Filename, GetTTL)
+	u, err := s.Presigner.PresignGet(ctx, doc.ObjectKey, DownloadFilename(doc.Filename, doc.ContentType), GetTTL)
 	if err != nil {
 		return "", time.Time{}, err
 	}

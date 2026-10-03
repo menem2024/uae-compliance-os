@@ -60,6 +60,51 @@ func TestValidateAndClean(t *testing.T) {
 	}
 }
 
+// Security review A, finding 6: bidi/format controls are stripped from stored filenames (a U+202E
+// flips how "invoicexcod.exe" renders), Arabic letters are untouched.
+func TestCleanFilenameStripsBidiAndFormatControls(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"invoice\u202Efdp.exe", "invoicefdp.exe"},
+		{"a\u202A\u202B\u202C\u202D\u202Eb", "ab"},
+		{"a\u2066\u2067\u2068\u2069b", "ab"},
+		{"a\u200B\u200C\u200D\u200E\u200Fb", "ab"},
+		{"\u061Ca\uFEFFb", "ab"},
+		{"فاتورة 1.pdf", "فاتورة 1.pdf"},
+	} {
+		if got := documents.CleanFilename(c.in); got != c.want {
+			t.Errorf("%q: got %q want %q", c.in, got, c.want)
+		}
+	}
+	f := documents.FileIn{Filename: "x\u202E.pdf", ContentType: "application/pdf", SizeBytes: 1, SHA256: hexSHA(pdf)}
+	if got, code := f.Validate(); code != "" || got.Filename != "x.pdf" {
+		t.Fatalf("%q %q", got.Filename, code)
+	}
+}
+
+// Security review A, finding 6: the extension of the download name follows the verified content type.
+func TestDownloadFilenameFollowsContentType(t *testing.T) {
+	for _, c := range []struct{ name, ct, want string }{
+		{"invoice.pdf", "application/pdf", "invoice.pdf"},
+		{"INVOICE.PDF", "application/pdf", "INVOICE.PDF"},
+		{"invoice.hta", documents.ContentTypeCSV, "invoice.csv"},
+		{"run.cmd", documents.ContentTypeCSV, "run.csv"},
+		{"invoice.pdf.exe", "application/pdf", "invoice.pdf.pdf"},
+		{"scan.jpeg", "image/jpeg", "scan.jpeg"},
+		{"scan.png", "image/jpeg", "scan.jpg"},
+		{"photo.bin", "image/webp", "photo.webp"},
+		{"sheet.xls", documents.ContentTypeXLSX, "sheet.xlsx"},
+		{"noext", "image/png", "noext.png"},
+		{"Invoice 2026.03 ACME", documents.ContentTypeCSV, "Invoice 2026.03 ACME.csv"},
+		{"trailing.", "application/pdf", "trailing.pdf"},
+		{"x\u202Eexe.csv", documents.ContentTypeCSV, "xexe.csv"},
+		{"فاتورة.hta", "application/pdf", "فاتورة.pdf"},
+	} {
+		if got := documents.DownloadFilename(c.name, c.ct); got != c.want {
+			t.Errorf("%q (%s): got %q want %q", c.name, c.ct, got, c.want)
+		}
+	}
+}
+
 func TestSniffAndKey(t *testing.T) {
 	cases := []struct {
 		ct   string
@@ -356,7 +401,7 @@ func (s *fakeStore) FirmIDs(context.Context) ([]uuid.UUID, error) {
 	return s.firms, nil
 }
 
-type fakePresigner struct{ puts []string }
+type fakePresigner struct{ puts, gets []string }
 
 func (p *fakePresigner) PresignPut(_ context.Context, key, ct string, size int64, ttl time.Duration) (*url.URL, http.Header, error) {
 	p.puts = append(p.puts, key)
@@ -366,7 +411,8 @@ func (p *fakePresigner) PresignPut(_ context.Context, key, ct string, size int64
 	return &url.URL{Scheme: "http", Host: "minio.local:9000", Path: "/documents/" + key}, http.Header{"Content-Type": {ct}, "If-None-Match": {"*"}}, nil
 }
 
-func (p *fakePresigner) PresignGet(_ context.Context, key, _ string, _ time.Duration) (*url.URL, error) {
+func (p *fakePresigner) PresignGet(_ context.Context, key, filename string, _ time.Duration) (*url.URL, error) {
+	p.gets = append(p.gets, filename)
 	return &url.URL{Scheme: "http", Host: "minio.local:9000", Path: "/documents/" + key}, nil
 }
 
@@ -647,6 +693,13 @@ func TestHandlerHappyPath(t *testing.T) {
 	code, out = do(t, h, "GET", "/v1/documents/"+id+"/download", "")
 	if code != 200 || !strings.Contains(out["url"].(string), "/docs/"+id) {
 		t.Fatalf("%d %v", code, out)
+	}
+	// A stored name whose extension disagrees with the verified type is repaired on the way out.
+	d := r.store.docs[uuid.MustParse(id)]
+	d.Filename = "invoice\u202E.hta"
+	r.store.docs[d.ID] = d
+	if code, _ = do(t, h, "GET", "/v1/documents/"+id+"/download", ""); code != 200 || r.pre.gets[len(r.pre.gets)-1] != "invoice.pdf" {
+		t.Fatalf("%d %v", code, r.pre.gets)
 	}
 	code, out = do(t, h, "GET", "/v1/documents?limit=1", "")
 	if code != 200 || len(out["items"].([]any)) != 1 || out["next_cursor"] != nil {
