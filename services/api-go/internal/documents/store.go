@@ -248,6 +248,9 @@ func (s PGStore) ApplyExtracted(ctx context.Context, firm uuid.UUID, p Extracted
 	var n int64
 	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
 		var err error
+		if p.ReviewReasons == nil {
+			p.ReviewReasons = []string{} // review_reasons is NOT NULL; nil would be sent as NULL
+		}
 		n, err = q.ApplyDocumentExtracted(ctx, sqlc.ApplyDocumentExtractedParams{
 			Status: p.Status, StatusReason: p.StatusReason, Kind: p.Kind, Direction: p.Direction,
 			Language: p.Language, ExtractionMethod: p.ExtractionMethod, ReviewReasons: p.ReviewReasons,

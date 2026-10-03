@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/menem2024/uae-platform/services/api-go/internal/db"
@@ -82,4 +83,42 @@ func ClientCompany(t testing.TB, e Env, firm uuid.UUID, name, trn string) uuid.U
 		t.Fatal(err)
 	}
 	return id
+}
+
+// ExecFirm runs a statement as the owner role with app.firm_id set for the transaction, so it
+// satisfies FORCE ROW LEVEL SECURITY (the owner role has no BYPASSRLS).
+func ExecFirm(ctx context.Context, e Env, firm uuid.UUID, sql string, args ...any) (pgconn.CommandTag, error) {
+	var tag pgconn.CommandTag
+	err := pgx.BeginFunc(ctx, e.Owner, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT set_config('app.firm_id', $1, true)`, firm.String()); err != nil {
+			return err
+		}
+		var err error
+		tag, err = tx.Exec(ctx, sql, args...)
+		return err
+	})
+	return tag, err
+}
+
+type firmRow struct {
+	ctx  context.Context
+	e    Env
+	firm uuid.UUID
+	sql  string
+	args []any
+}
+
+// Scan runs the query inside a firm-scoped transaction and scans the single row.
+func (r firmRow) Scan(dst ...any) error {
+	return pgx.BeginFunc(r.ctx, r.e.Owner, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(r.ctx, `SELECT set_config('app.firm_id', $1, true)`, r.firm.String()); err != nil {
+			return err
+		}
+		return tx.QueryRow(r.ctx, r.sql, r.args...).Scan(dst...)
+	})
+}
+
+// QueryRowFirm is the firm-scoped counterpart of Owner.QueryRow.
+func QueryRowFirm(ctx context.Context, e Env, firm uuid.UUID, sql string, args ...any) pgx.Row {
+	return firmRow{ctx: ctx, e: e, firm: firm, sql: sql, args: args}
 }

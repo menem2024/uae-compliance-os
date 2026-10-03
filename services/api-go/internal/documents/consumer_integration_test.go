@@ -74,7 +74,7 @@ func TestConsumerIntegrationRoundTrip(t *testing.T) {
 		Invoice:    &compliancev1.Invoice{InvoiceNumber: "A-2", TotalAmount: "50.00"},
 		Confidence: 0.6, Verdict: &compliancev1.VerifierVerdict{Verdict: compliancev1.Verdict_VERDICT_REVISE}}
 	m := &compliancev1.DocumentExtracted{DocumentId: docID.String(), FirmId: env.FirmA.String(), ClientCompanyId: cc.String(),
-		RunId: uuid.NewString(), DocumentKind: "invoice", Direction: "outgoing", Language: "en", ExtractionMethod: "llm",
+		RunId: uuid.NewString(), DocumentKind: "invoice", Direction: "issued", Language: "en", ExtractionMethod: "llm",
 		Invoices: []*compliancev1.ExtractedInvoice{accepted, revise}}
 	data, err := proto.Marshal(m)
 	if err != nil {

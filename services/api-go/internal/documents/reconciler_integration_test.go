@@ -54,8 +54,10 @@ func TestReconcilerIntegrationRepublishesUnpublished(t *testing.T) {
 		t.Fatalf("want exactly one republish for %s, got %d (bus=%+v)", docID, n, bus.published)
 	}
 
+	// A successful republish counts twice: BumpPublishAttempt (enforces the retry cap before publishing)
+	// and MarkPublished (+1 on success). A published Document is never republished again.
 	doc, err := store.Get(ctx, env.FirmA, docID)
-	if err != nil || doc.PublishAttempts != 1 || !doc.PublishedAt.Valid {
+	if err != nil || doc.PublishAttempts != 2 || !doc.PublishedAt.Valid {
 		t.Fatalf("%+v %v", doc, err)
 	}
 }

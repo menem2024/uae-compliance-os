@@ -34,8 +34,8 @@ func TestConsumerIsOrderIndependentAndIdempotent(t *testing.T) {
 	c := &agents.Consumer{Pool: env.App}
 	cc := dbtest.ClientCompany(t, env, env.FirmA, "Oasis", "")
 	doc := uuid.New()
-	if _, err := env.Owner.Exec(ctx, `INSERT INTO documents (id, firm_id, client_company_id, sha256, object_key, filename,
-		content_type, size_bytes, status) VALUES ($1, $2, $3, repeat('a', 64), 'firms/' || $2::text || '/docs/' || $1::text,
+	if _, err := dbtest.ExecFirm(ctx, env, env.FirmA, `INSERT INTO documents (id, firm_id, client_company_id, sha256, object_key, filename,
+		content_type, size_bytes, status) VALUES ($1::uuid, $2::uuid, $3, repeat('a', 64), 'firms/' || $2::text || '/docs/' || $1::text,
 		'a.pdf', 'application/pdf', 10, 'uploaded')`, doc, env.FirmA, cc); err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestConsumerIsOrderIndependentAndIdempotent(t *testing.T) {
 	var seq int64
 	q := func(sql string, args []any, dst ...any) {
 		t.Helper()
-		if err := env.Owner.QueryRow(ctx, sql, args...).Scan(dst...); err != nil {
+		if err := dbtest.QueryRowFirm(ctx, env, env.FirmA, sql, args...).Scan(dst...); err != nil {
 			t.Fatal(err)
 		}
 	}

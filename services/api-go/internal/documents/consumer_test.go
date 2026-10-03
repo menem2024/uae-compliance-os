@@ -49,7 +49,7 @@ func TestConsumerExtractedInsertsAndPublishesAcceptedOnly(t *testing.T) {
 		Invoice:    &compliancev1.Invoice{InvoiceNumber: "A-2", TotalAmount: "50.00"},
 		Confidence: 0.6, Verdict: &compliancev1.VerifierVerdict{Verdict: compliancev1.Verdict_VERDICT_REVISE}}
 	m := &compliancev1.DocumentExtracted{DocumentId: docID.String(), FirmId: r.firm.String(), ClientCompanyId: r.cc.String(),
-		RunId: runID, DocumentKind: "invoice", Direction: "outgoing", Language: "en", ExtractionMethod: "llm",
+		RunId: runID, DocumentKind: "invoice", Direction: "issued", Language: "en", ExtractionMethod: "llm",
 		Invoices: []*compliancev1.ExtractedInvoice{accepted, revise}}
 	data, err := proto.Marshal(m)
 	if err != nil {

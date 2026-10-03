@@ -29,13 +29,13 @@ func seedDoc(t *testing.T, env dbtest.Env, firm, cc uuid.UUID) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
 	id := uuid.New()
-	_, err := env.Owner.Exec(ctx, `INSERT INTO documents (id, firm_id, client_company_id, sha256, object_key, filename,
-		content_type, size_bytes, status, direction) VALUES ($1, $2, $3, $4, 'firms/' || $2::text || '/docs/' || $1::text,
+	_, err := dbtest.ExecFirm(ctx, env, env.FirmA, `INSERT INTO documents (id, firm_id, client_company_id, sha256, object_key, filename,
+		content_type, size_bytes, status, direction) VALUES ($1::uuid, $2::uuid, $3, $4, 'firms/' || $2::text || '/docs/' || $1::text,
 		'a.pdf', 'application/pdf', 10, 'extracted', 'received')`, id, firm, cc, uuid.NewString()[:8]+"00000000000000000000000000000000000000000000000000000000")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := env.Owner.Exec(ctx, `INSERT INTO invoices (firm_id, status, payload, client_company_id, document_id, source_ordinal)
+	if _, err := dbtest.ExecFirm(ctx, env, env.FirmA, `INSERT INTO invoices (firm_id, status, payload, client_company_id, document_id, source_ordinal)
 		VALUES ($1, 'extracted', '{}', $2, $3, 0)`, firm, cc, id); err != nil {
 		t.Fatal(err)
 	}
@@ -89,10 +89,10 @@ func TestAttributionAcceptMovesDocumentAndInvoices(t *testing.T) {
 	var cc uuid.UUID
 	var dir string
 	var invoices int
-	if err := env.Owner.QueryRow(ctx, `SELECT client_company_id, direction FROM documents WHERE id = $1`, doc).Scan(&cc, &dir); err != nil || cc != newCC || dir != "unknown" {
+	if err := dbtest.QueryRowFirm(ctx, env, env.FirmA, `SELECT client_company_id, direction FROM documents WHERE id = $1`, doc).Scan(&cc, &dir); err != nil || cc != newCC || dir != "unknown" {
 		t.Fatalf("document %v %s %v", cc, dir, err)
 	}
-	if err := env.Owner.QueryRow(ctx, `SELECT count(*) FROM invoices WHERE document_id = $1 AND client_company_id = $2`, doc, newCC).Scan(&invoices); err != nil || invoices != 1 {
+	if err := dbtest.QueryRowFirm(ctx, env, env.FirmA, `SELECT count(*) FROM invoices WHERE document_id = $1 AND client_company_id = $2`, doc, newCC).Scan(&invoices); err != nil || invoices != 1 {
 		t.Fatalf("invoices %d %v", invoices, err)
 	}
 	if _, err := proposals.Decide(ctx, env.App, env.FirmA, second, proposals.Reject, "user-1", "", reg, nil); !errors.Is(err, proposals.ErrNotOpen) {
@@ -136,7 +136,7 @@ func TestDecideRollbackRejectAndExpiry(t *testing.T) {
 		t.Fatalf("%+v %v", p, err)
 	}
 	var state string
-	if err := env.Owner.QueryRow(ctx, `SELECT state FROM proposals WHERE id = $1`, expiredID).Scan(&state); err != nil || state != "expired" {
+	if err := dbtest.QueryRowFirm(ctx, env, env.FirmA, `SELECT state FROM proposals WHERE id = $1`, expiredID).Scan(&state); err != nil || state != "expired" {
 		t.Fatalf("expiry not committed: %s %v", state, err)
 	}
 	// A redelivered proposal is a no-op and supersedes nothing.
