@@ -2,13 +2,293 @@ syntax = "proto3";
 
 package compliance.v1;
 
-// Invoice is the canonical invoice. Money is a decimal string, never a float.
+// Invoice is the canonical invoice or credit note, modelled on PINT AE Billing 1.0.4
+// (urn:peppol:pint:billing-1@ae-1). Money, quantities, rates and percentages are
+// decimal strings, never floats. An empty string means "absent". Code values are
+// strings checked against the RuleSet's versioned code lists.
+// Fields 1-7 are the Phase 0 wire contract and never change.
 message Invoice {
-  string invoice_number = 1;
-  string issue_date = 2; // YYYY-MM-DD
-  string seller_trn = 3;
-  string buyer_trn = 4;
-  string currency = 5; // ISO 4217
-  string total_amount = 6; // decimal string, e.g. "1050.00"
-  string vat_amount = 7; // decimal string
+  // Phase 0 fields (unchanged).
+  string invoice_number = 1; // IBT-001 Invoice number
+  string issue_date = 2; // IBT-002 Invoice issue date, YYYY-MM-DD
+  string seller_trn = 3; // IBT-031 Seller VAT identifier (TRN)
+  string buyer_trn = 4; // IBT-048 Buyer VAT identifier (TRN)
+  string currency = 5; // IBT-005 Invoice currency code, ISO 4217
+  string total_amount = 6; // IBT-112 Invoice total amount with tax, decimal string
+  string vat_amount = 7; // IBT-110 Invoice total tax amount, decimal string
+
+  // v2 header.
+  string uuid = 8; // BTAE-07 Unique identifier number
+  string issue_time = 9; // IBT-168 Invoice issue time
+  string invoice_type_code = 10; // IBT-003 (UNCL1001 subset: 380, 480, 381, 81)
+  string transaction_type_code = 11; // BTAE-02, 8 characters of 0/1, e.g. "00000000"
+  string tax_currency = 12; // IBT-006 Tax accounting currency (AED when present)
+  string exchange_rate = 13; // BTAE-04 Currency exchange rate (<= 6 decimals)
+  string tax_point_date = 14; // IBT-007 VAT point date
+  string payment_due_date = 15; // IBT-009 Payment due date
+  string note = 16; // IBT-022 Invoice note
+  string credit_note_reason_code = 17; // BTAE-03 (credit notes only; CreditReason code list)
+  ProcessControl process = 18; // IBG-02
+  DocumentReferences references = 19; // IBT-010..IBT-019, BTAE-05, BTAE-21
+  repeated PrecedingInvoiceReference preceding_invoices = 20; // IBG-03
+  Party seller = 21; // IBG-04
+  Party buyer = 22; // IBG-07
+  string principal_id = 23; // BTAE-14 Principal ID (disclosed agent billing)
+  string beneficiary_id = 24; // BTAE-01 Beneficiary ID (free trade zone)
+  Payee payee = 25; // IBG-10
+  TaxRepresentative tax_representative = 26; // IBG-11 and IBG-12
+  Delivery delivery = 27; // IBG-13 and IBG-15
+  Period invoicing_period = 28; // IBG-14
+  string billing_frequency = 29; // BTAE-06 Frequency of billing (FreqBilling code list)
+  repeated PaymentInstructions payment_instructions = 30; // IBG-16
+  repeated PaymentTerms payment_terms = 31; // IBG-33
+  repeated AllowanceCharge allowances_charges = 32; // IBG-20 (is_charge=false) and IBG-21 (is_charge=true)
+  DocumentTotals totals = 33; // IBG-22 and IBG-37, except IBT-110 (field 7) and IBT-112 (field 6)
+  repeated TaxSubtotal tax_breakdown = 34; // IBG-23
+  repeated SupportingDocument supporting_documents = 35; // IBG-24
+  repeated InvoiceLine lines = 36; // IBG-25
+}
+
+// ProcessControl is IBG-02. The exporter fills the defaults when empty.
+message ProcessControl {
+  string business_process_type = 1; // IBT-023, default "urn:peppol:bis:billing"
+  string specification_identifier = 2; // IBT-024, default "urn:peppol:pint:billing-1@ae-1"
+}
+
+// Identifier is an identifier with an optional scheme (the "-1" sub-term).
+message Identifier {
+  string id = 1;
+  string scheme_id = 2;
+}
+
+message DocumentReferences {
+  string buyer_reference = 1; // IBT-010
+  string project_reference = 2; // IBT-011
+  string contract_reference = 3; // IBT-012
+  string contract_value = 4; // BTAE-05 Contract value, decimal string
+  string purchase_order_reference = 5; // IBT-013
+  string sales_order_reference = 6; // IBT-014
+  string receiving_advice_reference = 7; // IBT-015
+  string despatch_advice_reference = 8; // IBT-016
+  string tender_or_lot_reference = 9; // IBT-017
+  Identifier invoiced_object = 10; // IBT-018 and IBT-018-1
+  string buyer_accounting_reference = 11; // IBT-019
+  string customs_reference = 12; // BTAE-21 Customs reference number
+}
+
+message PrecedingInvoiceReference {
+  string id = 1; // IBT-025
+  string issue_date = 2; // IBT-026
+}
+
+// Party is a seller (IBG-04) or a buyer (IBG-07). The VAT identifiers IBT-031 and
+// IBT-048 are Invoice.seller_trn and Invoice.buyer_trn.
+message Party {
+  string name = 1; // IBT-027 / IBT-044 (legal registration name)
+  string trading_name = 2; // IBT-028 / IBT-045
+  repeated Identifier identifiers = 3; // IBT-029 (0..n) / IBT-046 (0..1)
+  LegalRegistration legal_registration = 4; // IBT-030 / IBT-047 and their BTAE qualifiers
+  string tax_registration_identifier = 5; // IBT-032 Seller TIN (seller only, 10 digits)
+  string additional_legal_information = 6; // IBT-033 (seller only)
+  Identifier electronic_address = 7; // IBT-034 / IBT-049 and their scheme, e.g. "0235"
+  PostalAddress postal_address = 8; // IBG-05 / IBG-08
+  Contact contact = 9; // IBG-06 / IBG-09
+}
+
+message LegalRegistration {
+  string id = 1; // IBT-030 / IBT-047
+  string scheme_id = 2; // IBT-030-1 / IBT-047-1
+  string type = 3; // BTAE-15 / BTAE-16: "TL" | "EID" | "PAS" | "CD"
+  string authority_name = 4; // BTAE-12 / BTAE-11 (when type = TL)
+  string passport_issuing_country = 5; // BTAE-18 / BTAE-19, ISO 3166-1 (when type = PAS)
+}
+
+message PostalAddress {
+  string line1 = 1; // IBT-035 / 050 / 064 / 075
+  string line2 = 2; // IBT-036 / 051 / 065 / 076
+  string line3 = 3; // IBT-162 / 163 / 164 / 165
+  string city = 4; // IBT-037 / 052 / 066 / 077
+  string post_code = 5; // IBT-038 / 053 / 067 / 078
+  string country_subdivision = 6; // IBT-039 / 054 / 068 / 079 (AUH, DXB, SHJ, UAQ, FUJ, AJM, RAK when AE)
+  string country_code = 7; // IBT-040 / 055 / 069 / 080, ISO 3166-1 alpha-2
+}
+
+message Contact {
+  string name = 1; // IBT-041 / IBT-056
+  string telephone = 2; // IBT-042 / IBT-057
+  string email = 3; // IBT-043 / IBT-058
+}
+
+message Payee {
+  string name = 1; // IBT-059
+  Identifier identifier = 2; // IBT-060 and IBT-060-1
+  Identifier legal_registration = 3; // IBT-061 and IBT-061-1
+}
+
+message TaxRepresentative {
+  string name = 1; // IBT-062
+  string vat_identifier = 2; // IBT-063
+  PostalAddress postal_address = 3; // IBG-12
+}
+
+message Delivery {
+  string party_name = 1; // IBT-070
+  string incoterms = 2; // BTAE-22
+  Identifier location = 3; // IBT-071 and IBT-071-1
+  string actual_delivery_date = 4; // IBT-072
+  PostalAddress address = 5; // IBG-15
+}
+
+message Period {
+  string start_date = 1; // IBT-073 / IBT-134
+  string end_date = 2; // IBT-074 / IBT-135
+}
+
+message PaymentInstructions {
+  string id = 1; // IBT-178
+  string means_code = 2; // IBT-081 (UNCL4461 subset)
+  string means_text = 3; // IBT-082
+  repeated Identifier remittance_information = 4; // IBT-083 and IBT-083-1
+  CreditTransfer credit_transfer = 5; // IBG-17
+  PaymentCard card = 6; // IBG-18
+  DirectDebit direct_debit = 7; // IBG-19
+}
+
+message CreditTransfer {
+  Identifier account = 1; // IBT-084 and IBT-084-1 (e.g. IBAN)
+  string account_name = 2; // IBT-085
+  string service_provider_id = 3; // IBT-086
+  PostalAddress institution_address = 4; // IBG-34 (IBT-169..IBT-175)
+}
+
+// PaymentCard is IBG-18. Only a masked PAN is ever stored or transmitted.
+message PaymentCard {
+  string primary_account_number = 1; // IBT-087, masked (last 4 to 6 digits only)
+  string holder_name = 2; // IBT-088
+  string network_id = 3; // UBL cac:CardAccount/cbc:NetworkID (required by UBL), no IBT
+}
+
+message DirectDebit {
+  string mandate_reference = 1; // IBT-089
+  string creditor_identifier = 2; // IBT-090
+  string debited_account = 3; // IBT-091
+}
+
+message PaymentTerms {
+  string instructions_id = 1; // IBT-187
+  string note = 2; // IBT-020
+  string amount = 3; // IBT-176
+  string installment_due_date = 4; // IBT-177
+}
+
+// TaxCategory is shared by lines (IBG-30), document allowances and charges, and the
+// tax breakdown.
+message TaxCategory {
+  string code = 1; // IBT-151 / IBT-095 / IBT-102 / IBT-118: S, E, O, AE, Z, N
+  string rate = 2; // IBT-152 / IBT-096 / IBT-103 / IBT-119, percent; empty = absent
+  string tax_scheme = 3; // IBT-167 / IBT-095-1 / IBT-102-1 / IBT-118-1; empty = "VAT"
+  string exemption_reason_code = 4; // IBT-186 / IBT-196 / IBT-198 / IBT-121
+  string exemption_reason_text = 5; // IBT-185 / IBT-197 / IBT-199 / IBT-120
+}
+
+// AllowanceCharge is a document-level (IBG-20/21) or line-level (IBG-27/28)
+// allowance or charge.
+message AllowanceCharge {
+  bool is_charge = 1; // false = allowance, true = charge (UBL ChargeIndicator)
+  string amount = 2; // IBT-092 / IBT-099 / IBT-136 / IBT-141
+  string base_amount = 3; // IBT-093 / IBT-100 / IBT-137 / IBT-142
+  string percentage = 4; // IBT-094 / IBT-101 / IBT-138 / IBT-143
+  string reason = 5; // IBT-097 / IBT-104 / IBT-139 / IBT-144
+  string reason_code = 6; // IBT-098 (UNCL5189) / IBT-105 (UNCL7161) / IBT-140 / IBT-145
+  TaxCategory tax_category = 7; // document level only: IBT-095..096, IBT-196..197 / IBT-102..103, IBT-198..199
+}
+
+// DocumentTotals is IBG-22 and IBG-37. IBT-110 = Invoice.vat_amount and
+// IBT-112 = Invoice.total_amount.
+message DocumentTotals {
+  string line_extension_amount = 1; // IBT-106 Sum of invoice line net amount
+  string allowance_total_amount = 2; // IBT-107
+  string charge_total_amount = 3; // IBT-108
+  string tax_exclusive_amount = 4; // IBT-109
+  string paid_amount = 5; // IBT-113
+  string rounding_amount = 6; // IBT-114
+  string payable_amount = 7; // IBT-115
+  bool tax_inclusive_pricing = 8; // IBT-200 (UBL TaxTotal/TaxIncludedIndicator)
+  string tax_amount_accounting_currency = 9; // IBT-111 (in IBT-006, i.e. AED)
+  string total_with_tax_aed = 10; // BTAE-20 Invoice total amount with VAT in AED
+}
+
+message TaxSubtotal {
+  string taxable_amount = 1; // IBT-116
+  string tax_amount = 2; // IBT-117
+  TaxCategory category = 3; // IBT-118, IBT-119, IBT-118-1 (+ IBT-121 / IBT-120)
+}
+
+message SupportingDocument {
+  string reference = 1; // IBT-122
+  string description = 2; // IBT-123
+  string external_uri = 3; // IBT-124
+  Attachment attachment = 4; // IBT-125
+}
+
+// Attachment points into the platform's object storage. The v2 exporter does not
+// embed it (see spec non-goals).
+message Attachment {
+  string object_key = 1; // internal object-storage key (not a business term)
+  string mime_code = 2; // IBT-125-1
+  string filename = 3; // IBT-125-2
+}
+
+message InvoiceLine {
+  string id = 1; // IBT-126
+  string note = 2; // IBT-127
+  Identifier object_identifier = 3; // IBT-128 and IBT-128-1
+  string quantity = 4; // IBT-129
+  string unit_code = 5; // IBT-130 (UN/ECE Rec 20)
+  string net_amount = 6; // IBT-131 Invoice line net amount
+  string order_reference = 7; // IBT-183
+  string order_line_reference = 8; // IBT-132
+  string despatch_advice_reference = 9; // IBT-184
+  string accounting_reference = 10; // IBT-133
+  string batch_number = 11; // BTAE-24
+  Period period = 12; // IBG-26
+  repeated AllowanceCharge allowances_charges = 13; // IBG-27 / IBG-28 (tax_category unused)
+  Price price = 14; // IBG-29
+  TaxCategory tax = 15; // IBG-30: IBT-151, IBT-152, IBT-185, IBT-186, IBT-167
+  string amount_aed = 16; // BTAE-10 Invoice line amount in AED
+  string vat_amount_aed = 17; // BTAE-08 VAT line amount in AED
+  Item item = 18; // IBG-31
+}
+
+message Price {
+  string net_price = 1; // IBT-146
+  string discount = 2; // IBT-147
+  string gross_price = 3; // IBT-148
+  string base_quantity = 4; // IBT-149
+  string base_quantity_unit_code = 5; // IBT-150
+}
+
+message Item {
+  string name = 1; // IBT-153
+  string description = 2; // IBT-154
+  string item_type = 3; // BTAE-13: G | S | B
+  string goods_service_type = 4; // BTAE-09 (GoodsType code list, for reverse charge)
+  string seller_item_id = 5; // IBT-155
+  string buyer_item_id = 6; // IBT-156
+  Identifier standard_id = 7; // IBT-157 and IBT-157-1
+  repeated Classification classifications = 8; // IBT-158, -1 (HS), -2
+  repeated Classification service_accounting_codes = 9; // BTAE-17, -1 (SAC), -2
+  string origin_country = 10; // IBT-159
+  repeated ItemAttribute attributes = 11; // IBG-32
+}
+
+message Classification {
+  string code = 1;
+  string scheme_id = 2;
+  string scheme_version = 3;
+}
+
+message ItemAttribute {
+  string name = 1; // IBT-160
+  string value = 2; // IBT-161
 }

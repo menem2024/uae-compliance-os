@@ -21,7 +21,7 @@ gen:
 	cd proto && buf generate
 	cd services/ai-py && uv run python -m grpc_tools.protoc -I ../../proto \
 	  --python_out=src/ai/gen --pyi_out=src/ai/gen \
-	  ../../proto/compliance/v1/invoice.proto ../../proto/compliance/v1/validator.proto ../../proto/compliance/v1/events.proto
+	  ../../proto/compliance/v1/invoice.proto ../../proto/compliance/v1/validator.proto ../../proto/compliance/v1/events.proto ../../proto/compliance/v1/export.proto
 	find services/ai-py/src/ai/gen -type d -exec touch {}/__init__.py \;
 	sed -i 's/^from compliance\.v1 import/from ai.gen.compliance.v1 import/' services/ai-py/src/ai/gen/compliance/v1/*_pb2.py services/ai-py/src/ai/gen/compliance/v1/*_pb2.pyi
 

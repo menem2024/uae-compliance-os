@@ -25,23 +25,35 @@ _sym_db = _symbol_database.Default()
 from ai.gen.compliance.v1 import invoice_pb2 as compliance_dot_v1_dot_invoice__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1d\x63ompliance/v1/validator.proto\x12\rcompliance.v1\x1a\x1b\x63ompliance/v1/invoice.proto\":\n\x0fValidateRequest\x12\'\n\x07invoice\x18\x01 \x01(\x0b\x32\x16.compliance.v1.Invoice\"=\n\x10ValidateResponse\x12)\n\x03run\x18\x01 \x01(\x0b\x32\x1c.compliance.v1.ValidationRun\"l\n\x0fValidationIssue\x12\x0f\n\x07rule_id\x18\x01 \x01(\t\x12)\n\x08severity\x18\x02 \x01(\x0e\x32\x17.compliance.v1.Severity\x12\x0c\n\x04path\x18\x03 \x01(\t\x12\x0f\n\x07message\x18\x04 \x01(\t\"X\n\rValidationRun\x12\x17\n\x0fruleset_version\x18\x01 \x01(\t\x12.\n\x06issues\x18\x02 \x03(\x0b\x32\x1e.compliance.v1.ValidationIssue*N\n\x08Severity\x12\x18\n\x14SEVERITY_UNSPECIFIED\x10\x00\x12\x12\n\x0eSEVERITY_ERROR\x10\x01\x12\x14\n\x10SEVERITY_WARNING\x10\x02\x32_\n\x10ValidatorService\x12K\n\x08Validate\x12\x1e.compliance.v1.ValidateRequest\x1a\x1f.compliance.v1.ValidateResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1d\x63ompliance/v1/validator.proto\x12\rcompliance.v1\x1a\x1b\x63ompliance/v1/invoice.proto\"S\n\x0fValidateRequest\x12\'\n\x07invoice\x18\x01 \x01(\x0b\x32\x16.compliance.v1.Invoice\x12\x17\n\x0fruleset_version\x18\x02 \x01(\t\"=\n\x10ValidateResponse\x12)\n\x03run\x18\x01 \x01(\x0b\x32\x1c.compliance.v1.ValidationRun\"\xbc\x02\n\x0fValidationIssue\x12\x0f\n\x07rule_id\x18\x01 \x01(\t\x12)\n\x08severity\x18\x02 \x01(\x0e\x32\x17.compliance.v1.Severity\x12\x0c\n\x04path\x18\x03 \x01(\t\x12\x0f\n\x07message\x18\x04 \x01(\t\x12\x15\n\rbusiness_term\x18\x05 \x01(\t\x12\x45\n\x0cmessage_args\x18\x06 \x03(\x0b\x32/.compliance.v1.ValidationIssue.MessageArgsEntry\x12\x0f\n\x07\x66ixable\x18\x07 \x01(\x08\x12\x12\n\nmessage_ar\x18\x08 \x01(\t\x12\x17\n\x0fsuggested_value\x18\t \x01(\t\x1a\x32\n\x10MessageArgsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x86\x01\n\rValidationRun\x12\x17\n\x0fruleset_version\x18\x01 \x01(\t\x12.\n\x06issues\x18\x02 \x03(\x0b\x32\x1e.compliance.v1.ValidationIssue\x12\x13\n\x0b\x64uration_us\x18\x03 \x01(\x03\x12\x17\n\x0frules_evaluated\x18\x04 \x01(\x05\"\xd6\x01\n\x0c\x46ixTaskInput\x12\x12\n\ninvoice_id\x18\x01 \x01(\t\x12\x17\n\x0fpayload_version\x18\x02 \x01(\x05\x12\x19\n\x11validation_run_id\x18\x03 \x01(\t\x12\x17\n\x0fruleset_version\x18\x04 \x01(\t\x12\'\n\x07invoice\x18\x05 \x01(\x0b\x32\x16.compliance.v1.Invoice\x12.\n\x06issues\x18\x06 \x03(\x0b\x32\x1e.compliance.v1.ValidationIssue\x12\x0c\n\x04mode\x18\x07 \x01(\t\"R\n\rFixChangeNote\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x10\n\x08rule_ids\x18\x02 \x03(\t\x12\x0e\n\x06source\x18\x03 \x01(\t\x12\x11\n\trationale\x18\x04 \x01(\t\"\xd5\x01\n\x11\x46ixProposalDetail\x12\x19\n\x11validation_run_id\x18\x01 \x01(\t\x12\x17\n\x0fpayload_version\x18\x02 \x01(\x05\x12\x17\n\x0fruleset_version\x18\x03 \x01(\t\x12+\n\x05notes\x18\x04 \x03(\x0b\x32\x1c.compliance.v1.FixChangeNote\x12\x15\n\rerrors_before\x18\x05 \x01(\x05\x12\x14\n\x0c\x65rrors_after\x18\x06 \x01(\x05\x12\x19\n\x11resolved_rule_ids\x18\x07 \x03(\t\"F\n\rFixTaskResult\x12\x0f\n\x07outcome\x18\x01 \x01(\t\x12\x13\n\x0bproposal_id\x18\x02 \x01(\t\x12\x0f\n\x07\x63hanges\x18\x03 \x01(\x05*N\n\x08Severity\x12\x18\n\x14SEVERITY_UNSPECIFIED\x10\x00\x12\x12\n\x0eSEVERITY_ERROR\x10\x01\x12\x14\n\x10SEVERITY_WARNING\x10\x02\x32_\n\x10ValidatorService\x12K\n\x08Validate\x12\x1e.compliance.v1.ValidateRequest\x1a\x1f.compliance.v1.ValidateResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'compliance.v1.validator_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_SEVERITY']._serialized_start=400
-  _globals['_SEVERITY']._serialized_end=478
+  _globals['_VALIDATIONISSUE_MESSAGEARGSENTRY']._loaded_options = None
+  _globals['_VALIDATIONISSUE_MESSAGEARGSENTRY']._serialized_options = b'8\001'
+  _globals['_SEVERITY']._serialized_start=1270
+  _globals['_SEVERITY']._serialized_end=1348
   _globals['_VALIDATEREQUEST']._serialized_start=77
-  _globals['_VALIDATEREQUEST']._serialized_end=135
-  _globals['_VALIDATERESPONSE']._serialized_start=137
-  _globals['_VALIDATERESPONSE']._serialized_end=198
-  _globals['_VALIDATIONISSUE']._serialized_start=200
-  _globals['_VALIDATIONISSUE']._serialized_end=308
-  _globals['_VALIDATIONRUN']._serialized_start=310
-  _globals['_VALIDATIONRUN']._serialized_end=398
-  _globals['_VALIDATORSERVICE']._serialized_start=480
-  _globals['_VALIDATORSERVICE']._serialized_end=575
+  _globals['_VALIDATEREQUEST']._serialized_end=160
+  _globals['_VALIDATERESPONSE']._serialized_start=162
+  _globals['_VALIDATERESPONSE']._serialized_end=223
+  _globals['_VALIDATIONISSUE']._serialized_start=226
+  _globals['_VALIDATIONISSUE']._serialized_end=542
+  _globals['_VALIDATIONISSUE_MESSAGEARGSENTRY']._serialized_start=492
+  _globals['_VALIDATIONISSUE_MESSAGEARGSENTRY']._serialized_end=542
+  _globals['_VALIDATIONRUN']._serialized_start=545
+  _globals['_VALIDATIONRUN']._serialized_end=679
+  _globals['_FIXTASKINPUT']._serialized_start=682
+  _globals['_FIXTASKINPUT']._serialized_end=896
+  _globals['_FIXCHANGENOTE']._serialized_start=898
+  _globals['_FIXCHANGENOTE']._serialized_end=980
+  _globals['_FIXPROPOSALDETAIL']._serialized_start=983
+  _globals['_FIXPROPOSALDETAIL']._serialized_end=1196
+  _globals['_FIXTASKRESULT']._serialized_start=1198
+  _globals['_FIXTASKRESULT']._serialized_end=1268
+  _globals['_VALIDATORSERVICE']._serialized_start=1350
+  _globals['_VALIDATORSERVICE']._serialized_end=1445
 # @@protoc_insertion_point(module_scope)

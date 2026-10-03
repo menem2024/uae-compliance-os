@@ -1,9 +1,4 @@
-pub mod pb {
-    tonic::include_proto!("compliance.v1");
-}
-mod rules;
-mod service;
-mod telemetry;
+use validator_rs::{pb, service, telemetry};
 
 use std::time::Duration;
 

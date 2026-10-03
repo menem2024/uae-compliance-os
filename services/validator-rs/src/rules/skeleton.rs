@@ -9,13 +9,17 @@ pub fn validate(inv: &pb::Invoice) -> pb::ValidationRun {
         issues.push(pb::ValidationIssue {
             rule_id: "AE-TRN-001".into(),
             severity: pb::Severity::Error as i32,
-            path: "invoice.seller_trn".into(),
+            path: "seller_trn".into(),
             message: "Seller TRN must be exactly 15 digits".into(),
+            ..Default::default()
         });
     }
+    let rules_evaluated = 1;
     pb::ValidationRun {
         ruleset_version: RULESET_VERSION.into(),
         issues,
+        rules_evaluated,
+        ..Default::default()
     }
 }
 
@@ -52,7 +56,7 @@ mod tests {
             let i = &run.issues[0];
             assert_eq!(i.rule_id, "AE-TRN-001");
             assert_eq!(i.severity, pb::Severity::Error as i32);
-            assert_eq!(i.path, "invoice.seller_trn");
+            assert_eq!(i.path, "seller_trn");
         }
     }
 }

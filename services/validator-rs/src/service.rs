@@ -1,4 +1,4 @@
-use crate::{pb, rules};
+use crate::{pb, rules::skeleton};
 use tonic::{Request, Response, Status};
 
 #[derive(Default)]
@@ -15,7 +15,7 @@ impl pb::validator_service_server::ValidatorService for Validator {
             .into_inner()
             .invoice
             .ok_or_else(|| Status::invalid_argument("invoice is required"))?;
-        let run = rules::validate(&inv);
+        let run = skeleton::validate(&inv);
         tracing::info!(issues = run.issues.len(), "validated");
         Ok(Response::new(pb::ValidateResponse { run: Some(run) }))
     }
@@ -29,7 +29,10 @@ mod tests {
     #[tokio::test]
     async fn missing_invoice_is_invalid_argument() {
         let err = Validator
-            .validate(Request::new(pb::ValidateRequest { invoice: None }))
+            .validate(Request::new(pb::ValidateRequest {
+                invoice: None,
+                ..Default::default()
+            }))
             .await
             .unwrap_err();
         assert_eq!(err.code(), tonic::Code::InvalidArgument);
@@ -42,7 +45,10 @@ mod tests {
             ..Default::default()
         };
         let resp = Validator
-            .validate(Request::new(pb::ValidateRequest { invoice: Some(inv) }))
+            .validate(Request::new(pb::ValidateRequest {
+                invoice: Some(inv),
+                ..Default::default()
+            }))
             .await
             .unwrap();
         assert_eq!(
