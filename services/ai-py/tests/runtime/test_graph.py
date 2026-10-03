@@ -328,3 +328,77 @@ async def test_finalize_runs_before_run_finished_and_failure_propagates():
         await executor(sink).run(TaskGraph("t@1", [Node("a", "a", "x", D, ok())]), RUN, Budget(), finalize=fin)
     assert seen == [RunStatus.SUCCEEDED]
     assert sink.finished[0].status is RunStatus.FAILED and sink.finished[0].error_code == "finalize_failed"
+
+
+# ------------------------------------------------------------------ review B #4: scheduler failures
+def hang():
+    async def fn(ctx):
+        await asyncio.sleep(3600)
+
+    return fn
+
+
+def leaked(before: set[asyncio.Task]) -> list[asyncio.Task]:
+    return [t for t in asyncio.all_tasks() - before if t is not asyncio.current_task() and not t.done()]
+
+
+def raising_when(_results) -> bool:
+    raise ZeroDivisionError("bad predicate")
+
+
+async def test_a_raising_when_fails_the_node_and_the_run_cleanly():
+    """A `when` raised out of run(): no run_finished, the sibling node and the emitter task kept running."""
+    before = set(asyncio.all_tasks())
+    out, sink = await run([Node("slow", "a", "x", D, hang()), Node("a", "a", "x", D, ok(1)),
+                           Node("b", "a", "x", D, ok(2), depends_on=("a",), when=raising_when),
+                           Node("c", "a", "x", D, ok(3), depends_on=("b",))])
+    assert out.status is RunStatus.FAILED and out.error_code == "internal"
+    assert [r.status for r in sink.steps if r.node_id == "b"] == [StepStatus.FAILED]
+    b = next(r for r in sink.steps if r.node_id == "b")
+    assert (b.attempt, b.step_id, b.error_code) == (0, step_id_for(RUN.run_id, "b", 0), "internal")
+    slow = [r for r in sink.steps if r.node_id == "slow"][-1]
+    assert slow.status is StepStatus.FAILED and slow.error_code == "cancelled"
+    assert out.node_status["c"] is StepStatus.SKIPPED
+    assert len(sink.finished) == 1 and sink.finished[0].status is RunStatus.FAILED
+    assert leaked(before) == []
+
+
+async def test_a_raising_when_on_a_non_critical_node_fails_only_that_node():
+    out, sink = await run([Node("a", "a", "x", D, ok(1)),
+                           Node("b", "a", "x", D, ok(2), depends_on=("a",), when=raising_when, critical=False),
+                           Node("c", "a", "x", D, ok(3), depends_on=("b",)),
+                           Node("d", "a", "x", D, ok(4), depends_on=("a",))])
+    assert out.status is RunStatus.SUCCEEDED
+    assert (out.node_status["b"], out.node_status["c"]) == (StepStatus.FAILED, StepStatus.SKIPPED)
+    assert out.results["d"] == 4 and len(sink.finished) == 1
+
+
+async def test_a_scheduler_error_fails_the_run_and_leaks_no_task():
+    class Broken(GraphExecutor):
+        calls = 0
+
+        def _schedule(self, *a, **kw):
+            Broken.calls += 1
+            if Broken.calls > 1:
+                raise RuntimeError("scheduler bug")
+            return super()._schedule(*a, **kw)
+
+    before = set(asyncio.all_tasks())
+    sink = MemorySink()
+    ex = Broken(gateway=FakeGateway({}), sink=sink, tools=ToolRegistry(), clock=FakeClock(), sleep=no_sleep)
+    out = await ex.run(TaskGraph("t@1", [Node("slow", "a", "x", D, hang()), Node("a", "a", "x", D, ok(1))]),
+                       RUN, Budget())
+    assert out.status is RunStatus.FAILED and out.error_code == "internal"
+    assert out.node_status["slow"] is StepStatus.FAILED
+    assert [r for r in sink.steps if r.node_id == "slow"][-1].error_code == "cancelled"
+    assert len(sink.finished) == 1 and leaked(before) == []
+
+
+@pytest.mark.parametrize("max_parallel", [0, -1])
+async def test_max_parallel_must_be_positive(max_parallel):
+    """max_parallel <= 0 used to validate, run nothing and report SUCCEEDED."""
+    graph = TaskGraph("t@1", [Node("a", "a", "x", D, ok(1))], max_parallel=max_parallel)
+    with pytest.raises(GraphInvalid, match="max_parallel"):
+        graph.validate()
+    with pytest.raises(GraphInvalid):
+        await executor(MemorySink()).run(graph, RUN, Budget())

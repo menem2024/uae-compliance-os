@@ -131,6 +131,8 @@ class TaskGraph:
         self.max_parallel = max_parallel
 
     def validate(self) -> None:
+        if self.max_parallel < 1:
+            raise GraphInvalid(f"max_parallel {self.max_parallel} < 1")
         ids = [n.id for n in self.nodes]
         if len(ids) > self.max_nodes:
             raise GraphInvalid(f"{len(ids)} nodes > max_nodes {self.max_nodes}")
@@ -260,7 +262,12 @@ class GraphExecutor:
         run_status, run_error = RunStatus.SUCCEEDED, ""
         try:
             while True:
-                self._schedule(graph, st, meter, emitter, running)
+                for att in self._schedule(graph, st, meter, emitter, running):
+                    if st.nodes[att.node_id].critical and run_status is RunStatus.SUCCEEDED:
+                        run_status, run_error = RunStatus.FAILED, att.error_code or "node_failed"
+                if run_status is RunStatus.FAILED:
+                    await self._cancel(st, emitter, running, "cancelled")
+                    break
                 if not running:
                     break  # every node is terminal (the graph is acyclic, so nothing is stuck)
                 done, _ = await asyncio.wait(running, timeout=meter.remaining_s(),
@@ -292,6 +299,10 @@ class GraphExecutor:
             await self._cancel(st, emitter, running, "cancelled")
             await emitter.close()
             raise
+        except Exception as exc:  # an executor bug: end the run, never leak in-flight nodes or the emitter
+            log.exception("graph executor failed run_id=%s error=%s", identity.run_id, type(exc).__name__)
+            run_status, run_error = RunStatus.FAILED, error_code_of(exc)
+            await self._cancel(st, emitter, running, "cancelled")
 
         outcome = RunOutcome(identity=identity, status=run_status,
                              results=MappingProxyType(dict(st.results)),
@@ -325,7 +336,10 @@ class GraphExecutor:
 
     # ------------------------------------------------------------------ scheduling
     def _schedule(self, graph: TaskGraph, st: _Run, meter: BudgetMeter, emitter: _Emitter,
-                  running: dict[asyncio.Task[_Attempt], str]) -> None:
+                  running: dict[asyncio.Task[_Attempt], str]) -> list[_Attempt]:
+        """Starts ready nodes and skips the ones whose `when` is False. A `when` that raises fails its node
+        (attempt 0, it never ran); the failures are returned, and scheduling stops at a critical one."""
+        failed: list[_Attempt] = []
         progressed = True
         while progressed:  # skipping a node can make others ready
             progressed = False
@@ -340,15 +354,30 @@ class GraphExecutor:
                     self._skip(st, emitter, node, "upstream")
                     progressed = True
                     continue
-                if node.when is not None and not node.when(MappingProxyType(st.results)):
-                    self._skip(st, emitter, node, "")
-                    progressed = True
-                    continue
+                if node.when is not None:
+                    try:
+                        ready = node.when(MappingProxyType(st.results))
+                    except Exception as exc:  # noqa: BLE001 - the predicate's node fails, not the executor
+                        log.error("when predicate failed run_id=%s node_id=%s error=%s", st.identity.run_id,
+                                  node_id, type(exc).__name__)
+                        att = _Attempt(node_id, StepStatus.FAILED, 0, step_id_for(st.identity.run_id, node_id, 0),
+                                       error=exc, error_code=error_code_of(exc))
+                        self._finish(graph, st, emitter, att)
+                        failed.append(att)
+                        if node.critical:
+                            return failed
+                        progressed = True
+                        continue
+                    if not ready:
+                        self._skip(st, emitter, node, "")
+                        progressed = True
+                        continue
                 if len(running) >= graph.max_parallel:
                     continue
                 st.inflight[node_id] = (0, "")
                 task = asyncio.create_task(self._run_node(st, node, meter, emitter))
                 running[task] = node_id
+        return failed
 
     def _skip(self, st: _Run, emitter: _Emitter, node: Node, code: str) -> None:
         st.status[node.id] = StepStatus.SKIPPED
