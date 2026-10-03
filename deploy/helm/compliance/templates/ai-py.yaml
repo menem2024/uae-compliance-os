@@ -32,12 +32,40 @@ spec:
     metadata:
       labels:
         {{- include "compliance.labels" $ctx | nindent 8 }}
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       terminationGracePeriodSeconds: 20
       securityContext:
         {{- include "compliance.podSecurityContext" (dict "uid" 65532) | nindent 8 }}
+      # The consumers touch MinIO and Valkey at start-up: wait until both
+      # accept TCP connections (the counterpart of compose's depends_on healthy).
+      initContainers:
+        - name: wait-for-minio-valkey
+          {{- include "compliance.serviceImage" $ctx | nindent 10 }}
+          command:
+            - /app/.venv/bin/python
+            - -c
+            - |
+              import socket, time
+              for host, port in (("minio", 9000), ("valkey", 6379)):
+                  while True:
+                      try:
+                          socket.create_connection((host, port), timeout=3).close()
+                          break
+                      except OSError:
+                          time.sleep(2)
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" true) | nindent 12 }}
       containers:
         - name: {{ $name }}
           {{- include "compliance.serviceImage" $ctx | nindent 10 }}
@@ -50,6 +78,16 @@ spec:
             - name: {{ $k }}
               value: {{ $v | quote }}
             {{- end }}
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ACCESS_KEY
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_SECRET_KEY
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           readinessProbe:

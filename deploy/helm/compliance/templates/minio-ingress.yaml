@@ -1,0 +1,38 @@
+# Public path to MinIO's S3 API only, so browsers can PUT and GET the presigned
+# document URLs api-go hands out (host storage.compliance.localhost, same
+# Traefik entrypoint and public.secure/public.port as web and Zitadel).
+#
+# What this does NOT expose: the MinIO console (Service port 9001) and the admin
+# API (/minio/admin/...) are not routed. The only path is the `documents`
+# bucket (api-go's DocumentsBucket), so a request for anything else on this host
+# (the root, other buckets, /minio/...) is a Traefik 404. Every request still
+# needs a valid presigned signature or credentials, and the Host header reaches
+# MinIO unchanged, which the signature requires. The scheme api-go signs with
+# follows its MINIO_USE_SSL, so keep it equal to public.secure.
+{{- if .Values.minio.enabled }}
+{{- $expected := (include "compliance.publicOrigin" (dict "root" $ "host" .Values.public.storageHost)) | trimPrefix "http://" | trimPrefix "https://" }}
+{{- if ne (toString .Values.apiGo.env.STORAGE_PUBLIC_ENDPOINT) $expected }}
+{{- fail (printf "apiGo.env.STORAGE_PUBLIC_ENDPOINT (%v) must equal the public storage host %q (public.storageHost and public.port)" .Values.apiGo.env.STORAGE_PUBLIC_ENDPOINT $expected) }}
+{{- end }}
+{{- $name := "minio-s3" -}}
+{{- $ctx := dict "root" $ "name" $name "component" "storage" }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "compliance.labels" $ctx | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.public.storageHost | quote }}
+      http:
+        paths:
+          - path: /documents
+            pathType: Prefix
+            backend:
+              service:
+                name: minio
+                port:
+                  name: api
+{{- end }}
