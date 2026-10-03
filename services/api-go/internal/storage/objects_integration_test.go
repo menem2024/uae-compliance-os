@@ -107,7 +107,9 @@ func TestObjectStoreAndPresignAgainstMinIO(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Content-Type", hdr.Get("Content-Type"))
+	for k := range hdr { // exactly the headers the browser is told to send
+		req.Header.Set(k, hdr.Get(k))
+	}
 	req.ContentLength = int64(len(body))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -118,11 +120,65 @@ func TestObjectStoreAndPresignAgainstMinIO(t *testing.T) {
 		t.Fatalf("signed put: got status %d, want 200", resp.StatusCode)
 	}
 
+	// Security review A, finding 3: the same presigned URL must not overwrite the verified object.
+	evil := []byte("HELLO")
+	again, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), bytes.NewReader(evil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k := range hdr {
+		again.Header.Set(k, hdr.Get(k))
+	}
+	again.ContentLength = int64(len(evil))
+	againResp, err := http.DefaultClient.Do(again)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = againResp.Body.Close()
+	if againResp.StatusCode != http.StatusPreconditionFailed {
+		t.Fatalf("reused presigned put: got status %d, want 412", againResp.StatusCode)
+	}
+	rc, _, err = store.Open(ctx, "presign-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, _ := io.ReadAll(rc)
+	_ = rc.Close()
+	if !bytes.Equal(stored, body) {
+		t.Fatalf("object was overwritten: %q", stored)
+	}
+
+	// Dropping the signed If-None-Match header is a signature mismatch, not a way around it.
+	bare, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), bytes.NewReader(evil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bare.Header.Set("Content-Type", "text/plain")
+	bare.ContentLength = int64(len(evil))
+	bareResp, err := http.DefaultClient.Do(bare)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = bareResp.Body.Close()
+	if bareResp.StatusCode < 400 { // MinIO answers 400 (signed header absent); S3 proper 403
+		t.Fatalf("put without If-None-Match: got status %d, want a 4xx", bareResp.StatusCode)
+	}
+	rc, _, err = store.Open(ctx, "presign-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, _ = io.ReadAll(rc)
+	_ = rc.Close()
+	if !bytes.Equal(stored, body) {
+		t.Fatalf("object was overwritten without the header: %q", stored)
+	}
+
 	badReq, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
 	badReq.Header.Set("Content-Type", "application/json")
+	badReq.Header.Set("If-None-Match", "*")
 	badReq.ContentLength = int64(len(body))
 	badResp, err := http.DefaultClient.Do(badReq)
 	if err != nil {

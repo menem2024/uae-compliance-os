@@ -42,17 +42,21 @@ func NewPresigner(publicEndpoint, accessKey, secretKey, region string, useSSL bo
 }
 
 // PresignPut signs a PUT for key that is only valid with exactly this
-// Content-Type and Content-Length. It returns the URL and the headers the
-// client must send.
+// Content-Type and Content-Length, and only as a create: If-None-Match: * is a
+// signed header, so a second PUT with the same URL (the URL stays valid for ttl
+// after "complete" verified the bytes) is refused with 412 instead of replacing
+// the verified object, and omitting the header fails the signature (403). It
+// returns the URL and the headers the client must send.
 func (p *Presigner) PresignPut(ctx context.Context, key, contentType string, size int64, ttl time.Duration) (*url.URL, http.Header, error) {
 	h := http.Header{}
 	h.Set("Content-Type", contentType)
 	h.Set("Content-Length", strconv.FormatInt(size, 10))
+	h.Set("If-None-Match", "*")
 	u, err := p.c.PresignHeader(ctx, http.MethodPut, p.bucket, key, ttl, nil, h)
 	if err != nil {
 		return nil, nil, fmt.Errorf("presign put: %w", err)
 	}
-	return u, http.Header{"Content-Type": {contentType}}, nil
+	return u, http.Header{"Content-Type": {contentType}, "If-None-Match": {"*"}}, nil
 }
 
 // PresignGet signs a GET that downloads key as filename.

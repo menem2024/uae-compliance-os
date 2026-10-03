@@ -23,10 +23,10 @@ func TestPresignPutSignsTypeAndLength(t *testing.T) {
 	if u.Host != "files.example.test:9000" || u.Path != "/documents/firms/f/docs/d" {
 		t.Fatalf("url %s", u)
 	}
-	if q.Get("X-Amz-Expires") != "900" || q.Get("X-Amz-SignedHeaders") != "content-length;content-type;host" {
+	if q.Get("X-Amz-Expires") != "900" || q.Get("X-Amz-SignedHeaders") != "content-length;content-type;host;if-none-match" {
 		t.Fatalf("query %v", q)
 	}
-	if hdr.Get("Content-Type") != "application/pdf" || len(hdr) != 1 {
+	if hdr.Get("Content-Type") != "application/pdf" || hdr.Get("If-None-Match") != "*" || len(hdr) != 2 {
 		t.Fatalf("headers %v", hdr)
 	}
 }

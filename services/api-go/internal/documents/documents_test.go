@@ -363,7 +363,7 @@ func (p *fakePresigner) PresignPut(_ context.Context, key, ct string, size int64
 	if ttl != documents.PutTTL || size <= 0 {
 		return nil, nil, errors.New("bad presign args")
 	}
-	return &url.URL{Scheme: "http", Host: "minio.local:9000", Path: "/documents/" + key}, http.Header{"Content-Type": {ct}}, nil
+	return &url.URL{Scheme: "http", Host: "minio.local:9000", Path: "/documents/" + key}, http.Header{"Content-Type": {ct}, "If-None-Match": {"*"}}, nil
 }
 
 func (p *fakePresigner) PresignGet(_ context.Context, key, _ string, _ time.Duration) (*url.URL, error) {
@@ -453,6 +453,7 @@ func TestRequestUploadsSignsAndDeduplicates(t *testing.T) {
 		t.Fatalf("first: %+v", items[0])
 	}
 	if items[0].Upload.Method != "PUT" || items[0].Upload.Headers["Content-Type"] != "application/pdf" ||
+		items[0].Upload.Headers["If-None-Match"] != "*" ||
 		!items[0].Upload.ExpiresAt.Equal(time.Date(2026, 9, 30, 10, 15, 0, 0, time.UTC)) {
 		t.Fatalf("upload: %+v", items[0].Upload)
 	}

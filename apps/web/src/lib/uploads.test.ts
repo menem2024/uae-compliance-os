@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  isTerminal, uploadReducer, type DocumentRow, type UploadAction, type UploadItem, documentsNeedPolling, formatBytes, settleFromRows,
+  isTerminal, uploadReducer, type DocumentRow, type UploadAction, type UploadItem, documentsNeedPolling, formatBytes, putSucceeded, settleFromRows,
 } from "./uploads";
 
 const file = new File(["x"], "inv.pdf", { type: "application/pdf" });
@@ -138,5 +138,12 @@ describe("settleFromRows", () => {
     ]);
     expect(out.map((i) => i.state)).toEqual(["needs_review", "processing", "uploading"]);
     expect(settleFromRows(items, [])).toBe(items);
+  });
+});
+
+describe("putSucceeded", () => {
+  it("treats 2xx and the create-only 412 as uploaded and everything else as failed", () => {
+    expect([200, 204, 412].every(putSucceeded)).toBe(true);
+    expect([0, 301, 400, 403, 404, 500].some(putSucceeded)).toBe(false);
   });
 });

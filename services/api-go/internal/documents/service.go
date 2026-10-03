@@ -111,8 +111,11 @@ func (s *Service) RequestUploads(ctx context.Context, firmID, clientCompanyID uu
 				if err != nil {
 					return nil, fmt.Errorf("presign %s: %w", p.Doc.ID, err)
 				}
-				item.Upload = &Upload{URL: u.String(), Method: http.MethodPut,
-					Headers: map[string]string{"Content-Type": hdr.Get("Content-Type")}, ExpiresAt: expires}
+				headers := make(map[string]string, len(hdr))
+				for k := range hdr { // every header the URL signed: the browser must send all of them
+					headers[k] = hdr.Get(k)
+				}
+				item.Upload = &Upload{URL: u.String(), Method: http.MethodPut, Headers: headers, ExpiresAt: expires}
 			}
 			items[slots[k]] = item
 		}

@@ -38,6 +38,13 @@ const TERMINAL: ReadonlySet<UploadState> = new Set([
   "extracted", "needs_review", "not_invoice", "failed", "rejected", "duplicate",
 ]);
 
+/**
+ * The presigned PUT is create-only (If-None-Match: *), so a retry after a lost response, or a re-request
+ * of a still-pending upload, answers 412: the object is already there. That is not a failure: "complete"
+ * re-verifies size and sha256 server-side and rejects (and removes) wrong bytes.
+ */
+export const putSucceeded = (status: number): boolean => (status >= 200 && status < 300) || status === 412;
+
 export const isTerminal = (s: UploadState): boolean => TERMINAL.has(s);
 
 /** Server statuses a processing Document can settle in; each one is also an UploadState. */

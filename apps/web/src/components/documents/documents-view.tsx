@@ -10,7 +10,7 @@ import {
   runUploads, type CompleteResponseItem, type UploadDeps, type UploadResponseItem,
 } from "@/lib/upload-queue";
 import {
-  documentsNeedPolling, isTerminal, settleFromRows, uploadReducer, type DocumentRow, type UploadAction, type UploadItem,
+  documentsNeedPolling, isTerminal, putSucceeded, settleFromRows, uploadReducer, type DocumentRow, type UploadAction, type UploadItem,
 } from "@/lib/uploads";
 import { ClientPicker } from "./client-picker";
 import { Dropzone } from "./dropzone";
@@ -32,7 +32,7 @@ function putFile(
     xhr.open(target.method, target.url);
     for (const [k, v] of Object.entries(target.headers)) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new ApiError(xhr.status, "upload_failed", null)));
+    xhr.onload = () => (putSucceeded(xhr.status) ? resolve() : reject(new ApiError(xhr.status, "upload_failed", null)));
     xhr.onerror = () => reject(new ApiError(0, "upload_failed", null));
     xhr.send(file);
   });
