@@ -13,7 +13,10 @@
 //!   attachments; `mimeCode` and `filename` are kept);
 //! * the `NA` placeholders the exporter writes where UBL requires a value that the business
 //!   term does not have (`OrderReference/ID` with only IBT-014, `OrderLineReference/LineID`
-//!   with only IBT-183, `CardAccount/NetworkID`), which import back as empty fields.
+//!   with only IBT-183, `CardAccount/NetworkID`), which import back as empty fields;
+//! * the currency prefix of the BTAE-05 text (`AED200000`): the canonical contract value is a
+//!   bare decimal string. A prefix equal to IBT-005 is redundant; any other currency has no
+//!   canonical home and is reported as `.../cbc:DocumentDescription#currency`.
 //!
 //! The only content of the 30 official examples that is not modelled is the line-level
 //! `DiscrepancyResponse` of `Volume-discount-credit-note.xml` (upstream defect 3).
@@ -34,7 +37,8 @@ const NS_XSI: &str = "http://www.w3.org/2001/XMLSchema-instance";
 /// What the importer left out of the canonical invoice.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ImportReport {
-    /// One entry per unconsumed element (`Root/cac:A/cbc:B`) or attribute (`.../cbc:B@attr`).
+    /// One entry per unconsumed element (`Root/cac:A/cbc:B`), attribute (`.../cbc:B@attr`) or
+    /// dropped part of an element's text (`.../cbc:B#part`).
     pub ignored: Vec<String>,
 }
 
@@ -70,11 +74,28 @@ impl Ns {
 struct Imp {
     visited: RefCell<HashSet<NodeId>>,
     attrs: RefCell<HashSet<(NodeId, String)>>,
+    /// Elements whose text was consumed only in part, with the name of the dropped part.
+    dropped: RefCell<Vec<(NodeId, &'static str)>>,
     credit_note: bool,
 }
 
 fn nz<T: Default + PartialEq>(t: T) -> Option<T> {
     if t == T::default() { None } else { Some(t) }
+}
+
+/// Splits BTAE-05 text of the form `<ISO 4217 code>[spaces]<decimal>` into the code and the
+/// decimal. The official examples write the contract value with a currency prefix
+/// (`AED200000`, `AED 1000000`), while the canonical field is a bare decimal string (CI rule 10
+/// and the BTAE-05 mapping row). Any other text is `None` and is imported verbatim, so
+/// `AE-FMT-001` reports it instead of the importer guessing.
+fn split_currency_prefix(text: &str) -> Option<(&str, &str)> {
+    let (code, rest) = text.split_at_checked(3)?;
+    if !code.bytes().all(|b| b.is_ascii_uppercase()) {
+        return None;
+    }
+    let amount = rest.trim_start();
+    crate::decimal::parse(amount).ok()?;
+    Some((code, amount))
 }
 
 impl Imp {
@@ -118,6 +139,11 @@ impl Imp {
         self.kid(p, Ns::Cbc, name)
             .map(|c| self.text(c))
             .unwrap_or_default()
+    }
+
+    /// Records that part of `n`'s text (`what`) was consumed but not stored.
+    fn drop_text(&self, n: N, what: &'static str) {
+        self.dropped.borrow_mut().push((n.id(), what));
     }
 
     fn attr(&self, n: N, name: &str) -> String {
@@ -544,7 +570,18 @@ impl Imp {
         }
         if let Some(c) = self.kid(root, Ns::Cac, "ContractDocumentReference") {
             refs.contract_reference = self.tx(c, "ID");
-            refs.contract_value = self.tx(c, "DocumentDescription");
+            if let Some(d) = self.kid(c, Ns::Cbc, "DocumentDescription") {
+                let text = self.text(d);
+                refs.contract_value = match split_currency_prefix(&text) {
+                    Some((code, amount)) => {
+                        if code != inv.currency {
+                            self.drop_text(d, "currency");
+                        }
+                        amount.to_string()
+                    }
+                    None => text,
+                };
+            }
         }
         if !self.credit_note
             && let Some(p) = self.kid(root, Ns::Cac, "ProjectReference")
@@ -832,7 +869,8 @@ impl Imp {
         ImportReport { ignored }
     }
 
-    /// Document order: a node's attributes, then each child (reported, or descended into).
+    /// Document order: a node's attributes, the parts of its text that were dropped, then each
+    /// child (reported, or descended into).
     fn walk(&self, n: N, out: &mut Vec<String>) {
         let attrs = self.attrs.borrow();
         for a in n.attributes() {
@@ -844,6 +882,9 @@ impl Imp {
             }
         }
         drop(attrs);
+        for (_, what) in self.dropped.borrow().iter().filter(|(id, _)| *id == n.id()) {
+            out.push(format!("{}#{what}", Self::path(n)));
+        }
         for c in n.children().filter(|c| c.is_element()) {
             if self.visited.borrow().contains(&c.id()) {
                 self.walk(c, out);
@@ -871,6 +912,7 @@ pub fn from_xml(xml: &str) -> Result<(pb::Invoice, ImportReport), ImportError> {
     let imp = Imp {
         visited: RefCell::new(HashSet::new()),
         attrs: RefCell::new(HashSet::new()),
+        dropped: RefCell::new(Vec::new()),
         credit_note,
     };
     imp.visit(root);
@@ -932,6 +974,66 @@ mod tests {
         );
         let (_, rep) = from_xml(&xml).unwrap();
         assert_eq!(rep.ignored, ["Invoice/cbc:ID@foo", "Invoice/cbc:Bogus"]);
+    }
+
+    fn with_contract_value(text: &str) -> String {
+        MIN.replace(
+            "<cbc:DocumentCurrencyCode>",
+            &format!(
+                "<cac:ContractDocumentReference><cbc:ID>C-1</cbc:ID>\
+                 <cbc:DocumentDescription>{text}</cbc:DocumentDescription>\
+                 </cac:ContractDocumentReference><cbc:DocumentCurrencyCode>"
+            ),
+        )
+    }
+
+    /// BTAE-05 is a bare decimal string (CI rule 10); the official examples write a currency
+    /// prefix (`AED200000`, `AED 1000000`), which the importer strips.
+    #[test]
+    fn contract_value_drops_a_currency_prefix_of_the_document_currency() {
+        for (text, want) in [
+            ("AED200000", "200000"),
+            ("AED 1000000", "1000000"),
+            (" AED\t1500.50 ", "1500.50"),
+            ("200000", "200000"),
+            ("-12.5", "-12.5"),
+        ] {
+            let (inv, rep) = from_xml(&with_contract_value(text)).unwrap();
+            let refs = inv.references.unwrap();
+            assert_eq!(refs.contract_reference, "C-1");
+            assert_eq!(refs.contract_value, want, "{text:?}");
+            assert!(rep.ignored.is_empty(), "{text:?}: {:?}", rep.ignored);
+        }
+    }
+
+    /// A prefix naming another currency carries information the canonical model has no field
+    /// for: the amount is kept, the currency is reported as dropped.
+    #[test]
+    fn contract_value_reports_a_foreign_currency_prefix_as_ignored() {
+        let (inv, rep) = from_xml(&with_contract_value("USD 5000")).unwrap();
+        assert_eq!(inv.references.unwrap().contract_value, "5000");
+        assert_eq!(
+            rep.ignored,
+            ["Invoice/cac:ContractDocumentReference/cbc:DocumentDescription#currency"]
+        );
+    }
+
+    /// Text that is not `[currency] decimal` stays verbatim, so `AE-FMT-001` reports it rather
+    /// than the importer guessing.
+    #[test]
+    fn contract_value_without_a_decimal_amount_is_kept_verbatim() {
+        for text in [
+            "AED",
+            "AED two hundred",
+            "aed 5",
+            "AED 1,000",
+            "AEDX 5",
+            "5 AED",
+        ] {
+            let (inv, rep) = from_xml(&with_contract_value(text)).unwrap();
+            assert_eq!(inv.references.unwrap().contract_value, text, "{text:?}");
+            assert!(rep.ignored.is_empty(), "{text:?}: {:?}", rep.ignored);
+        }
     }
 
     #[test]

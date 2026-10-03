@@ -46,13 +46,11 @@ fn ae_scope_001(doc: &Doc<'_>, sink: &mut Sink<'_>) {
     }
 }
 
-/// Corpus examples whose imported BTAE-05 is the official text (`AED200000`, `AED 1000000`), not
-/// the decimal string the contract requires, so `AE-FMT-001` fires on `references.contract_value`.
-/// The importer (`conformance/ubl_import.rs`, Task 5) copies `DocumentDescription` verbatim; once
-/// it strips the currency prefix this list must become empty (the tests below then fail).
+/// Corpus examples whose imported BTAE-05 is not the decimal string the contract requires, so
+/// `AE-FMT-001` fires on `references.contract_value`. Empty: the importer strips the currency
+/// prefix of the official text (`AED200000`, `AED 1000000`), so every example passes.
 #[cfg(test)]
-pub(crate) const KNOWN_INVALID_CONTRACT_VALUE: &[&str] =
-    &["continuous-supplies", "standard-invoice-extensive"];
+pub(crate) const KNOWN_INVALID_CONTRACT_VALUE: &[&str] = &[];
 
 #[cfg(test)]
 mod tests {
@@ -86,18 +84,26 @@ mod tests {
 
     #[test]
     fn the_official_examples_pass_every_platform_rule() {
+        assert_eq!(KNOWN_INVALID_CONTRACT_VALUE, &[] as &[&str]);
         for (slug, inv) in examples() {
             for rule in RULES {
                 let paths: Vec<String> = run(rule.id, &inv).into_iter().map(|f| f.path).collect();
-                let known = rule.id == "AE-FMT-001"
-                    && KNOWN_INVALID_CONTRACT_VALUE.contains(&slug.as_str());
-                let want: &[&str] = if known {
-                    &["references.contract_value"]
-                } else {
-                    &[]
-                };
-                assert_eq!(paths, want, "{} on {slug}", rule.id);
+                assert_eq!(paths, Vec::<String>::new(), "{} on {slug}", rule.id);
             }
+        }
+    }
+
+    /// The two examples that write BTAE-05 with a currency prefix import as bare decimals.
+    #[test]
+    fn the_examples_contract_values_are_decimal_strings() {
+        let ex = examples();
+        for (slug, want) in [
+            ("continuous-supplies", "1000000"),
+            ("standard-invoice-extensive", "200000"),
+        ] {
+            let (_, inv) = ex.iter().find(|(s, _)| s == slug).unwrap();
+            let got = &inv.references.as_ref().unwrap().contract_value;
+            assert_eq!(got, want, "{slug}");
         }
     }
 
