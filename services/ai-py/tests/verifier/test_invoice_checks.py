@@ -70,6 +70,30 @@ def test_arithmetic_details():
     assert "arithmetic.line_total" in codes and codes["arithmetic.line_total"].severity == "block"
 
 
+def _out_of_range(inv) -> dict[str, str]:
+    return {f.path: f.severity for f in ArithmeticCheck.check(inv) if f.code == "arithmetic.out_of_range"}
+
+
+def test_a_27_digit_quantity_is_flagged_not_a_crash():
+    """Review B #3: quantize raised decimal.InvalidOperation (>= ~1e26) and failed the whole document."""
+    inv = generate(3, "en", defect_rate=0.0).truth.model_copy(deep=True)
+    inv.lines[0].quantity = "1" * 27
+    assert _out_of_range(inv) == {"lines[0].quantity": "block", "lines[0].net_amount": "block"}
+
+
+def test_a_huge_taxable_amount_is_flagged_not_a_crash():
+    inv = generate(3, "en", defect_rate=0.0).truth.model_copy(deep=True)
+    inv.tax_breakdown[0].taxable_amount = "9" * 30
+    assert _out_of_range(inv)["tax_breakdown[0].taxable_amount"] == "block"
+
+
+def test_a_product_too_large_for_cents_is_flagged():
+    inv = generate(3, "en", defect_rate=0.0).truth.model_copy(deep=True)
+    inv.lines[0].quantity = inv.lines[0].price.net_price = "9" * 14  # each plausible-looking, product ~1e28
+    findings = {f.path: f for f in ArithmeticCheck.check(inv) if f.code == "arithmetic.out_of_range"}
+    assert findings["lines[0].net_amount"].related == ("lines[0].quantity", "lines[0].price.net_price")
+
+
 def test_identifier_and_date_details():
     inv = generate(4, "en", defect_rate=0.0).truth.model_copy(deep=True)
     inv.buyer_trn = inv.seller_trn

@@ -307,6 +307,24 @@ async def test_attribution_proposal_for_another_candidate():
     assert run.extracted().direction == "unknown"  # relative to the chosen ClientCompany until a human accepts
 
 
+async def test_a_27_digit_quantity_is_reviewed_not_a_failed_document():
+    """Review B #3: the verifier's quantize overflow turned this into DocumentFailed(internal). Here the model
+    misread the quantity twice; the critic reads the printed one. (A value the critic confirms as printed
+    follows the binding critic-confirmation rule: validity is validator-rs's question.)"""
+    truth = generate(11, "en", defect_rate=0.0).truth
+    bad = truth.model_copy(deep=True)
+    bad.lines[0].quantity = "1" * 27
+    run = await ingest(pdf(), script(intake_classify=intake(), extraction_invoice=extraction(bad),
+                                     verifier_critic=reader(truth), extraction_revise=extraction(bad),
+                                     verifier_escalate=reader(truth)))
+    assert run.outcome is not None and run.outcome.status is RunStatus.SUCCEEDED
+    assert "verify.arithmetic" in run.outcome.node_status
+    assert run.outcome.node_status["verify.arithmetic"] is StepStatus.SUCCEEDED
+    msg = run.extracted()
+    assert msg.needs_review and "verifier_escalated" in msg.review_reasons
+    assert msg.invoices[0].verdict.verdict == agents_pb2.VERDICT_ESCALATE
+
+
 # ------------------------------------------------------------------ tabular branch
 @pytest.mark.parametrize(("method", "writer"), [("xlsx", write_xlsx), ("csv", write_csv)])
 async def test_four_invoice_spreadsheet_makes_no_model_call(method, writer):
@@ -326,6 +344,16 @@ async def test_four_invoice_spreadsheet_makes_no_model_call(method, writer):
     verdicts = [e.verdict.verdict for e in msg.invoices]
     assert verdicts[:3] == [agents_pb2.VERDICT_ACCEPT] * 3  # clean rows
     assert verdicts[3] == agents_pb2.VERDICT_ESCALATE and msg.needs_review  # printed line-sum defect, no critic
+
+
+async def test_a_1e30_cell_is_reviewed_not_a_failed_sheet():
+    truths = [generate(600 + k, "en", defect_rate=0.0).truth.model_copy(deep=True) for k in range(2)]
+    truths[1].lines[0].net_amount = "1" + "0" * 30  # an amount cell, '#,##0.00'
+    run = await ingest(write_xlsx(truths, "en"), script())
+    assert run.outcome is not None and run.outcome.status is RunStatus.SUCCEEDED
+    msg = run.extracted()
+    assert [e.verdict.verdict for e in msg.invoices] == [agents_pb2.VERDICT_ACCEPT, agents_pb2.VERDICT_ESCALATE]
+    assert msg.needs_review and "verifier_escalated" in msg.review_reasons
 
 
 async def test_a_large_spreadsheet_is_verified_in_bounded_chunks():

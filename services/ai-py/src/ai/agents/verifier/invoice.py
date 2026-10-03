@@ -9,15 +9,18 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import ClassVar
 
 from ai.agents.extraction.normalize import to_decimal
-from ai.agents.extraction.schema import ExtractedInvoice, ExtractionOutput, flatten
+from ai.agents.extraction.schema import DECIMAL_FIELDS, ExtractedInvoice, ExtractionOutput, flatten, leaf
 from ai.agents.verifier.core import Check, Critic, Finding, VerifierProfile
 
 CENT = Decimal("0.01")
 LINE_TOLERANCE = CENT  # per-line and per-category rounding; sums of printed amounts must match exactly
+# No real invoice amount, quantity or rate reaches this, and it stays far below ~1e26, where the default 28-digit
+# Decimal context stops being exact at cent precision (quantize raises InvalidOperation, sums silently round).
+MAX_MAGNITUDE = Decimal("1e18")
 CRITICAL_PATHS: tuple[str, ...] = (
     "invoice_number", "issue_date", "seller_trn", "buyer_trn", "currency", "vat_amount", "total_amount",
 )
@@ -45,13 +48,32 @@ def _iso_date(value: str) -> date | None:
         return None
 
 
+def _cents(d: Decimal) -> Decimal | None:
+    """d rounded to cents; None when it has more digits than the decimal context holds (>= ~1e26)."""
+    try:
+        return d.quantize(CENT, rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        return None
+
+
+def _out_of_range(inv: ExtractedInvoice) -> list[Finding]:
+    """A block finding for every decimal field at or over MAX_MAGNITUDE: implausible, and the arithmetic
+    below is only exact under it. A human looks instead of the document failing."""
+    out: list[Finding] = []
+    for path, value in flatten(inv).items():
+        if leaf(path) in DECIMAL_FIELDS and (d := to_decimal(value)) is not None and abs(d) >= MAX_MAGNITUDE:
+            out.append(Finding(path, "arithmetic.out_of_range", "block", observed=value))
+    return out
+
+
 def _rate(value: str) -> Decimal:
     d = to_decimal(value)
     return d if d is not None else Decimal(0)
 
 
 class ArithmeticCheck:
-    """Line nets, line total, per-category taxable and tax amounts, VAT total, grand total, payable."""
+    """Line nets, line total, per-category taxable and tax amounts, VAT total, grand total, payable; values
+    too large to compute with are flagged (`arithmetic.out_of_range`), never raised."""
 
     code_family: ClassVar[str] = "arithmetic"
 
@@ -60,14 +82,18 @@ class ArithmeticCheck:
 
     @staticmethod
     def check(inv: ExtractedInvoice) -> list[Finding]:
-        out: list[Finding] = []
+        out: list[Finding] = _out_of_range(inv)
         nets: list[Decimal | None] = []
         for i, ln in enumerate(inv.lines):
             q, p, n = to_decimal(ln.quantity), to_decimal(ln.price.net_price), to_decimal(ln.net_amount)
             nets.append(n)
             if q is not None and p is not None and n is not None:
-                exp = (q * p).quantize(CENT, rounding=ROUND_HALF_UP)
-                if abs(exp - n) > LINE_TOLERANCE:
+                exp = _cents(q * p)
+                if exp is None:
+                    out.append(Finding(f"lines[{i}].net_amount", "arithmetic.out_of_range", "block",
+                                       observed=ln.net_amount,
+                                       related=(f"lines[{i}].quantity", f"lines[{i}].price.net_price")))
+                elif abs(exp - n) > LINE_TOLERANCE:
                     out.append(Finding(f"lines[{i}].net_amount", "arithmetic.line_net", "warn", observed=ln.net_amount,
                                        expected=str(exp),
                                        related=(f"lines[{i}].quantity", f"lines[{i}].price.net_price")))
@@ -88,8 +114,12 @@ class ArithmeticCheck:
             key = (t.category.code, rate)
             seen.add(key)
             if base is not None and tax is not None:
-                exp = (base * rate / 100).quantize(CENT, rounding=ROUND_HALF_UP)
-                if abs(exp - tax) > LINE_TOLERANCE:
+                exp = _cents(base * rate / 100)
+                if exp is None:
+                    out.append(Finding(f"tax_breakdown[{j}].tax_amount", "arithmetic.out_of_range", "block",
+                                       observed=t.tax_amount,
+                                       related=(f"tax_breakdown[{j}].taxable_amount", f"tax_breakdown[{j}].category.rate")))
+                elif abs(exp - tax) > LINE_TOLERANCE:
                     out.append(Finding(f"tax_breakdown[{j}].tax_amount", "arithmetic.tax_amount", "warn",
                                        observed=t.tax_amount, expected=str(exp),
                                        related=(f"tax_breakdown[{j}].taxable_amount", f"tax_breakdown[{j}].category.rate")))

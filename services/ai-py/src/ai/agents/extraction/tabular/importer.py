@@ -14,7 +14,7 @@ import re
 import zipfile
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Literal
 
 from openpyxl import load_workbook
@@ -96,10 +96,13 @@ def cell_text(value: object, number_format: str = "General") -> str:
     if isinstance(value, int | float):  # openpyxl reads a whole-number float back as int
         d = Decimal(repr(value)) if isinstance(value, float) else Decimal(value)
         places = _places(number_format)
-        if places is not None:
-            d = d.quantize(Decimal(1).scaleb(-places))
-        elif d == d.to_integral_value():
-            d = d.quantize(Decimal(1))
+        try:
+            if places is not None:
+                d = d.quantize(Decimal(1).scaleb(-places))
+            elif d == d.to_integral_value():
+                d = d.quantize(Decimal(1))
+        except InvalidOperation:  # too many digits to quantise (>= ~1e26): keep the exact value; the
+            pass  # verifier flags it (arithmetic.out_of_range) and a human looks, instead of failing the sheet
         return format(d, "f")
     if isinstance(value, Decimal):
         return format(value, "f")

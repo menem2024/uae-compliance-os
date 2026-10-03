@@ -85,6 +85,13 @@ def test_cell_text_prints_values_as_excel_shows_them(value, fmt, want):
     assert cell_text(value, fmt) == want
 
 
+@pytest.mark.parametrize("fmt", ["#,##0.00", "General", "0"])
+def test_cell_text_of_a_value_too_large_to_quantize_is_exact_not_a_crash(fmt):
+    """Review B #3: 1e30 with '#,##0.00' raised InvalidOperation and failed the whole sheet."""
+    assert cell_text(1e30, fmt) == "1" + "0" * 30
+    assert cell_text(10**30, fmt) == "1" + "0" * 30
+
+
 def _zip(entries: int, size: int) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
