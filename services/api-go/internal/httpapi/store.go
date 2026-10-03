@@ -18,7 +18,6 @@ import (
 type PGStore struct{ Pool *pgxpool.Pool }
 
 var _ Store = PGStore{}
-var _ ValidationStore = PGStore{}
 
 // FirmIDForOrg resolves a firm id from a Zitadel org id.
 func (s PGStore) FirmIDForOrg(ctx context.Context, orgID string) (uuid.UUID, error) {
@@ -73,25 +72,6 @@ func (s PGStore) Get(ctx context.Context, firmID, id uuid.UUID) (InvoiceView, er
 		}
 	}
 	return v, nil
-}
-
-// Status returns the invoice's current status if visible to firmID, else
-// db.ErrNotFound. Used to skip redelivered invoice.extracted events for an
-// invoice already in a terminal status.
-func (s PGStore) Status(ctx context.Context, firmID, id uuid.UUID) (string, error) {
-	var status string
-	err := db.WithFirm(ctx, s.Pool, firmID, func(q *sqlc.Queries) error {
-		inv, err := q.GetInvoice(ctx, id)
-		if err != nil {
-			return err
-		}
-		status = inv.Status
-		return nil
-	})
-	if err != nil {
-		return "", fmt.Errorf("status %s: %w", id, err)
-	}
-	return status, nil
 }
 
 func textPtr(t pgtype.Text) *string {

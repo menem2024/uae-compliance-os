@@ -30,6 +30,7 @@ import (
 	"github.com/menem2024/uae-platform/services/api-go/internal/ratelimit"
 	"github.com/menem2024/uae-platform/services/api-go/internal/storage"
 	"github.com/menem2024/uae-platform/services/api-go/internal/telemetry"
+	"github.com/menem2024/uae-platform/services/api-go/internal/validation"
 	"github.com/menem2024/uae-platform/services/api-go/internal/validator"
 )
 
@@ -219,7 +220,7 @@ func serve(ctx context.Context) (err error) {
 	store := httpapi.PGStore{Pool: pool}
 	// The consumer re-creates its streams and durable whenever consumption
 	// stops (e.g. the durable was deleted or the server lost its state).
-	consumer := events.NewValidationConsumer(jsh, httpapi.HandleExtracted(store, vc), startupRetryInterval)
+	consumer := events.NewValidationConsumer(jsh, httpapi.HandleExtracted(&validation.Service{Pool: pool, Validator: vc}), startupRetryInterval)
 	consumerCtx, stopConsumer := context.WithCancel(ctx)
 	defer stopConsumer()
 	var wg sync.WaitGroup
