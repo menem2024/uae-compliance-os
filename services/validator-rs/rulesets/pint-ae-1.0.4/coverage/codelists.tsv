@@ -1,0 +1,19 @@
+rule_id	family	status	severity	business_term	path	fix	message_en	message_ar	note
+ibr-cl-01	codelists	pending	error	IBT-003		none		ترجمة قيد المراجعة	
+ibr-cl-03	codelists	pending	error			none		ترجمة قيد المراجعة	
+ibr-cl-04	codelists	pending	error	IBT-005		none		ترجمة قيد المراجعة	
+ibr-cl-05	codelists	pending	error	IBT-006		none		ترجمة قيد المراجعة	
+ibr-cl-07	codelists	pending	error	IBT-018-1		none		ترجمة قيد المراجعة	
+ibr-cl-10	codelists	pending	error	IBT-046-1		none		ترجمة قيد المراجعة	
+ibr-cl-11	codelists	pending	error	IBT-030-1		none		ترجمة قيد المراجعة	
+ibr-cl-13	codelists	pending	error	IBT-158-1		none		ترجمة قيد المراجعة	
+ibr-cl-14	codelists	pending	error	IBT-040		none		ترجمة قيد المراجعة	
+ibr-cl-15	codelists	pending	error	IBT-159		none		ترجمة قيد المراجعة	
+ibr-cl-16	codelists	pending	error	IBT-081		none		ترجمة قيد المراجعة	
+ibr-cl-19	codelists	pending	error	IBT-098		none		ترجمة قيد المراجعة	
+ibr-cl-20	codelists	pending	error	IBT-105		none		ترجمة قيد المراجعة	
+ibr-cl-21	codelists	pending	error	IBT-157		none		ترجمة قيد المراجعة	
+ibr-cl-23	codelists	pending	error	IBT-130		none		ترجمة قيد المراجعة	
+ibr-cl-24	codelists	pending	error	IBT-125-1		none		ترجمة قيد المراجعة	
+ibr-cl-25	codelists	pending	error	IBT-034-1		none		ترجمة قيد المراجعة	
+ibr-cl-26	codelists	pending	error	IBT-071-1		none		ترجمة قيد المراجعة	
