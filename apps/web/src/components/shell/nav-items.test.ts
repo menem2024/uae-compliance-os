@@ -10,7 +10,6 @@ describe("nav items", () => {
     expect(activeNavItem("/dashboard")?.key).toBe("dashboard");
     expect(activeNavItem("/demo/x")?.key).toBe("demo");
     expect(activeNavItem("/")).toBeNull();
-    expect(activeNavItem("/agents")).toBeNull(); // href null until Task 26
   });
 
   it("enable clients and settings with their page headings (Task 11)", () => {
@@ -20,5 +19,9 @@ describe("nav items", () => {
 
   it("enable documents with its page heading (Task 24)", () => {
     expect(activeNavItem("/documents")).toMatchObject({ key: "documents", titleKey: "P1Documents.title" });
+  });
+
+  it("enable agents as the live page (Task 26)", () => {
+    expect(activeNavItem("/agents")).toMatchObject({ key: "agents", live: true, titleKey: "P1Agents.title" });
   });
 });

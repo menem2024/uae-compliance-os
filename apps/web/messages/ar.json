@@ -330,5 +330,146 @@
       "http_429": "عدد كبير من عمليات الرفع. انتظر دقيقة ثم حاول مجدداً.",
       "sha256_mismatch": "محتوى الملف المرفوع غير مطابق."
     }
+  },
+  "P1Agents": {
+    "title": "نشاط الوكلاء",
+    "subtitle": "تابع الوكلاء وهم يعملون على مستنداتك مباشرة",
+    "connection": {
+      "connecting": "جارٍ الاتصال",
+      "live": "مباشر",
+      "offline": "إعادة الاتصال"
+    },
+    "catchingUp": "جارٍ اللحاق بآخر النشاط",
+    "header": {
+      "title": "الأوركسترا",
+      "runs": "تشغيلات اليوم",
+      "running": "قيد التشغيل الآن",
+      "documents": "المستندات",
+      "llmCalls": "استدعاءات النموذج",
+      "cacheHits": "إصابات الذاكرة المؤقتة",
+      "cost": "تكلفة اليوم",
+      "loadError": "تعذّر تحميل ملخص اليوم."
+    },
+    "roster": {
+      "title": "الوكلاء",
+      "calls": "استدعاءات اليوم",
+      "avg": "متوسط الزمن",
+      "active": "فعّال",
+      "phase2": "المرحلة 2",
+      "phase3": "المرحلة 3",
+      "names": {
+        "intake": "الاستلام",
+        "extraction": "الاستخراج",
+        "verifier": "المدقّق",
+        "orchestrator": "المنسّق",
+        "fix": "التصحيح",
+        "legal": "القانوني",
+        "regulation_watcher": "مراقب اللوائح"
+      },
+      "roles": {
+        "intake": "يصنّف كل ملف يُرفع",
+        "extraction": "يقرأ حقول الفاتورة",
+        "verifier": "يتحقق ويراجع النتيجة",
+        "orchestrator": "يخطّط التشغيل ويوجّهه",
+        "fix": "يقترح التصحيحات",
+        "legal": "يجيب عن الأسئلة القانونية",
+        "regulation_watcher": "يتابع تغيّر القواعد"
+      }
+    },
+    "feed": {
+      "title": "البث المباشر",
+      "empty": "بانتظار نشاط الوكلاء. ارفع مستنداً لتراه هنا.",
+      "count": "{count} حدثاً حديثاً",
+      "fallback": "تحديث من الوكيل",
+      "step": "{agent} {action}: {status}",
+      "intake": {
+        "classified": "صنّف الاستلام الملف على أنه {kind} ({language}) وفيه {count} فاتورة"
+      },
+      "gateway": {
+        "cache_hit": "أُعيد استخدام إجابة محفوظة من النموذج لـ {prompt}"
+      },
+      "proposal": {
+        "created": "اقتُرح {kind} للمراجعة"
+      },
+      "verifier": {
+        "check": {
+          "flagged": "فحوص {family} رصدت {count} ملاحظة",
+          "passed": "اجتازت فحوص {family}"
+        },
+        "critic": {
+          "agreed": "وافق المراجع الثاني (روجعت {paths} حقول)",
+          "disagreed": "اختلف المراجع الثاني في {count} حقل"
+        },
+        "verdict": {
+          "escalate": "الحكم: يحتاج إلى مراجعة بشرية (الثقة {confidence})",
+          "escalating": "التصعيد إلى نموذج أقوى (الثقة {confidence})",
+          "revise": "طلب من الاستخراج مراجعة {count} حقل"
+        }
+      }
+    },
+    "status": {
+      "running": "قيد التشغيل",
+      "succeeded": "نجح",
+      "failed": "فشل",
+      "budget_exceeded": "تجاوز الميزانية",
+      "cancelled": "أُلغي",
+      "abandoned": "متروك",
+      "pending": "في الانتظار",
+      "started": "بدأ",
+      "retrying": "إعادة المحاولة",
+      "skipped": "تم تخطيه"
+    },
+    "runs": {
+      "title": "التشغيلات",
+      "empty": "لا توجد تشغيلات بعد.",
+      "open": "فتح التشغيل",
+      "columns": {
+        "workflow": "سير العمل",
+        "subject": "الموضوع",
+        "status": "الحالة",
+        "steps": "الخطوات",
+        "cost": "التكلفة",
+        "started": "بدأ"
+      },
+      "subject": {
+        "document": "مستند"
+      }
+    },
+    "drawer": {
+      "title": "تفاصيل التشغيل",
+      "description": "خطة التشغيل وخطواته ومقترحاته",
+      "close": "إغلاق",
+      "loading": "جارٍ تحميل التشغيل",
+      "error": "تعذّر تحميل هذا التشغيل.",
+      "plan": "الخطة",
+      "dagError": "تعذّر رسم هذه الخطة.",
+      "steps": "الخطوات",
+      "noSteps": "لم تُسجَّل خطوات بعد.",
+      "totals": {
+        "llmCalls": "استدعاءات النموذج",
+        "tokens": "الرموز دخل / خرج",
+        "cost": "التكلفة",
+        "duration": "الزمن"
+      },
+      "error_code": "الخطأ"
+    },
+    "proposals": {
+      "title": "المقترحات",
+      "empty": "لا توجد مقترحات بعد.",
+      "columns": {
+        "agent": "الوكيل",
+        "kind": "النوع",
+        "summary": "الملخص",
+        "confidence": "الثقة",
+        "state": "الحالة"
+      },
+      "state": {
+        "proposed": "مقترح",
+        "accepted": "مقبول",
+        "rejected": "مرفوض",
+        "superseded": "مستبدل",
+        "expired": "منتهي"
+      }
+    }
   }
 }

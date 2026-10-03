@@ -330,5 +330,146 @@
       "http_429": "Too many uploads. Wait a minute and try again.",
       "sha256_mismatch": "The uploaded content did not match."
     }
+  },
+  "P1Agents": {
+    "title": "Agent activity",
+    "subtitle": "Watch the agents work on your documents, live",
+    "connection": {
+      "connecting": "Connecting",
+      "live": "Live",
+      "offline": "Reconnecting"
+    },
+    "catchingUp": "Catching up with the latest activity",
+    "header": {
+      "title": "The orchestra",
+      "runs": "Runs today",
+      "running": "Running now",
+      "documents": "Documents",
+      "llmCalls": "Model calls",
+      "cacheHits": "Cache hits",
+      "cost": "Cost today",
+      "loadError": "Could not load today's summary."
+    },
+    "roster": {
+      "title": "Agents",
+      "calls": "Calls today",
+      "avg": "Avg time",
+      "active": "Active",
+      "phase2": "Phase 2",
+      "phase3": "Phase 3",
+      "names": {
+        "intake": "Intake",
+        "extraction": "Extraction",
+        "verifier": "Verifier",
+        "orchestrator": "Orchestrator",
+        "fix": "Fix",
+        "legal": "Legal",
+        "regulation_watcher": "Regulation watcher"
+      },
+      "roles": {
+        "intake": "Classifies each upload",
+        "extraction": "Reads invoice fields",
+        "verifier": "Checks and second-guesses",
+        "orchestrator": "Plans and routes the run",
+        "fix": "Suggests corrections",
+        "legal": "Answers legal questions",
+        "regulation_watcher": "Tracks rule changes"
+      }
+    },
+    "feed": {
+      "title": "Live feed",
+      "empty": "Waiting for agent activity. Upload a document to see it here.",
+      "count": "{count} recent events",
+      "fallback": "Agent update",
+      "step": "{agent} {action}: {status}",
+      "intake": {
+        "classified": "Intake classified the file as {kind} ({language}), {count} invoice(s)"
+      },
+      "gateway": {
+        "cache_hit": "Reused a cached model answer for {prompt}"
+      },
+      "proposal": {
+        "created": "Proposed a {kind} for review"
+      },
+      "verifier": {
+        "check": {
+          "flagged": "{family} checks flagged {count} issue(s)",
+          "passed": "{family} checks passed"
+        },
+        "critic": {
+          "agreed": "Second reviewer agreed ({paths} fields reviewed)",
+          "disagreed": "Second reviewer disagreed on {count} field(s)"
+        },
+        "verdict": {
+          "escalate": "Verdict: needs a human (confidence {confidence})",
+          "escalating": "Escalating to a stronger model (confidence {confidence})",
+          "revise": "Asking extraction to revise {count} field(s)"
+        }
+      }
+    },
+    "status": {
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "budget_exceeded": "Over budget",
+      "cancelled": "Cancelled",
+      "abandoned": "Abandoned",
+      "pending": "Waiting",
+      "started": "Started",
+      "retrying": "Retrying",
+      "skipped": "Skipped"
+    },
+    "runs": {
+      "title": "Runs",
+      "empty": "No runs yet.",
+      "open": "Open run",
+      "columns": {
+        "workflow": "Workflow",
+        "subject": "Subject",
+        "status": "Status",
+        "steps": "Steps",
+        "cost": "Cost",
+        "started": "Started"
+      },
+      "subject": {
+        "document": "Document"
+      }
+    },
+    "drawer": {
+      "title": "Run details",
+      "description": "Plan, steps and proposals of one run",
+      "close": "Close",
+      "loading": "Loading run",
+      "error": "Could not load this run.",
+      "plan": "Plan",
+      "dagError": "This plan could not be drawn.",
+      "steps": "Steps",
+      "noSteps": "No steps recorded yet.",
+      "totals": {
+        "llmCalls": "Model calls",
+        "tokens": "Tokens in / out",
+        "cost": "Cost",
+        "duration": "Time"
+      },
+      "error_code": "Error"
+    },
+    "proposals": {
+      "title": "Proposals",
+      "empty": "No proposals yet.",
+      "columns": {
+        "agent": "Agent",
+        "kind": "Kind",
+        "summary": "Summary",
+        "confidence": "Confidence",
+        "state": "State"
+      },
+      "state": {
+        "proposed": "Proposed",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "superseded": "Superseded",
+        "expired": "Expired"
+      }
+    }
   }
 }
