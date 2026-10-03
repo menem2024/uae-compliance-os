@@ -12,6 +12,7 @@ from opentelemetry import trace
 from opentelemetry.trace import SpanKind, Status, StatusCode
 from pydantic import ValidationError
 
+from ai.gateway.errors import GatewayError
 from ai.gateway.types import (
     Message,
     ModelGateway,
@@ -44,6 +45,13 @@ def error_code_of(exc: BaseException) -> str:
     if isinstance(exc, ValidationError):
         return "output_invalid"
     return "internal"
+
+
+def _usage_attributes(span: trace.Span, u: Usage) -> None:
+    span.set_attribute("gen_ai.usage.input_tokens", u.input_tokens)
+    span.set_attribute("gen_ai.usage.output_tokens", u.output_tokens)
+    span.set_attribute("compliance.cost_micro_usd", u.cost_micro_usd)
+    span.set_attribute("compliance.cache_read_input_tokens", u.cache_read_input_tokens)
 
 
 def merge_usage(a: Usage | None, b: Usage) -> Usage:
@@ -112,17 +120,17 @@ class NodeContextImpl:
             except Exception as exc:
                 span.set_attribute("compliance.error_code", error_code_of(exc))
                 span.set_status(Status(StatusCode.ERROR, error_code_of(exc)))
+                billed = exc.usage if isinstance(exc, GatewayError) else None
+                if billed is not None:  # refusal / max_tokens / schema mismatch / context overflow: still paid for
+                    _usage_attributes(span, billed)
+                    self._meter(billed, cause=exc)
                 raise
             u = resp.usage
-            span.set_attribute("gen_ai.usage.input_tokens", u.input_tokens)
-            span.set_attribute("gen_ai.usage.output_tokens", u.output_tokens)
+            _usage_attributes(span, u)
             span.set_attribute("gen_ai.response.finish_reasons", [resp.stop_reason])
             span.set_attribute("compliance.cache_key", resp.cache_key)
             span.set_attribute("compliance.cache_hit", u.response_cache_hit)
-            span.set_attribute("compliance.cost_micro_usd", u.cost_micro_usd)
-            span.set_attribute("compliance.cache_read_input_tokens", u.cache_read_input_tokens)
-        self.usage = merge_usage(self.usage, u)
-        self.budget.add_usage(u)
+        self._meter(u)
         for h in self._hooks:
             try:
                 h.on_model_call(req, resp)
@@ -132,6 +140,18 @@ class NodeContextImpl:
             self.emit("gateway.cache_hit", prompt=req.prompt_id)
         log.debug("model call %s took %.0f ms", req.prompt_id, (time.monotonic() - started) * 1000)
         return resp
+
+    def _meter(self, usage: Usage, *, cause: BaseException | None = None) -> None:
+        """Adds a call's usage to this step and to the run budget. A BudgetExceeded from the meter wins over
+        the gateway error it was charged for: the run stops instead of retrying a call it can no longer pay."""
+        self.usage = merge_usage(self.usage, usage)
+        if cause is None:
+            self.budget.add_usage(usage)
+            return
+        try:
+            self.budget.add_usage(usage)
+        except BudgetExceeded as exc:
+            raise exc from cause
 
     async def run_tool_loop(self, req: ModelRequest, *, max_turns: int = 8) -> ModelResponse:
         messages = list(req.messages)

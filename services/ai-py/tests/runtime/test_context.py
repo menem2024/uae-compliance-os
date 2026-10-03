@@ -4,6 +4,7 @@ import uuid
 
 from pydantic import BaseModel
 
+from ai.gateway.errors import OutputInvalid
 from ai.gateway.fake import FakeGateway, response_for
 from ai.gateway.types import SONNET, Message, ModelRequest, ModelResponse, TextPart, ToolCall, Usage
 from ai.runtime.clock import FakeClock
@@ -12,7 +13,7 @@ from ai.runtime.events import MemorySink
 from ai.runtime.graph import GraphExecutor, Node, TaskGraph
 from ai.runtime.proposals import ProposalDraft, proposal_id
 from ai.runtime.tools import ToolRegistry, tool
-from ai.runtime.types import Budget, RunIdentity, RunStatus, StepKind
+from ai.runtime.types import Budget, RunIdentity, RunStatus, StepKind, StepStatus
 
 RUN = RunIdentity(run_id=str(uuid.uuid4()), firm_id="firm-1", client_company_id="cc", workflow="t@1",
                   subject_type="document", subject_id="d1")
@@ -99,6 +100,57 @@ async def test_run_tool_loop_returns_results_in_one_user_message():
     second = gw.calls[1].messages
     assert [m.role for m in second] == ["user", "assistant", "user"]
     assert [p.content for p in second[2].parts] == ["A", "B"]
+
+
+async def _no_sleep(_s: float) -> None:
+    return None
+
+
+def _billed_max_tokens(cost: int) -> OutputInvalid:
+    """What AnthropicGateway raises on stop_reason max_tokens: the provider billed the call (exc.usage)."""
+    exc = OutputInvalid("t.p: stop_reason max_tokens")
+    exc.usage = Usage(model=SONNET, prompt_id="t.p", prompt_version=1, input_tokens=1000, output_tokens=2000,
+                      cost_micro_usd=cost, llm_calls=1)
+    return exc
+
+
+async def _run_billed_failures(budget: Budget, cost: int):
+    gw = FakeGateway({"t.p": [_billed_max_tokens(cost)]})
+    sink = MemorySink()
+    ex = GraphExecutor(gateway=gw, sink=sink, tools=ToolRegistry(), clock=FakeClock(), sleep=_no_sleep)
+
+    async def fn(ctx):
+        return (await ctx.complete(req())).parsed
+
+    out = await ex.run(TaskGraph("t@1", [Node("a", "agent", "act", StepKind.LLM, fn)]), RUN, budget)
+    return out, sink, gw
+
+
+async def test_billed_failures_count_toward_run_totals(spans):
+    """Review B #1: three retried max_tokens stops were billed but RunTotals said 0 calls and $0."""
+    out, sink, gw = await _run_billed_failures(Budget(), cost=41_000)
+    assert len(gw.calls) == 3  # RetryPolicy: OutputInvalid is retried, 3 attempts
+    assert out.status is RunStatus.FAILED and out.error_code == "output_invalid"
+    t = out.totals
+    assert (t.llm_calls, t.cost_micro_usd, t.output_tokens) == (3, 123_000, 6000)
+    assert t.input_tokens == 3000
+    assert sink.finished[0].totals == t  # agent.run.finished carries the true cost
+    failed = [r for r in sink.steps if r.status is StepStatus.FAILED]
+    assert failed[0].usage is not None and failed[0].usage.cost_micro_usd == 41_000
+    chat = next(s for s in spans.get_finished_spans() if s.name == f"chat {SONNET}")
+    assert chat.attributes["compliance.cost_micro_usd"] == 41_000
+
+
+async def test_billed_failures_trip_the_run_cost_budget():
+    out, _, gw = await _run_billed_failures(Budget(max_cost_micro_usd=60_000), cost=41_000)
+    assert out.status is RunStatus.BUDGET_EXCEEDED and out.error_code == "budget_exceeded:cost"
+    assert len(gw.calls) == 2 and out.totals.cost_micro_usd == 82_000
+
+
+async def test_billed_failures_trip_the_run_llm_call_budget():
+    out, _, gw = await _run_billed_failures(Budget(max_llm_calls=2), cost=1)
+    assert out.status is RunStatus.BUDGET_EXCEEDED and out.error_code == "budget_exceeded:llm_calls"
+    assert len(gw.calls) == 2 and out.totals.llm_calls == 2
 
 
 async def test_propose_is_deterministic_and_published():
