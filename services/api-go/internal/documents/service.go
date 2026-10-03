@@ -266,6 +266,24 @@ func (s *Service) Detail(ctx context.Context, firmID, id uuid.UUID) (DetailView,
 	return DetailView{View: ViewOf(doc), Invoices: inv}, nil
 }
 
+// Reprocess moves a Document back to uploaded and republishes document.uploaded (POST
+// /v1/documents/{id}/reprocess). ErrNotReprocessable when the Document's current status does not
+// allow it; db.ErrNotFound when it does not exist in this Firm.
+func (s *Service) Reprocess(ctx context.Context, firm, id uuid.UUID) (string, error) {
+	if _, err := s.Store.Get(ctx, firm, id); err != nil {
+		return "", err
+	}
+	doc, err := s.Store.Reprocess(ctx, firm, id)
+	if err != nil {
+		return "", err
+	}
+	if err := s.PublishUploaded(ctx, doc); err != nil {
+		// The row is committed as uploaded with published_at NULL: the reconciler republishes it.
+		slog.WarnContext(ctx, "reprocess: publish document.uploaded", "document_id", id, "err", err)
+	}
+	return doc.Status, nil
+}
+
 // Download signs a 5-minute GET for a Document whose bytes were verified.
 func (s *Service) Download(ctx context.Context, firmID, id uuid.UUID) (string, time.Time, error) {
 	doc, err := s.Store.Get(ctx, firmID, id)

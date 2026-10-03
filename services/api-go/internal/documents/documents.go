@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
+	compliancev1 "github.com/menem2024/uae-platform/services/api-go/gen/compliance/v1"
 	"github.com/menem2024/uae-platform/services/api-go/internal/db/sqlc"
 )
 
@@ -64,7 +65,67 @@ var (
 	ErrClientArchived = errors.New("client company archived")
 	// ErrNotDownloadable: the object of a pending or rejected Document may not exist.
 	ErrNotDownloadable = errors.New("document not downloadable")
+	// ErrNotReprocessable: the Document's current status does not allow a reprocess (Task 17).
+	ErrNotReprocessable = errors.New("document not reprocessable")
 )
+
+// LowConfidence is the per-invoice confidence floor below which status is needs_review (Task 13's
+// rule, applied by the results consumer).
+const LowConfidence = 0.85
+
+// DocumentStatus is the Document-level status rule (Task 17 design decisions): a Document whose kind
+// is not an invoice or credit_note is not_invoice regardless of needsReview.
+func DocumentStatus(kind string, needsReview bool) string {
+	if kind != "invoice" && kind != "credit_note" {
+		return "not_invoice"
+	}
+	if needsReview {
+		return "needs_review"
+	}
+	return "extracted"
+}
+
+// InvoiceStatus is the per-invoice status rule (Task 13's rule, applied here): anything short of a
+// clean VERDICT_ACCEPT at or above LowConfidence needs a human.
+func InvoiceStatus(verdict compliancev1.Verdict, confidence float64) string {
+	if verdict != compliancev1.Verdict_VERDICT_ACCEPT || confidence < LowConfidence {
+		return "needs_review"
+	}
+	return "extracted"
+}
+
+// ExtractedParams is the Document-level fields of one document.extracted result (Store.ApplyExtracted).
+type ExtractedParams struct {
+	ID               uuid.UUID
+	RunID            uuid.UUID
+	Status           string
+	StatusReason     string
+	Kind             string
+	Direction        string
+	Language         string
+	ExtractionMethod string
+	ReviewReasons    []string
+	InvoiceCount     int32
+}
+
+// InvoiceIn is one invoice to insert for a document.extracted result (Store.InsertInvoices).
+type InvoiceIn struct {
+	SourceOrdinal   int32
+	SourceRef       string
+	Payload         []byte
+	Status          string
+	Confidence      float64
+	ClientCompanyID uuid.UUID
+}
+
+// InvoiceOut is one invoice of the Document's full invoice set, read back after InsertInvoices so the
+// consumer always decides what to publish from the authoritative row, not from what it tried to insert.
+type InvoiceOut struct {
+	ID         uuid.UUID
+	Status     string
+	Payload    []byte
+	Confidence *float64
+}
 
 var sha256Hex = regexp.MustCompile(`^[0-9a-f]{64}$`)
 

@@ -28,6 +28,7 @@ func (h *Handler) Mount(r chi.Router, read, write, uploads func(http.Handler) ht
 	r.With(read).Get("/v1/documents", h.list)
 	r.With(read).Get("/v1/documents/{id}", h.detail)
 	r.With(read).Get("/v1/documents/{id}/download", h.download)
+	r.With(write).Post("/v1/documents/{id}/reprocess", h.reprocess)
 }
 
 type uploadsRequest struct {
@@ -166,6 +167,24 @@ func (h *Handler) download(w http.ResponseWriter, r *http.Request) {
 			URL       string    `json:"url"`
 			ExpiresAt time.Time `json:"expires_at"`
 		}{u, exp})
+	}
+}
+
+func (h *Handler) reprocess(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	status, err := h.svc.Reprocess(r.Context(), httpx.FirmFrom(r.Context()), id)
+	switch {
+	case errors.Is(err, db.ErrNotFound):
+		httpx.WriteError(w, http.StatusNotFound, CodeNotFound)
+	case errors.Is(err, ErrNotReprocessable):
+		httpx.WriteError(w, http.StatusConflict, "not_reprocessable")
+	case err != nil:
+		internal(w, r, "reprocess", err)
+	default:
+		httpx.WriteJSON(w, http.StatusAccepted, map[string]string{"status": status})
 	}
 }
 

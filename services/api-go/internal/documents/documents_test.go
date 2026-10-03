@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -18,6 +19,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/proto"
 
 	compliancev1 "github.com/menem2024/uae-platform/services/api-go/gen/compliance/v1"
@@ -90,14 +93,31 @@ func TestSniffAndKey(t *testing.T) {
 
 // ------------------------------------------------------------------ fakes
 
+type invoiceRow struct {
+	ordinal int32
+	out     documents.InvoiceOut
+}
+
 type fakeStore struct {
 	mu        sync.Mutex
 	docs      map[uuid.UUID]sqlc.Document
 	archived  bool
 	published []string
+	invoices  map[uuid.UUID][]invoiceRow // keyed by document id, idempotent on ordinal (consumer_test.go)
+	firms     []uuid.UUID                // reconciler_test.go sets this directly (FirmLister)
 }
 
-func newStore() *fakeStore { return &fakeStore{docs: map[uuid.UUID]sqlc.Document{}} }
+func newStore() *fakeStore {
+	return &fakeStore{docs: map[uuid.UUID]sqlc.Document{}, invoices: map[uuid.UUID][]invoiceRow{}}
+}
+
+// sqlcDoc builds a minimal Document row for consumer_test.go/reconciler_test.go, which seed
+// s.docs directly instead of going through PreparePending/FinishUpload.
+func sqlcDoc(firm, id uuid.UUID, status string) sqlc.Document {
+	return sqlc.Document{ID: id, FirmID: firm, ClientCompanyID: uuid.New(), Sha256: strings.Repeat("a", 64),
+		ObjectKey: documents.ObjectKey(firm, id), Filename: "a.pdf", ContentType: "application/pdf", SizeBytes: 10,
+		Status: status, ReprocessNonce: uuid.NewString()}
+}
 
 func (s *fakeStore) PreparePending(_ context.Context, firm, cc uuid.UUID, by string, files []documents.FileIn) ([]documents.Pending, error) {
 	s.mu.Lock()
@@ -187,6 +207,145 @@ func (s *fakeStore) Invoices(context.Context, uuid.UUID, uuid.UUID) ([]documents
 	return []documents.InvoiceRef{{ID: uuid.New(), Status: "extracted", SourceOrdinal: 0, ExtractionConfidence: &c}}, nil
 }
 
+// The methods below back Task 17's consumer_test.go and reconciler_test.go too (same fakeStore, same
+// in-memory s.docs); Task 15's tests in this file just never call them.
+
+// ApplyExtracted implements documents.Store.
+func (s *fakeStore) ApplyExtracted(_ context.Context, firm uuid.UUID, p documents.ExtractedParams) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, ok := s.docs[p.ID]
+	if !ok || d.FirmID != firm || (d.Status != "uploaded" && d.Status != "processing") {
+		return false, nil
+	}
+	d.Status, d.StatusReason = p.Status, p.StatusReason
+	d.Kind, d.Direction, d.Language, d.ExtractionMethod = p.Kind, p.Direction, p.Language, p.ExtractionMethod
+	d.ReviewReasons, d.InvoiceCount = p.ReviewReasons, p.InvoiceCount
+	d.LatestRunID = uuid.NullUUID{UUID: p.RunID, Valid: p.RunID != uuid.Nil}
+	s.docs[p.ID] = d
+	return true, nil
+}
+
+// ApplyFailed implements documents.Store.
+func (s *fakeStore) ApplyFailed(_ context.Context, firm, id, runID uuid.UUID, reason string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, ok := s.docs[id]
+	if !ok || d.FirmID != firm || (d.Status != "uploaded" && d.Status != "processing") {
+		return false, nil
+	}
+	d.Status, d.StatusReason = "failed", reason
+	d.LatestRunID = uuid.NullUUID{UUID: runID, Valid: runID != uuid.Nil}
+	s.docs[id] = d
+	return true, nil
+}
+
+// InsertInvoices implements documents.Store: idempotent on SourceOrdinal, then the full set.
+func (s *fakeStore) InsertInvoices(_ context.Context, _, documentID uuid.UUID, items []documents.InvoiceIn) ([]documents.InvoiceOut, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing := map[int32]bool{}
+	for _, r := range s.invoices[documentID] {
+		existing[r.ordinal] = true
+	}
+	for _, it := range items {
+		if existing[it.SourceOrdinal] {
+			continue
+		}
+		c := it.Confidence
+		s.invoices[documentID] = append(s.invoices[documentID],
+			invoiceRow{ordinal: it.SourceOrdinal, out: documents.InvoiceOut{ID: uuid.New(), Status: it.Status, Payload: it.Payload, Confidence: &c}})
+		existing[it.SourceOrdinal] = true
+	}
+	rows := append([]invoiceRow{}, s.invoices[documentID]...)
+	sort.Slice(rows, func(i, j int) bool { return rows[i].ordinal < rows[j].ordinal })
+	out := make([]documents.InvoiceOut, len(rows))
+	for i, r := range rows {
+		out[i] = r.out
+	}
+	return out, nil
+}
+
+// Reprocess implements documents.Store.
+func (s *fakeStore) Reprocess(_ context.Context, firm, id uuid.UUID) (sqlc.Document, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, ok := s.docs[id]
+	if !ok || d.FirmID != firm {
+		return sqlc.Document{}, db.ErrNotFound
+	}
+	if d.Status != "failed" && d.Status != "not_invoice" && (d.Status != "needs_review" || d.InvoiceCount != 0) {
+		return sqlc.Document{}, documents.ErrNotReprocessable
+	}
+	d.Status, d.StatusReason = "uploaded", ""
+	d.Kind, d.Direction, d.Language, d.ExtractionMethod = "", "", "", ""
+	d.ReviewReasons = []string{}
+	d.ReprocessNonce, d.PublishedAt, d.PublishAttempts = uuid.NewString(), pgtype.Timestamptz{}, 0
+	s.docs[id] = d
+	return d, nil
+}
+
+// Unpublished implements documents.Store.
+func (s *fakeStore) Unpublished(_ context.Context, firm uuid.UUID) ([]sqlc.Document, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []sqlc.Document
+	for _, d := range s.docs {
+		if d.FirmID == firm && d.Status == "uploaded" && !d.PublishedAt.Valid {
+			out = append(out, d)
+		}
+	}
+	return out, nil
+}
+
+// BumpPublishAttempt implements documents.Store: pgx.ErrNoRows once the Document has moved on.
+func (s *fakeStore) BumpPublishAttempt(_ context.Context, firm, id uuid.UUID) (int32, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, ok := s.docs[id]
+	if !ok || d.FirmID != firm || d.Status != "uploaded" || d.PublishedAt.Valid {
+		return 0, pgx.ErrNoRows
+	}
+	d.PublishAttempts++
+	s.docs[id] = d
+	return d.PublishAttempts, nil
+}
+
+// FailUnpublished implements documents.Store.
+func (s *fakeStore) FailUnpublished(_ context.Context, firm, id uuid.UUID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, ok := s.docs[id]
+	if !ok || d.FirmID != firm {
+		return nil
+	}
+	d.Status, d.StatusReason = "failed", "publish_exhausted"
+	s.docs[id] = d
+	return nil
+}
+
+// ResetStuck implements documents.Store.
+func (s *fakeStore) ResetStuck(_ context.Context, firm uuid.UUID) ([]uuid.UUID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []uuid.UUID
+	for id, d := range s.docs {
+		if d.FirmID == firm && d.Status == "processing" {
+			d.Status, d.ReprocessNonce, d.PublishedAt, d.PublishAttempts = "uploaded", uuid.NewString(), pgtype.Timestamptz{}, 0
+			s.docs[id] = d
+			out = append(out, id)
+		}
+	}
+	return out, nil
+}
+
+// FirmIDs implements documents.FirmLister (reconciler_test.go sets s.firms directly).
+func (s *fakeStore) FirmIDs(context.Context) ([]uuid.UUID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.firms, nil
+}
+
 type fakePresigner struct{ puts []string }
 
 func (p *fakePresigner) PresignPut(_ context.Context, key, ct string, size int64, ttl time.Duration) (*url.URL, http.Header, error) {
@@ -223,18 +382,27 @@ func (o *fakeObjects) Delete(_ context.Context, key string) error {
 	return nil
 }
 
+type publishedMsg struct {
+	subject, msgID string
+	msg            proto.Message
+}
+
 type fakeBus struct {
-	msgs []string
-	last *compliancev1.DocumentUploaded
-	err  error
+	msgs      []string
+	last      *compliancev1.DocumentUploaded
+	err       error
+	published []publishedMsg // Task 17's consumer_test.go/reconciler_test.go: any message type
 }
 
 func (b *fakeBus) Publish(_ context.Context, subject, msgID string, m proto.Message) error {
 	if b.err != nil {
 		return b.err
 	}
-	b.msgs = append(b.msgs, subject+"|"+msgID)
-	b.last = m.(*compliancev1.DocumentUploaded)
+	b.published = append(b.published, publishedMsg{subject: subject, msgID: msgID, msg: m})
+	if du, ok := m.(*compliancev1.DocumentUploaded); ok {
+		b.msgs = append(b.msgs, subject+"|"+msgID)
+		b.last = du
+	}
 	return nil
 }
 

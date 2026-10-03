@@ -40,6 +40,36 @@ type Store interface {
 	MarkPublished(ctx context.Context, firmID, id uuid.UUID, nonce string) error
 	List(ctx context.Context, firmID uuid.UUID, f ListFilter) ([]sqlc.Document, error)
 	Invoices(ctx context.Context, firmID, id uuid.UUID) ([]InvoiceRef, error)
+
+	// ApplyExtracted applies one document.extracted result. applied is false when the Document's
+	// status was no longer uploaded/processing (a redelivery, or a superseded run already applied a
+	// different result): the caller then does nothing else and only acks.
+	ApplyExtracted(ctx context.Context, firm uuid.UUID, p ExtractedParams) (applied bool, err error)
+	// ApplyFailed applies one document.failed result; applied has the same meaning as ApplyExtracted's.
+	ApplyFailed(ctx context.Context, firm, id, runID uuid.UUID, reason string) (applied bool, err error)
+	// InsertInvoices inserts each item (idempotent on (document_id, source_ordinal): ON CONFLICT DO
+	// NOTHING), then returns the Document's full, authoritative invoice set.
+	InsertInvoices(ctx context.Context, firm, documentID uuid.UUID, items []InvoiceIn) ([]InvoiceOut, error)
+	// Reprocess moves a failed/not_invoice/needs_review(invoice_count=0) Document back to uploaded with
+	// a new nonce. ErrNotReprocessable when the Document's current status does not allow it.
+	Reprocess(ctx context.Context, firm, id uuid.UUID) (sqlc.Document, error)
+	// Unpublished lists uploaded Documents whose document.uploaded publish was never acknowledged, past
+	// the 1-minute floor.
+	Unpublished(ctx context.Context, firm uuid.UUID) ([]sqlc.Document, error)
+	// BumpPublishAttempt increments publish_attempts and returns the new value. pgx.ErrNoRows means the
+	// Document moved on since Unpublished listed it (another path already finished it): the caller skips
+	// it without error.
+	BumpPublishAttempt(ctx context.Context, firm, id uuid.UUID) (int32, error)
+	// FailUnpublished moves a Document to failed/publish_exhausted.
+	FailUnpublished(ctx context.Context, firm, id uuid.UUID) error
+	// ResetStuck moves Documents stuck processing (no running run) back to uploaded with a new nonce.
+	ResetStuck(ctx context.Context, firm uuid.UUID) ([]uuid.UUID, error)
+}
+
+// FirmLister lists every Firm's id, outside any tenant scope (the firms table is readable by every
+// role; the reconciler runs one pass per Firm).
+type FirmLister interface {
+	FirmIDs(ctx context.Context) ([]uuid.UUID, error)
 }
 
 // PGStore is the Postgres Store.
@@ -204,3 +234,133 @@ func NumericFromFloat(v float64) pgtype.Numeric {
 	}
 	return pgtype.Numeric{Int: big.NewInt(milli), Exp: -3, Valid: true}
 }
+
+// nullUUID converts uuid.Nil to an invalid (SQL NULL) uuid.NullUUID.
+func nullUUID(id uuid.UUID) uuid.NullUUID {
+	if id == uuid.Nil {
+		return uuid.NullUUID{}
+	}
+	return uuid.NullUUID{UUID: id, Valid: true}
+}
+
+// ApplyExtracted implements Store.
+func (s PGStore) ApplyExtracted(ctx context.Context, firm uuid.UUID, p ExtractedParams) (bool, error) {
+	var n int64
+	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
+		var err error
+		n, err = q.ApplyDocumentExtracted(ctx, sqlc.ApplyDocumentExtractedParams{
+			Status: p.Status, StatusReason: p.StatusReason, Kind: p.Kind, Direction: p.Direction,
+			Language: p.Language, ExtractionMethod: p.ExtractionMethod, ReviewReasons: p.ReviewReasons,
+			InvoiceCount: p.InvoiceCount, RunID: nullUUID(p.RunID), ID: p.ID})
+		return err
+	})
+	return n == 1, err
+}
+
+// ApplyFailed implements Store.
+func (s PGStore) ApplyFailed(ctx context.Context, firm, id, runID uuid.UUID, reason string) (bool, error) {
+	var n int64
+	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
+		var err error
+		n, err = q.ApplyDocumentFailed(ctx, sqlc.ApplyDocumentFailedParams{Reason: reason, RunID: nullUUID(runID), ID: id})
+		return err
+	})
+	return n == 1, err
+}
+
+// InsertInvoices implements Store.
+func (s PGStore) InsertInvoices(ctx context.Context, firm, documentID uuid.UUID, items []InvoiceIn) ([]InvoiceOut, error) {
+	out := []InvoiceOut{}
+	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
+		for _, it := range items {
+			if _, err := q.InsertExtractedInvoice(ctx, sqlc.InsertExtractedInvoiceParams{
+				FirmID: firm, Status: it.Status, Payload: it.Payload,
+				ClientCompanyID: nullUUID(it.ClientCompanyID), DocumentID: uuid.NullUUID{UUID: documentID, Valid: true},
+				SourceOrdinal: pgtype.Int4{Int32: it.SourceOrdinal, Valid: true}, SourceRef: it.SourceRef,
+				ExtractionConfidence: NumericFromFloat(it.Confidence)}); err != nil {
+				return fmt.Errorf("insert extracted invoice: %w", err)
+			}
+		}
+		rows, err := q.ListDocumentInvoicesForPublish(ctx, uuid.NullUUID{UUID: documentID, Valid: true})
+		if err != nil {
+			return fmt.Errorf("list document invoices for publish: %w", err)
+		}
+		for _, r := range rows {
+			out = append(out, InvoiceOut{ID: r.ID, Status: r.Status, Payload: r.Payload, Confidence: numericPtr(r.ExtractionConfidence)})
+		}
+		return nil
+	})
+	return out, err
+}
+
+// Reprocess implements Store.
+func (s PGStore) Reprocess(ctx context.Context, firm, id uuid.UUID) (sqlc.Document, error) {
+	var d sqlc.Document
+	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
+		var err error
+		d, err = q.ReprocessDocument(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotReprocessable
+		}
+		return err
+	})
+	return d, err
+}
+
+// Unpublished implements Store.
+func (s PGStore) Unpublished(ctx context.Context, firm uuid.UUID) ([]sqlc.Document, error) {
+	var out []sqlc.Document
+	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
+		var err error
+		out, err = q.ListUnpublishedDocuments(ctx)
+		return err
+	})
+	return out, err
+}
+
+// BumpPublishAttempt implements Store. It returns pgx.ErrNoRows (not db.ErrNotFound) when the
+// Document moved on, so callers can share the same check against a fake Store in unit tests.
+func (s PGStore) BumpPublishAttempt(ctx context.Context, firm, id uuid.UUID) (int32, error) {
+	var attempts int32
+	found := true
+	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
+		var err error
+		attempts, err = q.BumpDocumentPublishAttempt(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			found = false
+			return nil
+		}
+		return err
+	})
+	if err == nil && !found {
+		return 0, pgx.ErrNoRows
+	}
+	return attempts, err
+}
+
+// FailUnpublished implements Store.
+func (s PGStore) FailUnpublished(ctx context.Context, firm, id uuid.UUID) error {
+	return db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
+		_, err := q.FailUnpublishedDocument(ctx, id)
+		return err
+	})
+}
+
+// ResetStuck implements Store.
+func (s PGStore) ResetStuck(ctx context.Context, firm uuid.UUID) ([]uuid.UUID, error) {
+	var out []uuid.UUID
+	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
+		var err error
+		out, err = q.ResetStuckDocuments(ctx)
+		return err
+	})
+	return out, err
+}
+
+// FirmIDs implements FirmLister. firms carries only a read-everyone RLS policy, so this runs outside
+// WithFirm (like db.FirmByOrg).
+func (s PGStore) FirmIDs(ctx context.Context) ([]uuid.UUID, error) {
+	return sqlc.New(s.Pool).ListFirmIDs(ctx)
+}
+
+var _ FirmLister = PGStore{}
