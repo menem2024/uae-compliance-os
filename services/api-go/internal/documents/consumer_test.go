@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/proto"
 
@@ -78,14 +79,68 @@ func TestConsumerExtractedInsertsAndPublishesAcceptedOnly(t *testing.T) {
 		t.Fatalf("%+v", ev.msg)
 	}
 
-	// Redelivery: Status is no longer uploaded/processing, so ApplyExtracted reports applied=false.
+	// Redelivery of the same run: no new rows, but invoice.extracted is published again with the same
+	// Msg-Id (the stream dedups it), so a publish lost after the first commit self-heals.
+	first := bus.published[0]
 	bus.published = nil
 	before := len(store.invoices[docID])
 	if err := c.Handle(ctx, fakeMsg{subject: events.DocumentExtractedSubject, data: data}); err != nil {
 		t.Fatal(err)
 	}
-	if len(store.invoices[docID]) != before || len(bus.published) != 0 {
-		t.Fatalf("redelivery must be a no-op: invoices=%d published=%v", len(store.invoices[docID]), bus.published)
+	if len(store.invoices[docID]) != before || len(bus.published) != 1 || bus.published[0].msgID != first.msgID {
+		t.Fatalf("redelivery: invoices=%d published=%v", len(store.invoices[docID]), bus.published)
+	}
+
+	// A different run's result for the already-applied Document is a plain no-op (first result wins).
+	other, _ := proto.Marshal(&compliancev1.DocumentExtracted{DocumentId: docID.String(), FirmId: r.firm.String(),
+		ClientCompanyId: r.cc.String(), RunId: uuid.NewString(), DocumentKind: "invoice"})
+	bus.published = nil
+	if err := c.Handle(ctx, fakeMsg{subject: events.DocumentExtractedSubject, data: other}); err != nil {
+		t.Fatal(err)
+	}
+	if len(bus.published) != 0 || len(store.invoices[docID]) != before {
+		t.Fatalf("superseded run must be a no-op: %v", bus.published)
+	}
+}
+
+func TestConsumerPublishFailureIsRetriedAndSelfHeals(t *testing.T) {
+	r := newRig()
+	c := &documents.Consumer{Store: r.store, Bus: r.bus}
+	docID := uuid.New()
+	r.store.docs[docID] = sqlcDoc(r.firm, docID, "uploaded")
+	data, _ := proto.Marshal(&compliancev1.DocumentExtracted{DocumentId: docID.String(), FirmId: r.firm.String(),
+		ClientCompanyId: r.cc.String(), RunId: uuid.NewString(), DocumentKind: "invoice",
+		Invoices: []*compliancev1.ExtractedInvoice{{SourceOrdinal: 0, Invoice: &compliancev1.Invoice{InvoiceNumber: "A"},
+			Confidence: 0.99, Verdict: &compliancev1.VerifierVerdict{Verdict: compliancev1.Verdict_VERDICT_ACCEPT}}}})
+	r.bus.err = errors.New("nats: timeout")
+	err := c.Handle(context.Background(), fakeMsg{subject: events.DocumentExtractedSubject, data: data})
+	if err == nil || errors.Is(err, events.ErrPermanent) {
+		t.Fatalf("want a retryable error, got %v", err)
+	}
+	r.bus.err = nil
+	if err := c.Handle(context.Background(), fakeMsg{subject: events.DocumentExtractedSubject, data: data}); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.bus.published) != 1 {
+		t.Fatalf("%v", r.bus.published)
+	}
+}
+
+func TestConsumerRolledBackApplyLeavesTheDocumentUntouched(t *testing.T) {
+	r := newRig()
+	c := &documents.Consumer{Store: r.store, Bus: r.bus}
+	docID := uuid.New()
+	r.store.docs[docID] = sqlcDoc(r.firm, docID, "uploaded")
+	r.store.applyErr = &pgconn.PgError{Code: "23503"} // FK violation inside the one transaction
+	data, _ := proto.Marshal(&compliancev1.DocumentExtracted{DocumentId: docID.String(), FirmId: r.firm.String(),
+		ClientCompanyId: r.cc.String(), RunId: uuid.NewString(), DocumentKind: "invoice",
+		Invoices: []*compliancev1.ExtractedInvoice{{SourceOrdinal: 0, Invoice: &compliancev1.Invoice{}}}})
+	err := c.Handle(context.Background(), fakeMsg{subject: events.DocumentExtractedSubject, data: data})
+	if !errors.Is(err, events.ErrPermanent) {
+		t.Fatalf("an FK failure can never succeed: %v", err)
+	}
+	if r.store.docs[docID].Status != "uploaded" || len(r.bus.published) != 0 {
+		t.Fatalf("%+v %v", r.store.docs[docID], r.bus.published)
 	}
 }
 

@@ -103,13 +103,15 @@ func TestConsumerIntegrationRoundTrip(t *testing.T) {
 		t.Fatalf("published: %+v", bus.published)
 	}
 
-	// Redelivery: the row is no longer uploaded/processing, so the consumer must do nothing else.
+	// Redelivery of the same run: no new rows; invoice.extracted is published again (same Msg-Id, so
+	// the stream dedups it) in case the first publish was lost.
+	first := bus.published[0]
 	bus.published = nil
 	if err := c.Handle(ctx, fakeMsg{subject: events.DocumentExtractedSubject, data: data}); err != nil {
 		t.Fatal(err)
 	}
-	if len(bus.published) != 0 {
-		t.Fatalf("redelivery must be a no-op: %+v", bus.published)
+	if len(bus.published) != 1 || bus.published[0].msgID != first.msgID {
+		t.Fatalf("redelivery must re-publish with the same Msg-Id: %+v vs %+v", bus.published, first)
 	}
 	inv2, err := store.Invoices(ctx, env.FirmA, docID)
 	if err != nil || len(inv2) != 2 {
@@ -177,10 +179,91 @@ func TestServiceReprocessIntegration(t *testing.T) {
 	}
 
 	// Move the Document to a terminal, non-reprocessable state and verify the error.
-	if _, err := store.ApplyExtracted(ctx, env.FirmA, documents.ExtractedParams{ID: docID, Status: "extracted", Kind: "invoice"}); err != nil {
+	if _, err := store.ApplyExtractedResult(ctx, env.FirmA, documents.ExtractedParams{ID: docID, Status: "extracted", Kind: "invoice"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := svc.Reprocess(ctx, env.FirmA, docID); !errors.Is(err, documents.ErrNotReprocessable) {
 		t.Fatalf("%v", err)
+	}
+}
+
+// extractedMsg builds a document.extracted result with one accepted invoice per ordinal.
+func extractedMsg(env dbtest.Env, docID, cc uuid.UUID, runID string, ordinals ...int32) []byte {
+	var invs []*compliancev1.ExtractedInvoice
+	for _, o := range ordinals {
+		invs = append(invs, &compliancev1.ExtractedInvoice{SourceOrdinal: o, SourceRef: "row",
+			Invoice:    &compliancev1.Invoice{InvoiceNumber: "A-1", TotalAmount: "100.00"},
+			Confidence: 0.95, Verdict: &compliancev1.VerifierVerdict{Verdict: compliancev1.Verdict_VERDICT_ACCEPT}})
+	}
+	data, _ := proto.Marshal(&compliancev1.DocumentExtracted{DocumentId: docID.String(), FirmId: env.FirmA.String(),
+		ClientCompanyId: cc.String(), RunId: runID, DocumentKind: "invoice", Direction: "issued", Language: "en",
+		ExtractionMethod: "llm", Invoices: invs})
+	return data
+}
+
+// P2 (security review A, finding 1): a failed invoice.extracted publish must not strand the Document
+// as 'extracted'. The first delivery errors (nak), the redelivery re-publishes.
+func TestConsumerIntegrationLostPublishSelfHeals(t *testing.T) {
+	env := dbtest.Setup(t)
+	ctx := context.Background()
+	store := documents.PGStore{Pool: env.App}
+	bus := &fakeBus{err: errors.New("nats: timeout")}
+	c := &documents.Consumer{Store: store, Bus: bus}
+	cc := dbtest.ClientCompany(t, env, env.FirmA, "Oasis", "")
+	docID := uploadedDocument(t, store, env, env.FirmA, cc)
+	data := extractedMsg(env, docID, cc, uuid.NewString(), 0)
+
+	if err := c.Handle(ctx, fakeMsg{subject: events.DocumentExtractedSubject, data: data}); err == nil ||
+		errors.Is(err, events.ErrPermanent) {
+		t.Fatalf("a failed publish must be retried (nak), got %v", err)
+	}
+	bus.err = nil
+	if err := c.Handle(ctx, fakeMsg{subject: events.DocumentExtractedSubject, data: data}); err != nil {
+		t.Fatal(err)
+	}
+	if len(bus.published) != 1 || bus.published[0].subject != events.ExtractedSubject {
+		t.Fatalf("redelivery must re-publish invoice.extracted: %+v", bus.published)
+	}
+	inv, err := store.Invoices(ctx, env.FirmA, docID)
+	if err != nil || len(inv) != 1 || bus.published[0].msgID != events.InvoiceExtractedMsgID(inv[0].ID.String()) {
+		t.Fatalf("%+v %v %+v", inv, err, bus.published)
+	}
+}
+
+// P2 (finding 1): a result that cannot be applied in full must leave the Document untouched, not
+// committed as 'extracted' with its invoices missing.
+func TestConsumerIntegrationBadResultRollsBackTheDocument(t *testing.T) {
+	env := dbtest.Setup(t)
+	ctx := context.Background()
+	store := documents.PGStore{Pool: env.App}
+	bus := &fakeBus{}
+	c := &documents.Consumer{Store: store, Bus: bus}
+	cc := dbtest.ClientCompany(t, env, env.FirmA, "Oasis", "")
+
+	for name, data := range map[string]func(docID uuid.UUID) []byte{
+		"negative ordinal (CHECK 23514)": func(id uuid.UUID) []byte { return extractedMsg(env, id, cc, uuid.NewString(), 0, -1) },
+		"unparsable client_company_id": func(id uuid.UUID) []byte {
+			m := &compliancev1.DocumentExtracted{}
+			_ = proto.Unmarshal(extractedMsg(env, id, cc, uuid.NewString(), 0), m)
+			m.ClientCompanyId = "not-a-uuid"
+			b, _ := proto.Marshal(m)
+			return b
+		},
+	} {
+		docID := uploadedDocument(t, store, env, env.FirmA, cc)
+		err := c.Handle(ctx, fakeMsg{subject: events.DocumentExtractedSubject, data: data(docID)})
+		if !errors.Is(err, events.ErrPermanent) {
+			t.Fatalf("%s: want a permanent error, got %v", name, err)
+		}
+		doc, gerr := store.Get(ctx, env.FirmA, docID)
+		if gerr != nil || doc.Status != "uploaded" || doc.InvoiceCount != 0 {
+			t.Fatalf("%s: the Document must not be committed as extracted: %+v %v", name, doc, gerr)
+		}
+		if inv, _ := store.Invoices(ctx, env.FirmA, docID); len(inv) != 0 {
+			t.Fatalf("%s: %+v", name, inv)
+		}
+	}
+	if len(bus.published) != 0 {
+		t.Fatalf("%+v", bus.published)
 	}
 }

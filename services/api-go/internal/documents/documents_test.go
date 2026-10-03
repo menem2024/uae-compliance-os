@@ -105,6 +105,7 @@ type fakeStore struct {
 	published []string
 	invoices  map[uuid.UUID][]invoiceRow // keyed by document id, idempotent on ordinal (consumer_test.go)
 	firms     []uuid.UUID                // reconciler_test.go sets this directly (FirmLister)
+	applyErr  error                      // ApplyExtractedResult fails whole when set
 }
 
 func newStore() *fakeStore {
@@ -210,20 +211,55 @@ func (s *fakeStore) Invoices(context.Context, uuid.UUID, uuid.UUID) ([]documents
 // The methods below back Task 17's consumer_test.go and reconciler_test.go too (same fakeStore, same
 // in-memory s.docs); Task 15's tests in this file just never call them.
 
-// ApplyExtracted implements documents.Store.
-func (s *fakeStore) ApplyExtracted(_ context.Context, firm uuid.UUID, p documents.ExtractedParams) (bool, error) {
+// ApplyExtractedResult implements documents.Store: the Document and its invoices change together
+// (idempotent on SourceOrdinal), mirroring the one-transaction PGStore. applyErr, when set, fails the
+// whole call before anything changes (a rolled-back transaction).
+func (s *fakeStore) ApplyExtractedResult(_ context.Context, firm uuid.UUID, p documents.ExtractedParams, items []documents.InvoiceIn) (documents.ApplyOutcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	d, ok := s.docs[p.ID]
-	if !ok || d.FirmID != firm || (d.Status != "uploaded" && d.Status != "processing") {
-		return false, nil
+	if s.applyErr != nil {
+		return documents.ApplyOutcome{}, s.applyErr
 	}
-	d.Status, d.StatusReason = p.Status, p.StatusReason
-	d.Kind, d.Direction, d.Language, d.ExtractionMethod = p.Kind, p.Direction, p.Language, p.ExtractionMethod
-	d.ReviewReasons, d.InvoiceCount = p.ReviewReasons, p.InvoiceCount
-	d.LatestRunID = uuid.NullUUID{UUID: p.RunID, Valid: p.RunID != uuid.Nil}
-	s.docs[p.ID] = d
-	return true, nil
+	d, ok := s.docs[p.ID]
+	if !ok || d.FirmID != firm {
+		return documents.ApplyOutcome{}, nil
+	}
+	out := documents.ApplyOutcome{Found: true}
+	switch {
+	case d.Status == "uploaded" || d.Status == "processing":
+		d.Status, d.StatusReason = p.Status, p.StatusReason
+		d.Kind, d.Direction, d.Language, d.ExtractionMethod = p.Kind, p.Direction, p.Language, p.ExtractionMethod
+		d.ReviewReasons, d.InvoiceCount = p.ReviewReasons, p.InvoiceCount
+		d.LatestRunID = uuid.NullUUID{UUID: p.RunID, Valid: p.RunID != uuid.Nil}
+		s.docs[p.ID] = d
+		out.Applied = true
+		if p.Status == "not_invoice" {
+			return out, nil
+		}
+		existing := map[int32]bool{}
+		for _, r := range s.invoices[p.ID] {
+			existing[r.ordinal] = true
+		}
+		for _, it := range items {
+			if existing[it.SourceOrdinal] {
+				continue
+			}
+			c := it.Confidence
+			s.invoices[p.ID] = append(s.invoices[p.ID], invoiceRow{ordinal: it.SourceOrdinal,
+				out: documents.InvoiceOut{ID: uuid.New(), Status: it.Status, Payload: it.Payload, Confidence: &c}})
+			existing[it.SourceOrdinal] = true
+		}
+	case p.Status != "not_invoice" && d.Status == p.Status && d.LatestRunID.Valid && d.LatestRunID.UUID == p.RunID:
+		out.Replay = true
+	default:
+		return out, nil
+	}
+	rows := append([]invoiceRow{}, s.invoices[p.ID]...)
+	sort.Slice(rows, func(i, j int) bool { return rows[i].ordinal < rows[j].ordinal })
+	for _, r := range rows {
+		out.Invoices = append(out.Invoices, r.out)
+	}
+	return out, nil
 }
 
 // ApplyFailed implements documents.Store.
@@ -238,32 +274,6 @@ func (s *fakeStore) ApplyFailed(_ context.Context, firm, id, runID uuid.UUID, re
 	d.LatestRunID = uuid.NullUUID{UUID: runID, Valid: runID != uuid.Nil}
 	s.docs[id] = d
 	return true, nil
-}
-
-// InsertInvoices implements documents.Store: idempotent on SourceOrdinal, then the full set.
-func (s *fakeStore) InsertInvoices(_ context.Context, _, documentID uuid.UUID, items []documents.InvoiceIn) ([]documents.InvoiceOut, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	existing := map[int32]bool{}
-	for _, r := range s.invoices[documentID] {
-		existing[r.ordinal] = true
-	}
-	for _, it := range items {
-		if existing[it.SourceOrdinal] {
-			continue
-		}
-		c := it.Confidence
-		s.invoices[documentID] = append(s.invoices[documentID],
-			invoiceRow{ordinal: it.SourceOrdinal, out: documents.InvoiceOut{ID: uuid.New(), Status: it.Status, Payload: it.Payload, Confidence: &c}})
-		existing[it.SourceOrdinal] = true
-	}
-	rows := append([]invoiceRow{}, s.invoices[documentID]...)
-	sort.Slice(rows, func(i, j int) bool { return rows[i].ordinal < rows[j].ordinal })
-	out := make([]documents.InvoiceOut, len(rows))
-	for i, r := range rows {
-		out[i] = r.out
-	}
-	return out, nil
 }
 
 // Reprocess implements documents.Store.

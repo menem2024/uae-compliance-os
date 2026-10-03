@@ -41,15 +41,13 @@ type Store interface {
 	List(ctx context.Context, firmID uuid.UUID, f ListFilter) ([]sqlc.Document, error)
 	Invoices(ctx context.Context, firmID, id uuid.UUID) ([]InvoiceRef, error)
 
-	// ApplyExtracted applies one document.extracted result. applied is false when the Document's
-	// status was no longer uploaded/processing (a redelivery, or a superseded run already applied a
-	// different result): the caller then does nothing else and only acks.
-	ApplyExtracted(ctx context.Context, firm uuid.UUID, p ExtractedParams) (applied bool, err error)
+	// ApplyExtractedResult applies one document.extracted result atomically: the Document row is locked,
+	// and its status/kind/counts plus every invoice row commit (or roll back) in ONE transaction, so a
+	// failure can never leave the Document 'extracted' without its invoices. The returned Invoices are the
+	// Document's authoritative invoice set read back in the same transaction.
+	ApplyExtractedResult(ctx context.Context, firm uuid.UUID, p ExtractedParams, items []InvoiceIn) (ApplyOutcome, error)
 	// ApplyFailed applies one document.failed result; applied has the same meaning as ApplyExtracted's.
 	ApplyFailed(ctx context.Context, firm, id, runID uuid.UUID, reason string) (applied bool, err error)
-	// InsertInvoices inserts each item (idempotent on (document_id, source_ordinal): ON CONFLICT DO
-	// NOTHING), then returns the Document's full, authoritative invoice set.
-	InsertInvoices(ctx context.Context, firm, documentID uuid.UUID, items []InvoiceIn) ([]InvoiceOut, error)
 	// Reprocess moves a failed/not_invoice/needs_review(invoice_count=0) Document back to uploaded with
 	// a new nonce. ErrNotReprocessable when the Document's current status does not allow it.
 	Reprocess(ctx context.Context, firm, id uuid.UUID) (sqlc.Document, error)
@@ -243,21 +241,59 @@ func nullUUID(id uuid.UUID) uuid.NullUUID {
 	return uuid.NullUUID{UUID: id, Valid: true}
 }
 
-// ApplyExtracted implements Store.
-func (s PGStore) ApplyExtracted(ctx context.Context, firm uuid.UUID, p ExtractedParams) (bool, error) {
-	var n int64
+// ApplyExtractedResult implements Store.
+func (s PGStore) ApplyExtractedResult(ctx context.Context, firm uuid.UUID, p ExtractedParams, items []InvoiceIn) (ApplyOutcome, error) {
+	var out ApplyOutcome
 	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
-		var err error
-		if p.ReviewReasons == nil {
-			p.ReviewReasons = []string{} // review_reasons is NOT NULL; nil would be sent as NULL
+		doc, err := q.LockDocument(ctx, p.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil // missing, or owned by another Firm (RLS hides it): out.Found stays false
 		}
-		n, err = q.ApplyDocumentExtracted(ctx, sqlc.ApplyDocumentExtractedParams{
-			Status: p.Status, StatusReason: p.StatusReason, Kind: p.Kind, Direction: p.Direction,
-			Language: p.Language, ExtractionMethod: p.ExtractionMethod, ReviewReasons: p.ReviewReasons,
-			InvoiceCount: p.InvoiceCount, RunID: nullUUID(p.RunID), ID: p.ID})
-		return err
+		if err != nil {
+			return fmt.Errorf("lock document: %w", err)
+		}
+		out.Found = true
+		switch {
+		case doc.Status == "uploaded" || doc.Status == "processing":
+			if p.ReviewReasons == nil {
+				p.ReviewReasons = []string{} // review_reasons is NOT NULL; nil would be sent as NULL
+			}
+			if _, err := q.ApplyDocumentExtracted(ctx, sqlc.ApplyDocumentExtractedParams{
+				Status: p.Status, StatusReason: p.StatusReason, Kind: p.Kind, Direction: p.Direction,
+				Language: p.Language, ExtractionMethod: p.ExtractionMethod, ReviewReasons: p.ReviewReasons,
+				InvoiceCount: p.InvoiceCount, RunID: nullUUID(p.RunID), ID: p.ID}); err != nil {
+				return fmt.Errorf("apply document extracted: %w", err)
+			}
+			out.Applied = true
+			if p.Status == "not_invoice" {
+				return nil
+			}
+			for _, it := range items {
+				if _, err := q.InsertExtractedInvoice(ctx, sqlc.InsertExtractedInvoiceParams{
+					FirmID: firm, Status: it.Status, Payload: it.Payload,
+					ClientCompanyID: nullUUID(it.ClientCompanyID), DocumentID: uuid.NullUUID{UUID: p.ID, Valid: true},
+					SourceOrdinal: pgtype.Int4{Int32: it.SourceOrdinal, Valid: true}, SourceRef: it.SourceRef,
+					ExtractionConfidence: NumericFromFloat(it.Confidence)}); err != nil {
+					return fmt.Errorf("insert extracted invoice: %w", err)
+				}
+			}
+		case p.Status != "not_invoice" && doc.Status == p.Status && p.RunID != uuid.Nil &&
+			doc.LatestRunID.Valid && doc.LatestRunID.UUID == p.RunID:
+			out.Replay = true // this very result was already committed: the caller re-publishes
+		default:
+			return nil // a different run already won, or the Document moved on: nothing to do
+		}
+		rows, err := q.ListDocumentInvoicesForPublish(ctx, uuid.NullUUID{UUID: p.ID, Valid: true})
+		if err != nil {
+			return fmt.Errorf("list document invoices for publish: %w", err)
+		}
+		for _, r := range rows {
+			out.Invoices = append(out.Invoices, InvoiceOut{ID: r.ID, Status: r.Status, Payload: r.Payload,
+				Confidence: numericPtr(r.ExtractionConfidence)})
+		}
+		return nil
 	})
-	return n == 1, err
+	return out, err
 }
 
 // ApplyFailed implements Store.
@@ -269,31 +305,6 @@ func (s PGStore) ApplyFailed(ctx context.Context, firm, id, runID uuid.UUID, rea
 		return err
 	})
 	return n == 1, err
-}
-
-// InsertInvoices implements Store.
-func (s PGStore) InsertInvoices(ctx context.Context, firm, documentID uuid.UUID, items []InvoiceIn) ([]InvoiceOut, error) {
-	out := []InvoiceOut{}
-	err := db.WithFirm(ctx, s.Pool, firm, func(q *sqlc.Queries) error {
-		for _, it := range items {
-			if _, err := q.InsertExtractedInvoice(ctx, sqlc.InsertExtractedInvoiceParams{
-				FirmID: firm, Status: it.Status, Payload: it.Payload,
-				ClientCompanyID: nullUUID(it.ClientCompanyID), DocumentID: uuid.NullUUID{UUID: documentID, Valid: true},
-				SourceOrdinal: pgtype.Int4{Int32: it.SourceOrdinal, Valid: true}, SourceRef: it.SourceRef,
-				ExtractionConfidence: NumericFromFloat(it.Confidence)}); err != nil {
-				return fmt.Errorf("insert extracted invoice: %w", err)
-			}
-		}
-		rows, err := q.ListDocumentInvoicesForPublish(ctx, uuid.NullUUID{UUID: documentID, Valid: true})
-		if err != nil {
-			return fmt.Errorf("list document invoices for publish: %w", err)
-		}
-		for _, r := range rows {
-			out = append(out, InvoiceOut{ID: r.ID, Status: r.Status, Payload: r.Payload, Confidence: numericPtr(r.ExtractionConfidence)})
-		}
-		return nil
-	})
-	return out, err
 }
 
 // Reprocess implements Store.

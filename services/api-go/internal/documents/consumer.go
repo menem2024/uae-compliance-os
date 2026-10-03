@@ -28,8 +28,9 @@ func EventsDurableConfig() events.DurableConfig {
 }
 
 // Consumer turns document.extracted/document.failed into invoice rows, invoice.extracted and the
-// Document's terminal status. Every write is gated by Store.ApplyExtracted/ApplyFailed's affected-row
-// count, so a redelivery or a superseded run's result is a safe no-op (Task 17 design decisions).
+// Document's terminal status. Store.ApplyExtractedResult applies a result in one transaction gated by the
+// Document's status, so a superseded run's result is a no-op and a redelivery of the applied one only
+// re-publishes (Task 17 design decisions, security review A).
 type Consumer struct {
 	Store Store
 	Bus   events.ProtoPublisher
@@ -91,35 +92,38 @@ func (c *Consumer) extracted(ctx context.Context, m *compliancev1.DocumentExtrac
 	if status != "not_invoice" {
 		invoiceCount = int32(len(m.GetInvoices())) //nolint:gosec // bounded by the upload/extraction path
 	}
-	applied, err := c.Store.ApplyExtracted(ctx, firm, ExtractedParams{
+	var items []InvoiceIn
+	if status != "not_invoice" {
+		cc, err := uuid.Parse(m.GetClientCompanyId())
+		if err != nil {
+			return permanent("client_company_id %q", m.GetClientCompanyId())
+		}
+		items = make([]InvoiceIn, 0, len(m.GetInvoices()))
+		for _, ei := range m.GetInvoices() {
+			payload, err := protojson.Marshal(ei.GetInvoice())
+			if err != nil {
+				return permanent("marshal invoice: %v", err)
+			}
+			items = append(items, InvoiceIn{SourceOrdinal: ei.GetSourceOrdinal(), SourceRef: ei.GetSourceRef(),
+				Payload: payload, Status: InvoiceStatus(ei.GetVerdict().GetVerdict(), ei.GetConfidence()),
+				Confidence: ei.GetConfidence(), ClientCompanyID: cc})
+		}
+	}
+	// One transaction: the Document's status and its invoices commit together or not at all.
+	out, err := c.Store.ApplyExtractedResult(ctx, firm, ExtractedParams{
 		ID: id, RunID: runID, Status: status, Kind: m.GetDocumentKind(), Direction: m.GetDirection(),
 		Language: m.GetLanguage(), ExtractionMethod: m.GetExtractionMethod(), ReviewReasons: reviewReasons,
-		InvoiceCount: invoiceCount})
+		InvoiceCount: invoiceCount}, items)
 	if err != nil {
 		return fmt.Errorf("apply extracted: %w", err)
 	}
-	if !applied || status == "not_invoice" {
+	if !out.Applied && !out.Replay {
 		return nil
 	}
-	cc, err := uuid.Parse(m.GetClientCompanyId())
-	if err != nil {
-		return permanent("client_company_id %q", m.GetClientCompanyId())
-	}
-	items := make([]InvoiceIn, 0, len(m.GetInvoices()))
-	for _, ei := range m.GetInvoices() {
-		payload, err := protojson.Marshal(ei.GetInvoice())
-		if err != nil {
-			return permanent("marshal invoice: %v", err)
-		}
-		items = append(items, InvoiceIn{SourceOrdinal: ei.GetSourceOrdinal(), SourceRef: ei.GetSourceRef(),
-			Payload: payload, Status: InvoiceStatus(ei.GetVerdict().GetVerdict(), ei.GetConfidence()),
-			Confidence: ei.GetConfidence(), ClientCompanyID: cc})
-	}
-	out, err := c.Store.InsertInvoices(ctx, firm, id, items)
-	if err != nil {
-		return fmt.Errorf("insert invoices: %w", err)
-	}
-	for _, o := range out {
+	// Publish only after the commit. A failure returns an error, so the message is nak'd; the redelivery
+	// finds the Document already extracted for this run (Replay) and publishes again. The Nats-Msg-Id
+	// dedups inside the stream's window and the validation consumer is idempotent.
+	for _, o := range out.Invoices {
 		if o.Status != "extracted" {
 			continue
 		}

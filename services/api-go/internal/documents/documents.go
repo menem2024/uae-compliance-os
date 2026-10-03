@@ -94,7 +94,7 @@ func InvoiceStatus(verdict compliancev1.Verdict, confidence float64) string {
 	return "extracted"
 }
 
-// ExtractedParams is the Document-level fields of one document.extracted result (Store.ApplyExtracted).
+// ExtractedParams is the Document-level fields of one document.extracted result (Store.ApplyExtractedResult).
 type ExtractedParams struct {
 	ID               uuid.UUID
 	RunID            uuid.UUID
@@ -108,7 +108,7 @@ type ExtractedParams struct {
 	InvoiceCount     int32
 }
 
-// InvoiceIn is one invoice to insert for a document.extracted result (Store.InsertInvoices).
+// InvoiceIn is one invoice to insert for a document.extracted result (Store.ApplyExtractedResult).
 type InvoiceIn struct {
 	SourceOrdinal   int32
 	SourceRef       string
@@ -118,13 +118,27 @@ type InvoiceIn struct {
 	ClientCompanyID uuid.UUID
 }
 
-// InvoiceOut is one invoice of the Document's full invoice set, read back after InsertInvoices so the
-// consumer always decides what to publish from the authoritative row, not from what it tried to insert.
+// InvoiceOut is one invoice of the Document's full invoice set, read back inside the same transaction as
+// the insert so the consumer always decides what to publish from the authoritative row, not from what it
+// tried to insert.
 type InvoiceOut struct {
 	ID         uuid.UUID
 	Status     string
 	Payload    []byte
 	Confidence *float64
+}
+
+// ApplyOutcome is what Store.ApplyExtractedResult did.
+type ApplyOutcome struct {
+	// Found is false when the Document is not visible to the Firm (missing, or another Firm's).
+	Found bool
+	// Applied is true when this call moved the Document out of uploaded/processing.
+	Applied bool
+	// Replay is true when the Document already holds this very result (same run, same status): a
+	// redelivery, whose invoice.extracted publish may have been lost after the first commit.
+	Replay bool
+	// Invoices is the Document's full invoice set when Applied or Replay (not for not_invoice).
+	Invoices []InvoiceOut
 }
 
 var sha256Hex = regexp.MustCompile(`^[0-9a-f]{64}$`)
