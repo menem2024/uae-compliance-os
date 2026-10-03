@@ -47,3 +47,11 @@ class RecordingMissing(GatewayError):  # ReplayGateway has no recording for the 
 
 class SpendCapExceeded(GatewayError):  # per-Firm daily cap (SpendLimiter)
     code = "spend_cap_exceeded"
+
+
+class SpendLimiterUnavailable(TransientModelError):
+    """The spend-cap store (Valkey) is unreachable, so a live call cannot be admitted: the cap fails closed.
+
+    Transient on purpose (code `model_transient`): the node retries, then the message is nak'ed and
+    redelivered, so ingestion resumes by itself once the store is back. No provider call was made.
+    """

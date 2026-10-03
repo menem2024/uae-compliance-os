@@ -57,9 +57,9 @@ class Report:
 
 def live_stack(inner: ModelGateway, recordings: Path, limiter: MemorySpendLimiter,
                concurrency: int) -> ModelGateway:
-    """The live gateway: provider -> dedicated spend cap -> recording -> concurrency limit. The cap is checked
-    before each call and raises (SpendCapExceeded) once reached, so the overshoot is at most the calls already
-    in flight."""
+    """The live gateway: provider -> dedicated spend cap -> recording -> concurrency limit. Each call reserves
+    its upper-bound output cost before it runs and raises (SpendCapExceeded) once the cap is reached, so the
+    overshoot is at most one reservation plus the input cost of the calls in flight."""
     return ConcurrencyLimitedGateway(RecordingGateway(SpendLimitedGateway(inner, limiter), recordings),
                                      concurrency)
 

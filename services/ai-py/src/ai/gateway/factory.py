@@ -1,4 +1,9 @@
-"""The service's ModelGateway: Caching -> SpendLimited -> ConcurrencyLimited -> provider (contract section 2).
+"""The service's ModelGateway: Caching -> ConcurrencyLimited -> SpendLimited -> provider (contract section 2).
+
+The spend cap sits inside the concurrency limit (review B #2): a call reserves its cost only once it holds a
+semaphore slot, so queued calls neither pass the cap check together nor hold reservations while they wait.
+Only the fake gateway may run without the spend limiter's store (`live=False`); every other provider fails
+closed when Valkey is down.
 
 The provider is chosen by AI_GATEWAY: `anthropic` (the only live adapter), `replay` (recordings under
 AI_RECORDINGS_DIR) or `fake` (ScenarioGateway, the compose default). AI_CACHE picks the backing store of both
@@ -51,8 +56,8 @@ def build_gateway(settings: Settings) -> ModelGateway:
     cap = settings.daily_spend_cap_micro_usd
     limiter: SpendLimiter = (ValkeySpendLimiter(cap, client=client) if client is not None
                              else MemorySpendLimiter(cap))
-    gw: ModelGateway = ConcurrencyLimitedGateway(_provider(settings), settings.max_concurrent_llm_calls)
-    gw = SpendLimitedGateway(gw, limiter)
+    gw: ModelGateway = SpendLimitedGateway(_provider(settings), limiter, live=settings.gateway != "fake")
+    gw = ConcurrencyLimitedGateway(gw, settings.max_concurrent_llm_calls)
     if settings.cache == "none":
         return gw
     cache: ResponseCache = ValkeyCache(client=client) if client is not None else MemoryCache()

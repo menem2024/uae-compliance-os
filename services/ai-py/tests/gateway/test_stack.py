@@ -15,6 +15,7 @@ from ai.gateway.errors import (
     OutputInvalid,
     RecordingMissing,
     SpendCapExceeded,
+    SpendLimiterUnavailable,
     TransientModelError,
 )
 from ai.gateway.fake import FakeGateway, response_for
@@ -141,6 +142,9 @@ class BrokenLimiter:
     async def spent(self, firm_id, day):
         raise ConnectionError("down")
 
+    async def reserve(self, firm_id, day, micro_usd):
+        raise ConnectionError("down")
+
     async def add(self, firm_id, day, micro_usd):
         raise ConnectionError("down")
 
@@ -210,6 +214,115 @@ async def test_an_unbilled_failure_adds_nothing():
     with pytest.raises(TransientModelError):
         await gw.complete(req())
     assert await limiter.spent("f1", "20260929") == 0
+
+
+DAY = "20260929"
+
+
+def at_noon() -> datetime:
+    return datetime(2026, 9, 29, 12, 0, tzinfo=UTC)
+
+
+class Priced:
+    """A provider whose every call costs `cost` and takes a moment, so concurrent callers overlap."""
+
+    def __init__(self, cost: int, on_call=None) -> None:
+        self.cost = cost
+        self.calls = 0
+        self._on_call = on_call
+
+    async def complete(self, r):
+        self.calls += 1
+        if self._on_call is not None:
+            await self._on_call()
+        await asyncio.sleep(0.01)
+        resp = response_for(r, Out())
+        return dataclasses.replace(resp, usage=dataclasses.replace(resp.usage, cost_micro_usd=self.cost))
+
+
+def priced_req(firm="f1") -> ModelRequest:
+    """Sonnet output is 10 micro-USD per token: max_tokens 4000 reserves 40,000 micro-USD."""
+    return dataclasses.replace(req(firm), max_tokens=4000)
+
+
+async def burst(gws, n: int = 32) -> int:
+    """n concurrent calls spread over `gws` (replicas); returns how many were admitted."""
+    results = await asyncio.gather(*(gws[i % len(gws)].complete(priced_req()) for i in range(n)),
+                                   return_exceptions=True)
+    unexpected = [r for r in results if isinstance(r, BaseException) and not isinstance(r, SpendCapExceeded)]
+    assert unexpected == []
+    return sum(1 for r in results if not isinstance(r, BaseException))
+
+
+async def test_concurrent_calls_cannot_overshoot_the_cap_in_memory():
+    """Review B #2: cap 100k, 32 concurrent 40k calls -> all 32 were admitted (6.4M spent)."""
+    inner, limiter = Priced(40_000), MemorySpendLimiter(100_000)
+    admitted = await burst([SpendLimitedGateway(inner, limiter, now=at_noon)])
+    assert admitted <= 3 and inner.calls == admitted
+    assert await limiter.spent("f1", DAY) <= 100_000 + 40_000
+
+
+async def test_concurrent_replicas_cannot_overshoot_the_cap_in_valkey():
+    r = FakeAsyncRedis()  # one Valkey shared by two replicas
+    inners = [Priced(40_000), Priced(40_000)]
+    gws = [SpendLimitedGateway(i, ValkeySpendLimiter(100_000, client=r), now=at_noon) for i in inners]
+    admitted = await burst(gws)
+    assert admitted <= 3 and sum(i.calls for i in inners) == admitted
+    assert int(await r.get("llmspend:f1:20260929")) <= 100_000 + 40_000
+
+
+async def test_the_reservation_is_held_during_the_call_and_settled_to_the_actual_cost():
+    limiter = MemorySpendLimiter(100_000)
+    seen: list[int] = []
+
+    async def peek():
+        seen.append(await limiter.spent("f1", DAY))
+
+    await SpendLimitedGateway(Priced(1_234, on_call=peek), limiter, now=at_noon).complete(priced_req())
+    assert seen == [40_000]  # max_tokens x output price, reserved before the provider is called
+    assert await limiter.spent("f1", DAY) == 1_234
+
+
+def _hangs(started: asyncio.Event):
+    class Hangs:
+        async def complete(self, r):
+            started.set()
+            await asyncio.sleep(3600)
+
+    return Hangs()
+
+
+async def _cancel_mid_call(gw: SpendLimitedGateway) -> None:
+    started = asyncio.Event()
+    gw._inner = _hangs(started)  # type: ignore[attr-defined]
+    task = asyncio.create_task(gw.complete(priced_req()))
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+async def test_a_cancelled_live_call_is_charged_its_reservation():
+    """A node timeout or run cancel mid-call: the provider may have billed it, so the upper bound stays."""
+    limiter = MemorySpendLimiter(100_000)
+    await _cancel_mid_call(SpendLimitedGateway(FakeGateway({}), limiter, now=at_noon))
+    assert await limiter.spent("f1", DAY) == 40_000
+
+
+async def test_a_cancelled_fake_call_releases_its_reservation():
+    limiter = MemorySpendLimiter(100_000)
+    await _cancel_mid_call(SpendLimitedGateway(FakeGateway({}), limiter, now=at_noon, live=False))
+    assert await limiter.spent("f1", DAY) == 0
+
+
+async def test_a_limiter_outage_fails_closed_for_live_and_open_for_the_fake():
+    inner = Priced(0)
+    with pytest.raises(SpendLimiterUnavailable) as caught:
+        await SpendLimitedGateway(inner, BrokenLimiter()).complete(req())
+    assert isinstance(caught.value, TransientModelError) and inner.calls == 0
+    assert "spend limiter unavailable" in str(caught.value)
+    resp = await SpendLimitedGateway(inner, BrokenLimiter(), live=False).complete(req())
+    assert resp.parsed == Out() and inner.calls == 1
 
 
 async def test_a_limiter_outage_while_charging_a_failure_keeps_the_original_error():

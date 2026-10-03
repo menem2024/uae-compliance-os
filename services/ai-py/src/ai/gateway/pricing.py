@@ -30,3 +30,11 @@ def cost_micro_usd(model: str, *, input_tokens: int, output_tokens: int, cache_r
     total = (input_tokens * p.input + output_tokens * p.output
              + cache_read_input_tokens * p.cache_read + cache_creation_input_tokens * p.cache_write)
     return -(-total // 1_000_000)
+
+
+def reservation_micro_usd(model: str, max_tokens: int, pricing: dict[str, Price] = PRICING) -> int:
+    """What SpendLimitedGateway reserves against the daily cap before a call: `max_tokens` at the model's
+    output price, the upper bound of the output side. The input side is unknown until the provider counts it
+    and is charged when the call settles. An unpriced model is reserved at the dearest output price."""
+    p = pricing.get(model) or max(pricing.values(), key=lambda x: x.output)
+    return -(-max(0, max_tokens) * p.output // 1_000_000)

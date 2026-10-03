@@ -1,16 +1,19 @@
-"""build_gateway: Caching -> SpendLimited -> ConcurrencyLimited -> provider, chosen by AI_GATEWAY."""
+"""build_gateway: Caching -> ConcurrencyLimited -> SpendLimited -> provider, chosen by AI_GATEWAY."""
 
+import asyncio
+import dataclasses
 from pathlib import Path
 
 import pytest
 
 from ai.agents.intake import agent as intake_agent
 from ai.agents.intake.schema import IntakeResult
+from ai.gateway import factory
 from ai.gateway.anthropic_gw import AnthropicGateway
 from ai.gateway.cache import CachingGateway, MemoryCache, ValkeyCache
-from ai.gateway.errors import TransientModelError
+from ai.gateway.errors import SpendCapExceeded, SpendLimiterUnavailable
 from ai.gateway.factory import build_gateway
-from ai.gateway.fake import DEFAULT_SCENARIO, ScenarioGateway
+from ai.gateway.fake import DEFAULT_SCENARIO, ScenarioGateway, response_for
 from ai.gateway.limits import (
     ConcurrencyLimitedGateway,
     MemorySpendLimiter,
@@ -18,7 +21,7 @@ from ai.gateway.limits import (
     ValkeySpendLimiter,
 )
 from ai.gateway.recorded import ReplayGateway
-from ai.gateway.types import HAIKU, Message, ModelRequest, RequestMeta, TextPart
+from ai.gateway.types import HAIKU, SONNET, Message, ModelRequest, RequestMeta, TextPart
 from ai.settings import Settings
 
 UNREACHABLE_VALKEY = "redis://127.0.0.1:1/0"  # loopback, nothing listens: connection refused
@@ -41,9 +44,9 @@ def test_fake_builds_the_full_stack_over_the_scenario_gateway(monkeypatch):
     monkeypatch.delenv("AI_FAKE_SCENARIO", raising=False)
     s = Settings(gateway="fake", cache="memory", daily_spend_cap_micro_usd=1234, max_concurrent_llm_calls=3)
     stack = layers(build_gateway(s))
-    assert [type(x) for x in stack] == [CachingGateway, SpendLimitedGateway, ConcurrencyLimitedGateway,
+    assert [type(x) for x in stack] == [CachingGateway, ConcurrencyLimitedGateway, SpendLimitedGateway,
                                         ScenarioGateway]
-    caching, spend, conc, provider = stack
+    caching, conc, spend, provider = stack
     assert isinstance(caching._cache, MemoryCache)  # type: ignore[attr-defined]
     limiter = spend._limiter  # type: ignore[attr-defined]
     assert isinstance(limiter, MemorySpendLimiter) and limiter.cap_micro_usd == 1234
@@ -60,14 +63,14 @@ def test_fake_uses_the_settings_scenario(tmp_path):
 
 def test_replay_reads_the_recordings_dir():
     stack = layers(build_gateway(Settings(gateway="replay", recordings_dir="some/recordings")))
-    assert [type(x) for x in stack] == [CachingGateway, SpendLimitedGateway, ConcurrencyLimitedGateway,
+    assert [type(x) for x in stack] == [CachingGateway, ConcurrencyLimitedGateway, SpendLimitedGateway,
                                         ReplayGateway]
     assert stack[-1]._root == Path("some/recordings")  # type: ignore[attr-defined]
 
 
 def test_cache_none_drops_only_the_cache_layer():
     stack = layers(build_gateway(Settings(gateway="fake", cache="none")))
-    assert [type(x) for x in stack] == [SpendLimitedGateway, ConcurrencyLimitedGateway, ScenarioGateway]
+    assert [type(x) for x in stack] == [ConcurrencyLimitedGateway, SpendLimitedGateway, ScenarioGateway]
 
 
 async def test_anthropic_builds_without_a_key_or_valkey_and_fails_only_on_first_call(monkeypatch):
@@ -75,15 +78,50 @@ async def test_anthropic_builds_without_a_key_or_valkey_and_fails_only_on_first_
     s = Settings(gateway="anthropic", cache="valkey", valkey_url=UNREACHABLE_VALKEY)
     gw = build_gateway(s)  # lazy: no connection, no key check
     stack = layers(gw)
-    assert [type(x) for x in stack] == [CachingGateway, SpendLimitedGateway, ConcurrencyLimitedGateway,
+    assert [type(x) for x in stack] == [CachingGateway, ConcurrencyLimitedGateway, SpendLimitedGateway,
                                         AnthropicGateway]
     cache = stack[0]._cache  # type: ignore[attr-defined]
-    limiter = stack[1]._limiter  # type: ignore[attr-defined]
+    limiter = stack[2]._limiter  # type: ignore[attr-defined]
     assert isinstance(cache, ValkeyCache) and isinstance(limiter, ValkeySpendLimiter)
     assert cache._r is limiter._r  # one Valkey client for the cache and the spend counters
     assert limiter.cap_micro_usd == s.daily_spend_cap_micro_usd
-    with pytest.raises(TransientModelError):  # the cache miss is tolerated; the cap fails closed
+    with pytest.raises(SpendLimiterUnavailable):  # the cache miss is tolerated; the cap fails closed
         await gw.complete(intake_req())
+    assert stack[2]._live is True  # type: ignore[attr-defined]
+
+
+def test_only_the_fake_gateway_fails_open_on_a_limiter_outage():
+    def spend_layer(gateway):
+        return next(x for x in layers(build_gateway(Settings(gateway=gateway, cache="none")))
+                    if isinstance(x, SpendLimitedGateway))
+
+    assert spend_layer("fake")._live is False  # type: ignore[attr-defined]
+    assert spend_layer("replay")._live is True  # type: ignore[attr-defined]
+
+
+async def test_the_spend_check_runs_inside_the_concurrency_limit(monkeypatch):
+    """Review B #2: 32 queued calls all passed the cap check before the semaphore; now <= 3 are admitted."""
+    calls = 0
+
+    class Priced:
+        async def complete(self, r):
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0.01)
+            resp = response_for(r, IntakeResult(kind="invoice", language="en", invoice_count=1, seller_trn="",
+                                                buyer_trn="", confidence=0.9))
+            return dataclasses.replace(resp, usage=dataclasses.replace(resp.usage, cost_micro_usd=40_000))
+
+    monkeypatch.setattr(factory, "_provider", lambda s: Priced())
+    gw = build_gateway(Settings(gateway="fake", cache="none", daily_spend_cap_micro_usd=100_000,
+                                max_concurrent_llm_calls=4))
+    r = dataclasses.replace(intake_req(), model=SONNET, max_tokens=4000)  # reserves 40,000 micro-USD
+    results = await asyncio.gather(*(gw.complete(r) for _ in range(32)), return_exceptions=True)
+    admitted = [x for x in results if not isinstance(x, BaseException)]
+    assert all(isinstance(x, SpendCapExceeded) for x in results if isinstance(x, BaseException))
+    assert len(admitted) <= 3 and calls == len(admitted)
+    limiter = layers(gw)[1]._limiter  # type: ignore[attr-defined]
+    assert sum(limiter._spent.values()) <= 100_000 + 40_000  # type: ignore[attr-defined]  (no midnight race)
 
 
 async def test_the_compose_default_serves_and_caches(monkeypatch):
