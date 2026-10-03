@@ -1,9 +1,11 @@
 """OpenTelemetry tracer provider setup for ai-py."""
 
+import base64
 import os
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as OTLPHttpSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -26,5 +28,17 @@ def init(service_name: str) -> TracerProvider:
     timeout = float(os.environ.get("OTEL_EXPORTER_OTLP_TIMEOUT", "2"))
     exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True, timeout=timeout)
     provider.add_span_processor(BatchSpanProcessor(exporter))
+    _add_langfuse(provider, timeout)
     trace.set_tracer_provider(provider)
     return provider
+
+
+def _add_langfuse(provider: TracerProvider, timeout: float) -> None:
+    """Optional second processor (D2 option b): only when LANGFUSE_OTLP_ENDPOINT is set."""
+    endpoint = os.environ.get("LANGFUSE_OTLP_ENDPOINT")
+    if not endpoint:
+        return
+    pair = f"{os.environ.get('LANGFUSE_PUBLIC_KEY', '')}:{os.environ.get('LANGFUSE_SECRET_KEY', '')}"
+    auth = "Basic " + base64.b64encode(pair.encode()).decode()
+    provider.add_span_processor(BatchSpanProcessor(
+        OTLPHttpSpanExporter(endpoint=endpoint, headers={"Authorization": auth}, timeout=timeout)))
