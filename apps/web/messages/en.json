@@ -217,5 +217,43 @@
       "load": "Could not load the firm settings.",
       "invalid_brand_color": "Use a six-digit hex colour such as #C8A45D."
     }
+  },
+  "P1Landing": {
+    "hero": {
+      "badge": "Built for the UAE e-invoicing mandate",
+      "title": "Your firm's clients, mandate-ready before the deadline",
+      "subtitle": "An in-house agent orchestra reads, extracts and verifies invoices automatically, so your team reviews decisions instead of retyping documents."
+    },
+    "orchestra": {
+      "title": "An agent orchestra, not a single bot",
+      "subtitle": "Every document moves through a traceable pipeline. Each step is logged, budgeted and reviewable.",
+      "intake": "Intake — reads the upload and classifies the document",
+      "extraction": "Extraction — pulls invoice fields with confidence scores",
+      "verifier": "Verifier — runs checks and escalates what looks wrong",
+      "orchestrator": "Orchestrator — plans the run and keeps every step accountable"
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "steps": [
+        { "title": "Upload", "body": "Drop a PDF, image, CSV or XLSX. We dedupe by content hash automatically." },
+        { "title": "Extract", "body": "Intake and Extraction agents turn the document into structured invoice data." },
+        { "title": "Verify", "body": "The Verifier runs checks and flags anything that needs a human look." },
+        { "title": "Review", "body": "Your team approves or adjusts proposals; nothing ships to a client unreviewed." }
+      ]
+    },
+    "trust": {
+      "title": "Built with compliance in mind",
+      "points": [
+        "Every Firm's data is isolated at the database level",
+        "Agents never write business state directly",
+        "A full audit trail for every decision",
+        "No invoice is sent to a client without human review"
+      ]
+    },
+    "cta": {
+      "title": "Get your clients ready",
+      "body": "Open a workspace for your firm and start validating invoices ahead of the mandate.",
+      "button": "Sign in"
+    }
   }
 }
