@@ -150,6 +150,338 @@ pub fn export(inv: &pb::Invoice, rs: &RuleSet) -> ExportOutcome {
     ExportOutcome { run, xml }
 }
 
+/// How the exporter guarantees one XSD-required child (`minOccurs >= 1`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cover {
+    /// Written whenever its parent is: a constant, a default, a bool, or the field whose presence
+    /// is the parent's condition (the parent is omitted without it, CI "XSD-mandatory children").
+    Always,
+    /// The `NA` placeholder when the field is empty.
+    Placeholder,
+    /// The parent can be written without the child; one of these official rules then fails (the
+    /// audit corpus verifies it against the official schematron, and the property test does once
+    /// the rule is registered).
+    Official(&'static [&'static str]),
+    /// The parent can be written without the child; one of these platform rules then fails.
+    Platform(&'static [&'static str]),
+}
+
+/// One XSD-required child of an element the exporter writes. `parent` is the element's path with
+/// the root written `*` and both line kinds `cac:*Line` (`Invoice/cac:InvoiceLine/cac:Price` is
+/// `*/cac:*Line/cac:Price`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XsdRequired {
+    pub parent: &'static str,
+    pub child: &'static str,
+    pub cover: Cover,
+}
+
+/// The XSD audit (spec 5.2.7 `AE-EXP-00N`, 5.3.1): every `minOccurs >= 1` child of every element
+/// the exporter writes, and what keeps it from being missing. The test
+/// `xsd_audit_lists_every_required_child` keeps this list exact; the test
+/// `every_document_without_error_issues_exports_xsd_valid` checks each entry on every
+/// single-field clear of the examples and the maximal documents, plus seeded random multi-field
+/// clears. Datatypes are audited separately: dates (`AE-EXP-008`, `AE-EXP-009`) and times
+/// (`AE-EXP-010`) are the only XSD-1.0 differences from the official XPath casts; decimals are
+/// written only when they parse; `xs:anyURI` accepts any string the exporter writes.
+pub const XSD_AUDIT: &[XsdRequired] = &[
+    // Root (both kinds).
+    req("*", "cbc:ID", Cover::Official(&["ibr-002"])),
+    req("*", "cbc:IssueDate", Cover::Official(&["ibr-003"])),
+    req(
+        "*",
+        "cac:AccountingSupplierParty",
+        Cover::Official(&["ibr-006", "ibr-008"]),
+    ),
+    req(
+        "*",
+        "cac:AccountingCustomerParty",
+        Cover::Official(&["ibr-007", "ibr-010"]),
+    ),
+    req(
+        "*",
+        "cac:LegalMonetaryTotal",
+        Cover::Platform(&["AE-EXP-007"]),
+    ),
+    req("*", "cac:InvoiceLine", Cover::Official(&["ibr-016"])),
+    req("*", "cac:CreditNoteLine", Cover::Official(&["ibr-016"])),
+    // Header references.
+    req("*/cac:OrderReference", "cbc:ID", Cover::Placeholder),
+    req(
+        "*/cac:BillingReference/cac:InvoiceDocumentReference",
+        "cbc:ID",
+        Cover::Official(&["ibr-055"]),
+    ),
+    req("*/cac:DespatchDocumentReference", "cbc:ID", Cover::Always),
+    req("*/cac:ReceiptDocumentReference", "cbc:ID", Cover::Always),
+    req("*/cac:StatementDocumentReference", "cbc:ID", Cover::Always),
+    req("*/cac:OriginatorDocumentReference", "cbc:ID", Cover::Always),
+    req(
+        "*/cac:ContractDocumentReference",
+        "cbc:ID",
+        Cover::Platform(&["AE-EXP-006"]),
+    ),
+    req(
+        "*/cac:AdditionalDocumentReference",
+        "cbc:ID",
+        Cover::Official(&["ibr-052"]),
+    ),
+    req("*/cac:ProjectReference", "cbc:ID", Cover::Always),
+    // Seller and buyer.
+    req(
+        "*/cac:AccountingSupplierParty/cac:Party/cac:PartyIdentification",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:AccountingSupplierParty/cac:Party/cac:PartyName",
+        "cbc:Name",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:AccountingSupplierParty/cac:Party/cac:PostalAddress/cac:AddressLine",
+        "cbc:Line",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme",
+        "cac:TaxScheme",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:AccountingCustomerParty/cac:Party/cac:PartyIdentification",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:AccountingCustomerParty/cac:Party/cac:PartyName",
+        "cbc:Name",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:AccountingCustomerParty/cac:Party/cac:PostalAddress/cac:AddressLine",
+        "cbc:Line",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:AccountingCustomerParty/cac:Party/cac:PartyTaxScheme",
+        "cac:TaxScheme",
+        Cover::Always,
+    ),
+    // Other parties and delivery.
+    req(
+        "*/cac:PayeeParty/cac:PartyIdentification",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req("*/cac:PayeeParty/cac:PartyName", "cbc:Name", Cover::Always),
+    req(
+        "*/cac:BuyerCustomerParty/cac:Party/cac:PartyIdentification",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:SellerSupplierParty/cac:Party/cac:PartyIdentification",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:TaxRepresentativeParty/cac:PartyName",
+        "cbc:Name",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:TaxRepresentativeParty/cac:PostalAddress/cac:AddressLine",
+        "cbc:Line",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:TaxRepresentativeParty/cac:PartyTaxScheme",
+        "cac:TaxScheme",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:Delivery/cac:DeliveryLocation/cac:Address/cac:AddressLine",
+        "cbc:Line",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:Delivery/cac:DeliveryParty/cac:PartyName",
+        "cbc:Name",
+        Cover::Always,
+    ),
+    // Payment.
+    req(
+        "*/cac:PaymentMeans",
+        "cbc:PaymentMeansCode",
+        Cover::Official(&["ibr-049"]),
+    ),
+    req(
+        "*/cac:PaymentMeans/cac:CardAccount",
+        "cbc:PrimaryAccountNumberID",
+        Cover::Platform(&["AE-EXP-004"]),
+    ),
+    req(
+        "*/cac:PaymentMeans/cac:CardAccount",
+        "cbc:NetworkID",
+        Cover::Placeholder,
+    ),
+    req(
+        "*/cac:PaymentMeans/cac:PayeeFinancialAccount/cac:FinancialInstitutionBranch/cac:Address/cac:AddressLine",
+        "cbc:Line",
+        Cover::Always,
+    ),
+    // Document allowances and charges, tax.
+    req(
+        "*/cac:AllowanceCharge",
+        "cbc:ChargeIndicator",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:AllowanceCharge",
+        "cbc:Amount",
+        Cover::Official(&["ibr-031", "ibr-036"]),
+    ),
+    req(
+        "*/cac:AllowanceCharge/cac:TaxCategory",
+        "cac:TaxScheme",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:TaxExchangeRate",
+        "cbc:SourceCurrencyCode",
+        Cover::Official(&["ibr-005"]),
+    ),
+    req(
+        "*/cac:TaxExchangeRate",
+        "cbc:TargetCurrencyCode",
+        Cover::Platform(&["AE-EXP-003"]),
+    ),
+    req("*/cac:TaxTotal", "cbc:TaxAmount", Cover::Always),
+    req(
+        "*/cac:TaxTotal/cac:TaxSubtotal",
+        "cbc:TaxAmount",
+        Cover::Official(&["aligned-ibrp-046"]),
+    ),
+    req(
+        "*/cac:TaxTotal/cac:TaxSubtotal",
+        "cac:TaxCategory",
+        Cover::Official(&["aligned-ibrp-047"]),
+    ),
+    req(
+        "*/cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory",
+        "cac:TaxScheme",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:LegalMonetaryTotal",
+        "cbc:PayableAmount",
+        Cover::Official(&["ibr-015"]),
+    ),
+    // Lines.
+    req("*/cac:*Line", "cbc:ID", Cover::Official(&["ibr-021"])),
+    req(
+        "*/cac:*Line",
+        "cbc:LineExtensionAmount",
+        Cover::Official(&["ibr-024"]),
+    ),
+    req("*/cac:*Line", "cac:Item", Cover::Official(&["ibr-025"])),
+    req(
+        "*/cac:*Line/cac:OrderLineReference",
+        "cbc:LineID",
+        Cover::Placeholder,
+    ),
+    req(
+        "*/cac:*Line/cac:OrderLineReference/cac:OrderReference",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:DespatchLineReference",
+        "cbc:LineID",
+        Cover::Placeholder,
+    ),
+    req(
+        "*/cac:*Line/cac:DespatchLineReference/cac:DocumentReference",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req("*/cac:*Line/cac:DocumentReference", "cbc:ID", Cover::Always),
+    req(
+        "*/cac:*Line/cac:AllowanceCharge",
+        "cbc:ChargeIndicator",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:AllowanceCharge",
+        "cbc:Amount",
+        Cover::Official(&["ibr-041", "ibr-043"]),
+    ),
+    req(
+        "*/cac:*Line/cac:Item/cac:BuyersItemIdentification",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:Item/cac:SellersItemIdentification",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:Item/cac:StandardItemIdentification",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:Item/cac:AdditionalItemIdentification",
+        "cbc:ID",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:Item/cac:ClassifiedTaxCategory",
+        "cac:TaxScheme",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:Item/cac:AdditionalItemProperty",
+        "cbc:Name",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:Price",
+        "cbc:PriceAmount",
+        Cover::Official(&["ibr-026"]),
+    ),
+    req(
+        "*/cac:*Line/cac:Price/cac:AllowanceCharge",
+        "cbc:ChargeIndicator",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:Price/cac:AllowanceCharge",
+        "cbc:Amount",
+        Cover::Official(&["aligned-ibrp-004"]),
+    ),
+    req(
+        "*/cac:*Line/cac:ItemPriceExtension",
+        "cbc:Amount",
+        Cover::Always,
+    ),
+    req(
+        "*/cac:*Line/cac:ItemPriceExtension/cac:TaxTotal",
+        "cbc:TaxAmount",
+        Cover::Always,
+    ),
+];
+
+const fn req(parent: &'static str, child: &'static str, cover: Cover) -> XsdRequired {
+    XsdRequired {
+        parent,
+        child,
+        cover,
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Shared builders. `'a` is the lifetime of the canonical invoice: every written string borrows
 // from it, except the constants and BTAE-20's `AED ` prefix.
@@ -864,7 +1196,7 @@ pub(crate) mod testing {
     use std::collections::HashMap;
     use std::sync::LazyLock;
 
-    use prost_reflect::{Kind, MessageDescriptor};
+    use prost_reflect::{DynamicMessage, Kind, MessageDescriptor, Value as ReflectValue};
     use serde_json::{Map, Value};
 
     use crate::conformance::apply_patch;
@@ -980,12 +1312,26 @@ pub(crate) mod testing {
     /// One way an element breaks its XSD content model.
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub enum Violation {
-        /// `(parent element name, required child)`.
+        /// `(parent key, required child)`; the key is the parent's path with the root written
+        /// `*` and both line kinds written `cac:*Line` ([`parent_key`]).
         Missing(String, String),
         /// `(element path, child)`: not allowed, out of order, or too many.
         Order(String, String),
         /// An element without text and children.
         Empty(String),
+    }
+
+    /// `Invoice/cac:InvoiceLine/cac:Price` and `CreditNote/cac:CreditNoteLine/cac:Price` both
+    /// become `*/cac:*Line/cac:Price`.
+    pub fn parent_key(path: &str) -> String {
+        let rest = path.split_once('/').map_or("", |(_, r)| r);
+        let key = if rest.is_empty() {
+            "*".to_string()
+        } else {
+            format!("*/{rest}")
+        };
+        key.replace("cac:InvoiceLine", "cac:*Line")
+            .replace("cac:CreditNoteLine", "cac:*Line")
     }
 
     /// Checks every aggregate of `xml` against its XSD sequence (allowed children, order,
@@ -1001,36 +1347,36 @@ pub(crate) mod testing {
             if kids.is_empty() && n.text().is_none_or(|t| t.trim().is_empty()) {
                 out.push(Violation::Empty(path(n)));
             }
-            let name = qname(n);
-            if name.starts_with("cbc:") {
+            if n.tag_name().namespace() == Some(super::NS_CBC) {
                 continue;
             }
+            let name = qname(n);
             let model = x
                 .models
                 .get(&name)
                 .unwrap_or_else(|| panic!("no XSD model for {name}"));
+            let kid_names: Vec<String> = kids.iter().map(|k| qname(*k)).collect();
             let mut pos = 0usize;
             let mut count = 0u32;
-            for k in &kids {
-                let kn = qname(*k);
-                match model[pos..].iter().position(|p| p.name == kn) {
+            for kn in &kid_names {
+                match model[pos..].iter().position(|p| p.name == *kn) {
                     Some(0) => count += 1,
                     Some(skip) => {
                         pos += skip;
                         count = 1;
                     }
                     None => {
-                        out.push(Violation::Order(path(n), kn));
+                        out.push(Violation::Order(path(n), kn.clone()));
                         continue;
                     }
                 }
                 if model[pos].max.is_some_and(|m| count > m) {
-                    out.push(Violation::Order(path(n), kn));
+                    out.push(Violation::Order(path(n), kn.clone()));
                 }
             }
             for p in model.iter().filter(|p| p.min > 0) {
-                if !kids.iter().any(|k| qname(*k) == p.name) {
-                    out.push(Violation::Missing(name.clone(), p.name.clone()));
+                if !kid_names.contains(&p.name) {
+                    out.push(Violation::Missing(parent_key(&path(n)), p.name.clone()));
                 }
             }
         }
@@ -1113,6 +1459,218 @@ pub(crate) mod testing {
         let invoice = pool.get_message_by_name("compliance.v1.Invoice").unwrap();
         let mut out = Map::new();
         walk(&invoice, "", "", type_code, &mut out);
+        out
+    }
+
+    fn leaves(
+        v: &Value,
+        prefix: &str,
+        strings: &mut Vec<(String, Value)>,
+        messages: &mut Vec<String>,
+    ) {
+        match v {
+            Value::Object(m) => {
+                if !prefix.is_empty() {
+                    messages.push(prefix.to_string());
+                }
+                for (k, v) in m {
+                    let p = if prefix.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{prefix}.{k}")
+                    };
+                    match v {
+                        Value::Array(items) => {
+                            messages.push(p.clone());
+                            for (i, item) in items.iter().enumerate() {
+                                leaves(item, &format!("{p}[{i}]"), strings, messages);
+                            }
+                        }
+                        _ => leaves(v, &p, strings, messages),
+                    }
+                }
+            }
+            Value::String(_) => strings.push((prefix.to_string(), Value::String(String::new()))),
+            Value::Bool(_) => strings.push((prefix.to_string(), Value::Bool(false))),
+            _ => {}
+        }
+    }
+
+    /// One clearing step: `(label, set, remove)` for [`apply_patch`].
+    pub type ClearOp = (String, Map<String, Value>, Vec<String>);
+
+    /// The steps that can leave an XSD-required child of `base` out: each present string field
+    /// cleared, each bool set to false, each sub-message and repeated element removed, and the
+    /// three root elements whose content comes from several fields emptied completely.
+    pub fn clear_ops(base: &pb::Invoice) -> Vec<ClearOp> {
+        let json: Value =
+            serde_json::from_str(&crate::canonical_json::to_canonical_json(base)).unwrap();
+        let (mut strings, mut messages) = (Vec::new(), Vec::new());
+        leaves(&json, "", &mut strings, &mut messages);
+        let mut out: Vec<ClearOp> = Vec::new();
+        for (p, v) in strings {
+            out.push((format!("set {p}"), Map::from_iter([(p, v)]), vec![]));
+        }
+        for p in messages {
+            out.push((format!("remove {p}"), Map::new(), vec![p]));
+        }
+        for (label, field, scalar) in [
+            ("seller", "seller", "seller_trn"),
+            ("buyer", "buyer", "buyer_trn"),
+            ("totals", "totals", "total_amount"),
+        ] {
+            let set = Map::from_iter([(scalar.to_string(), Value::String(String::new()))]);
+            let has = json.get(field).is_some();
+            let remove = if has { vec![field.to_string()] } else { vec![] };
+            out.push((format!("empty {label}"), set, remove));
+        }
+        out
+    }
+
+    /// `base` with the steps applied together through [`apply_patch`], or `None` when the patch
+    /// fails or changes nothing. The reference for [`apply_ops`].
+    pub fn apply_ops_patch(base: &pb::Invoice, ops: &[&ClearOp]) -> Option<pb::Invoice> {
+        let mut set = Map::new();
+        let mut remove = Vec::new();
+        for (_, s, r) in ops {
+            set.extend(s.iter().map(|(k, v)| (k.clone(), v.clone())));
+            remove.extend(r.iter().cloned());
+        }
+        remove.sort();
+        remove.dedup();
+        let mut inv = base.clone();
+        (apply_patch(&mut inv, &set, &remove).is_ok() && inv != *base).then_some(inv)
+    }
+
+    /// `path` as `(field, index)` segments: `lines[1].item` is `[("lines", Some(1)), ("item",
+    /// None)]`.
+    fn segments(path: &str) -> Vec<(&str, Option<usize>)> {
+        path.split('.')
+            .map(|s| match s.split_once('[') {
+                Some((name, i)) => (name, Some(i.trim_end_matches(']').parse().unwrap())),
+                None => (s, None),
+            })
+            .collect()
+    }
+
+    /// The message a path's parent segments lead to.
+    fn walk_mut<'m>(
+        mut m: &'m mut DynamicMessage,
+        segs: &[(&str, Option<usize>)],
+    ) -> Option<&'m mut DynamicMessage> {
+        for (name, idx) in segs {
+            if !m.has_field_by_name(name) {
+                return None;
+            }
+            m = match (m.get_field_by_name_mut(name)?, idx) {
+                (ReflectValue::Message(x), None) => x,
+                (ReflectValue::List(items), Some(i)) => match items.get_mut(*i)? {
+                    ReflectValue::Message(x) => x,
+                    _ => return None,
+                },
+                _ => return None,
+            };
+        }
+        Some(m)
+    }
+
+    /// Clears a scalar or sub-message, or removes a repeated element.
+    fn clear_path(m: &mut DynamicMessage, path: &str) {
+        let segs = segments(path);
+        let ((name, idx), parents) = segs.split_last().unwrap();
+        let Some(m) = walk_mut(m, parents) else {
+            return;
+        };
+        match idx {
+            None => m.clear_field_by_name(name),
+            Some(i) => {
+                if let Some(ReflectValue::List(items)) = m.get_field_by_name_mut(name)
+                    && *i < items.len()
+                {
+                    items.remove(*i);
+                }
+            }
+        }
+    }
+
+    /// [`apply_ops_patch`] on the binary message with `prost-reflect`, much faster than the JSON
+    /// round trip: every `set` value of a [`ClearOp`] is `""` or `false`, which is the proto3
+    /// default, so setting it is clearing it; removals run after, highest path first.
+    pub fn apply_ops(base: &pb::Invoice, ops: &[&ClearOp]) -> Option<pb::Invoice> {
+        use prost::Message;
+        static INVOICE: LazyLock<MessageDescriptor> = LazyLock::new(|| {
+            prost_reflect::DescriptorPool::decode(crate::FILE_DESCRIPTOR_SET)
+                .unwrap()
+                .get_message_by_name("compliance.v1.Invoice")
+                .unwrap()
+        });
+        let mut m =
+            DynamicMessage::decode(INVOICE.clone(), base.encode_to_vec().as_slice()).ok()?;
+        let mut remove: Vec<&str> = Vec::new();
+        for (_, set, r) in ops {
+            for (path, v) in set {
+                assert!(matches!(v, Value::String(s) if s.is_empty()) || *v == Value::Bool(false));
+                clear_path(&mut m, path);
+            }
+            remove.extend(r.iter().map(String::as_str));
+        }
+        remove.sort_by(|a, b| crate::conformance::path_cmp(b, a));
+        remove.dedup();
+        for path in remove {
+            clear_path(&mut m, path);
+        }
+        let inv = pb::Invoice::decode(m.encode_to_vec().as_slice()).ok()?;
+        (inv != *base).then_some(inv)
+    }
+
+    /// Every step of [`clear_ops`] applied alone. Returns `(label, mutated invoice)`.
+    pub fn single_clears(base: &pb::Invoice) -> Vec<(String, pb::Invoice)> {
+        clear_ops(base)
+            .iter()
+            .filter_map(|op| Some((op.0.clone(), apply_ops(base, &[op])?)))
+            .collect()
+    }
+
+    /// `n` combinations of 2 to 5 steps of [`clear_ops`] over `bases`, drawn with a fixed
+    /// SplitMix64 seed so the set is the same on every run.
+    pub fn random_clears(bases: &[pb::Invoice], n: usize, seed: u64) -> Vec<(String, pb::Invoice)> {
+        let mut state = seed;
+        let mut next = move |bound: usize| -> usize {
+            state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut z = state;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            usize::try_from((z ^ (z >> 31)) % bound as u64).unwrap()
+        };
+        let ops: Vec<Vec<ClearOp>> = bases.iter().map(clear_ops).collect();
+        let mut out = Vec::new();
+        while out.len() < n {
+            let b = next(bases.len());
+            let k = 2 + next(4);
+            let picked: Vec<&ClearOp> = (0..k).map(|_| &ops[b][next(ops[b].len())]).collect();
+            if let Some(inv) = apply_ops(&bases[b], &picked) {
+                let labels: Vec<&str> = picked.iter().map(|o| o.0.as_str()).collect();
+                out.push((format!("base {b}: {}", labels.join(" + ")), inv));
+            }
+        }
+        out
+    }
+
+    /// The `(parent key, child)` pairs of every XSD-required child (`minOccurs >= 1`) of every
+    /// aggregate and root written in `xml`, present or not.
+    pub fn required(xml: &str) -> std::collections::BTreeSet<(String, String)> {
+        let x = xsd();
+        let doc = roxmltree::Document::parse(xml).unwrap();
+        let mut out = std::collections::BTreeSet::new();
+        for n in doc.descendants().filter(|n| n.is_element()) {
+            let name = qname(n);
+            if name.starts_with("cbc:") {
+                continue;
+            }
+            for p in x.models[&name].iter().filter(|p| p.min > 0) {
+                out.insert((parent_key(&path(n)), p.name.clone()));
+            }
+        }
         out
     }
 
@@ -1473,6 +2031,275 @@ mod tests {
         assert!(export_str(&inv).contains("<cbc:Note>Tax</cbc:Note>"));
     }
 
+    /// Writes the XSD audit corpus for the official schematron and the XSD:
+    /// `XSD_AUDIT_DIR=<dir> cargo test export::tests::write_xsd_audit_corpus -- --ignored`,
+    /// then `run_schematron.py <dir> --out <dir>/saxon.json`, `xsd_check.py <dir> --out
+    /// <dir>/xsd.json` and [`check_xsd_audit_corpus`]. `meta.json` lists, per file, the base,
+    /// the mutation, the platform error rule ids and the missing XSD-required children.
+    ///
+    /// A `TaxSubtotal` without `TaxableAmount` (IBT-116 cleared) is XSD-valid, but the official
+    /// `PINT-jurisdiction-aligned-rules.xslt` stops with a dynamic error on it ("An empty sequence
+    /// is not allowed as the first argument of u:slack()") before reporting `aligned-ibrp-045`;
+    /// such documents are not written, so the runner completes.
+    #[test]
+    #[ignore]
+    fn write_xsd_audit_corpus() {
+        let dir = std::path::PathBuf::from(std::env::var("XSD_AUDIT_DIR").unwrap());
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut bases: Vec<(String, pb::Invoice)> = examples();
+        bases.push(("maximal-380".into(), maximal("380")));
+        bases.push(("maximal-381".into(), maximal("381")));
+        let rs = crate::ruleset::default_ruleset();
+        let mut meta = serde_json::Map::new();
+        let mut n = 0;
+        for (slug, base) in &bases {
+            for (label, inv) in super::testing::single_clears(base) {
+                let Ok(xml) = to_xml(&Doc::new(&inv)) else {
+                    continue;
+                };
+                let xml = String::from_utf8(xml).unwrap();
+                let parsed = roxmltree::Document::parse(&xml).unwrap();
+                let crashes_saxon = parsed
+                    .descendants()
+                    .filter(|n| n.has_tag_name((NS_CAC, "TaxSubtotal")))
+                    .any(|n| {
+                        !n.children()
+                            .any(|c| c.has_tag_name((NS_CBC, "TaxableAmount")))
+                    });
+                if crashes_saxon {
+                    continue;
+                }
+                let missing: Vec<_> = violations(&xml)
+                    .into_iter()
+                    .filter_map(|v| match v {
+                        Violation::Missing(p, c) => Some(json!([p, c])),
+                        _ => None,
+                    })
+                    .collect();
+                let platform: Vec<_> = rs
+                    .validate(&inv)
+                    .issues
+                    .into_iter()
+                    .filter(|i| i.severity == pb::Severity::Error as i32)
+                    .map(|i| i.rule_id)
+                    .collect();
+                let file = format!("{n:05}.xml");
+                std::fs::write(dir.join(&file), xml).unwrap();
+                meta.insert(
+                    file,
+                    json!({"base": slug, "mutation": label, "missing": missing, "platform": platform}),
+                );
+                n += 1;
+            }
+        }
+        std::fs::write(
+            dir.join("meta.json"),
+            serde_json::to_string_pretty(&meta).unwrap(),
+        )
+        .unwrap();
+    }
+
+    fn audit_entry(parent: &str, child: &str) -> Option<&'static XsdRequired> {
+        XSD_AUDIT
+            .iter()
+            .find(|e| e.parent == parent && e.child == child)
+    }
+
+    /// `XSD_AUDIT` is exactly the set of XSD-required children of the elements the exporter
+    /// writes for the examples and the maximal documents of both kinds, and every rule it names
+    /// is in the catalogue with the right family.
+    #[test]
+    fn xsd_audit_lists_every_required_child() {
+        use super::testing::required;
+        use std::collections::BTreeSet;
+        let mut docs: Vec<pb::Invoice> = examples().into_iter().map(|(_, i)| i).collect();
+        docs.extend(["380", "381"].map(maximal));
+        let mut want = BTreeSet::new();
+        for inv in &docs {
+            want.extend(required(&export_str(inv)));
+        }
+        let mut got = BTreeSet::new();
+        for e in XSD_AUDIT {
+            let key = (e.parent.to_string(), e.child.to_string());
+            assert!(got.insert(key), "listed twice: {e:?}");
+        }
+        let not_audited: Vec<_> = want.difference(&got).collect();
+        let not_written: Vec<_> = got.difference(&want).collect();
+        assert!(
+            not_audited.is_empty() && not_written.is_empty(),
+            "not audited: {not_audited:#?}\nnot written: {not_written:#?}"
+        );
+        let catalog = crate::catalog::pint_ae_1_0_4();
+        for e in XSD_AUDIT {
+            let (ids, platform) = match e.cover {
+                Cover::Official(ids) => (ids, false),
+                Cover::Platform(ids) => (ids, true),
+                Cover::Always | Cover::Placeholder => continue,
+            };
+            assert!(!ids.is_empty(), "{e:?}");
+            for id in ids {
+                let entry = catalog
+                    .get(id)
+                    .unwrap_or_else(|| panic!("{e:?}: unknown {id}"));
+                assert_eq!(
+                    entry.family == crate::catalog::Family::Platform,
+                    platform,
+                    "{e:?}: {id}"
+                );
+            }
+        }
+    }
+
+    /// The property that makes the audit complete (spec 5.3.1): exporting any document whose run
+    /// has no error issue never leaves an XSD-required child out, writes no child out of order
+    /// and no empty element. Checked on every single-field clear of the maximal documents of both
+    /// kinds and of three examples (a credit note, a foreign-currency export, a passport
+    /// identifier), and on 400 seeded random combinations of 2 to 5 clears: an `Always` or `Placeholder` child is never missing; a `Platform` child is missing
+    /// only with one of its rules in the run's errors; an `Official` child likewise once all its
+    /// rules are registered (until then the audit corpus checks them against the official
+    /// schematron). Datatypes are the `AE-EXP` date and time rules' own tests.
+    #[test]
+    fn every_document_without_error_issues_exports_xsd_valid() {
+        use super::testing::{random_clears, single_clears};
+        let rs = crate::ruleset::default_ruleset();
+        let registered = |id: &&str| {
+            rs.catalog()
+                .get(id)
+                .is_some_and(|e| e.status == crate::catalog::Status::Implemented)
+        };
+        let mut bases: Vec<pb::Invoice> = ["380", "381"].map(maximal).to_vec();
+        for slug in [
+            "standard-tax-credit-note",
+            "exports",
+            "seller-pas-identifier",
+        ] {
+            bases.push(example(slug));
+        }
+        let mut cases = Vec::new();
+        for base in &bases {
+            cases.extend(single_clears(base));
+        }
+        cases.extend(random_clears(&bases, 400, 20_260_929));
+        let (mut missing_seen, mut clean) = (0, 0);
+        for (label, inv) in &cases {
+            let run = rs.validate(inv);
+            let errors: Vec<&str> = run
+                .issues
+                .iter()
+                .filter(|i| i.severity == pb::Severity::Error as i32)
+                .map(|i| i.rule_id.as_str())
+                .collect();
+            let xml = match to_xml(&Doc::new(inv)) {
+                Ok(xml) => String::from_utf8(xml).unwrap(),
+                Err(e) => {
+                    assert!(errors.contains(&"AE-EXP-005"), "{label}: {e}");
+                    continue;
+                }
+            };
+            let violations = violations(&xml);
+            if errors.is_empty() {
+                clean += 1;
+            }
+            for v in violations {
+                let Violation::Missing(parent, child) = &v else {
+                    panic!("{label}: {v:?}");
+                };
+                missing_seen += 1;
+                let e = audit_entry(parent, child)
+                    .unwrap_or_else(|| panic!("{label}: {parent} {child} is not audited"));
+                let ids = match e.cover {
+                    Cover::Always | Cover::Placeholder => {
+                        panic!("{label}: {parent} {child} is {:?} but missing", e.cover)
+                    }
+                    Cover::Platform(ids) => ids,
+                    Cover::Official(ids) if ids.iter().all(registered) => ids,
+                    Cover::Official(_) => continue,
+                };
+                assert!(
+                    ids.iter().any(|id| errors.contains(id)),
+                    "{label}: {parent} {child} is missing and none of {ids:?} is in {errors:?}"
+                );
+            }
+        }
+        assert!(cases.len() > 1_500 && missing_seen > 200 && clean > 100);
+    }
+
+    /// The binary fast path gives exactly what `apply_patch` gives, for single steps and for
+    /// combinations (a sample: the JSON round trip is slow in debug builds).
+    #[test]
+    fn clear_ops_on_the_binary_message_match_apply_patch() {
+        use super::testing::{ClearOp, apply_ops, apply_ops_patch, clear_ops};
+        for base in [maximal("380"), maximal("381"), example("exports")] {
+            let ops = clear_ops(&base);
+            let mut compared = 0;
+            for (i, op) in ops.iter().enumerate().step_by(7) {
+                let pair: Vec<&ClearOp> = vec![op, &ops[(i * 31 + 5) % ops.len()]];
+                for picked in [&pair[..1], &pair[..]] {
+                    assert_eq!(
+                        apply_ops(&base, picked),
+                        apply_ops_patch(&base, picked),
+                        "{:?}",
+                        picked.iter().map(|o| &o.0).collect::<Vec<_>>()
+                    );
+                    compared += 1;
+                }
+            }
+            assert!(compared > 20);
+        }
+    }
+
+    /// The audit corpus with the official schematron's and the XSD's verdicts (see
+    /// [`write_xsd_audit_corpus`]): every XSD-invalid document has an error, and every missing
+    /// `Official` or `Platform` child comes with a failure of one of its rules (official ids from
+    /// `saxon.json`, platform ids from the run).
+    /// `XSD_AUDIT_DIR=<dir> cargo test export::tests::check_xsd_audit_corpus -- --ignored`.
+    #[test]
+    #[ignore]
+    fn check_xsd_audit_corpus() {
+        let dir = std::path::PathBuf::from(std::env::var("XSD_AUDIT_DIR").unwrap());
+        let read = |f: &str| -> Value {
+            serde_json::from_str(&std::fs::read_to_string(dir.join(f)).unwrap()).unwrap()
+        };
+        let (meta, saxon, xsd) = (read("meta.json"), read("saxon.json"), read("xsd.json"));
+        let meta = meta.as_object().unwrap();
+        let mut failures = Vec::new();
+        for (file, m) in meta {
+            let mut failed: Vec<&str> = m["platform"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_str().unwrap())
+                .collect();
+            failed.extend(
+                saxon[file]["failed"]
+                    .as_object()
+                    .unwrap()
+                    .keys()
+                    .map(String::as_str),
+            );
+            if !xsd[file]["valid"].as_bool().unwrap() && failed.is_empty() {
+                failures.push(format!("{file}: XSD-invalid without an error: {m}"));
+            }
+            for pair in m["missing"].as_array().unwrap() {
+                let (p, c) = (pair[0].as_str().unwrap(), pair[1].as_str().unwrap());
+                let ids = match audit_entry(p, c).map(|e| e.cover) {
+                    Some(Cover::Official(ids) | Cover::Platform(ids)) => ids,
+                    other => {
+                        failures.push(format!("{file}: {p} {c} missing, audited as {other:?}"));
+                        continue;
+                    }
+                };
+                if !ids.iter().any(|id| failed.contains(id)) {
+                    failures.push(format!(
+                        "{file}: {p} {c} missing, none of {ids:?} failed: {m}"
+                    ));
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+        assert!(meta.len() > 5_000);
+    }
+
     #[test]
     fn the_violation_checker_reports_order_missing_and_empty() {
         let ok = export_str(&example("standard-tax-invoice"));
@@ -1497,7 +2324,7 @@ mod tests {
         );
         assert!(
             violations(&missing).contains(&Violation::Missing(
-                "cac:LegalMonetaryTotal".into(),
+                "*/cac:LegalMonetaryTotal".into(),
                 "cbc:PayableAmount".into()
             )),
             "{:?}",
