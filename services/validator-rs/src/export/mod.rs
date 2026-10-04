@@ -2008,6 +2008,38 @@ mod tests {
         assert!(xml.contains("<cac:ClassifiedTaxCategory>\n        <cbc:ID>S</cbc:ID>\n        <cbc:Percent>5</cbc:Percent>\n        <cac:TaxScheme>\n          <cbc:ID>VAT</cbc:ID>"), "{xml}");
     }
 
+    /// `export` validates first: XML only when the run has no error issue; warnings do not block.
+    #[test]
+    fn export_returns_xml_only_for_a_run_without_errors() {
+        let rs = crate::ruleset::default_ruleset();
+        let clean = example("standard-tax-invoice");
+        let out = export(&clean, rs);
+        assert!(out.run.issues.is_empty());
+        assert_eq!(out.run.ruleset_version, rs.id());
+        assert_eq!(out.xml, Some(to_xml(&Doc::new(&clean)).unwrap()));
+
+        let warning = patched(
+            &example("standard-tax-credit-note"),
+            json!({"payment_due_date": "2025-03-01"}),
+            &[],
+        );
+        let out = export(&warning, rs);
+        assert_eq!(out.run.issues.len(), 1);
+        assert_eq!(out.run.issues[0].severity, pb::Severity::Warning as i32);
+        assert_eq!(out.xml, Some(to_xml(&Doc::new(&warning)).unwrap()));
+
+        for (set, rule) in [
+            (json!({"total_amount": "1,0"}), "AE-FMT-001"),
+            (json!({"note": "a\u{1}b"}), "AE-EXP-005"),
+            (json!({"vat_amount": ""}), "AE-EXP-002"),
+        ] {
+            let inv = patched(&clean, set, &[]);
+            let out = export(&inv, rs);
+            assert!(out.xml.is_none(), "{rule}");
+            assert!(out.run.issues.iter().any(|i| i.rule_id == rule), "{rule}");
+        }
+    }
+
     #[test]
     fn a_forbidden_character_fails_the_export() {
         let inv = patched(
