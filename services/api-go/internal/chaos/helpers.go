@@ -205,6 +205,7 @@ type AIPyConfig struct {
 func AIPyEnv(c AIPyConfig) map[string]string {
 	return map[string]string{
 		"AI_GATEWAY":         "fake",
+		"AI_FAKE_RESULTS":    "accept", // fake extractions are otherwise forced to needs_review; the chaos pass check needs `extracted`
 		"AI_FAKE_SCENARIO":   c.Scenario,
 		"AI_FAKE_LATENCY_MS": strconv.Itoa(c.LatencyMS), // keeps runs in flight long enough to kill one
 		"AI_CACHE":           "none",                    // every Document goes through the gateway

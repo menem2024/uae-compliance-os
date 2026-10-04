@@ -87,7 +87,7 @@ func TestAIPyEnvIsTheFakeGatewayOnTheThrowawayStack(t *testing.T) {
 	env := AIPyEnv(AIPyConfig{NatsURL: "nats://127.0.0.1:4222", S3Endpoint: "127.0.0.1:45292", S3AccessKey: "minio",
 		S3SecretKey: "minio_dev_pw", ValkeyURL: "redis://127.0.0.1:6390/0", HealthPort: 18081, LatencyMS: 50})
 	for k, v := range map[string]string{
-		"AI_GATEWAY": "fake", "AI_FAKE_SCENARIO": "", "AI_FAKE_LATENCY_MS": "50", "NATS_URL": "nats://127.0.0.1:4222",
+		"AI_GATEWAY": "fake", "AI_FAKE_RESULTS": "accept", "AI_FAKE_SCENARIO": "", "AI_FAKE_LATENCY_MS": "50", "NATS_URL": "nats://127.0.0.1:4222",
 		"S3_ENDPOINT": "127.0.0.1:45292", "S3_ACCESS_KEY": "minio", "S3_SECRET_KEY": "minio_dev_pw",
 		"S3_BUCKET": "documents", "S3_USE_SSL": "false", "VALKEY_URL": "redis://127.0.0.1:6390/0",
 		"AI_HEALTH_PORT": "18081",
