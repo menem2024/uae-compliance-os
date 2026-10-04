@@ -1496,8 +1496,9 @@ mod tests {
     }
 
     /// The failing fixtures of `mutations/platform.jsonl` (spec 5.2.8). `expect` is the complete
-    /// multiset the full RuleSet must report; until the generic family harness (Task 9) checks it
-    /// exactly, this test checks the platform part, which the official families cannot change.
+    /// multiset the full RuleSet must report; the generic harness (`tests/family_fixtures.rs`)
+    /// checks its registered part exactly, and this test pins the platform part, which the
+    /// official families cannot change.
     #[test]
     fn platform_mutation_fixtures_fail_as_expected() {
         let path = crate::conformance::corpus::ruleset_dir().join("mutations/platform.jsonl");
