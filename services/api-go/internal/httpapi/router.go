@@ -46,9 +46,14 @@ func (c *cachedReady) Ready(ctx context.Context) error {
 	return c.err
 }
 
+// RouterOption mounts additional routes inside the authenticated group. Each
+// track registers its routes through one option (PARALLEL-CONTRACTS rule 6);
+// Track B's is WithTrackB in trackb_routes.go.
+type RouterOption func(chi.Router)
+
 // NewRouter wires the HTTP routes. ready is called by /readyz, at most once
 // per readyzCacheTTL.
-func NewRouter(v auth.Verifier, s Store, p Publisher, l Limiter, ready func(context.Context) error) http.Handler {
+func NewRouter(v auth.Verifier, s Store, p Publisher, l Limiter, ready func(context.Context) error, opts ...RouterOption) http.Handler {
 	h := &handlers{store: s, pub: p, limiter: l}
 	cr := newCachedReady(ready)
 	r := chi.NewRouter()
@@ -72,6 +77,9 @@ func NewRouter(v auth.Verifier, s Store, p Publisher, l Limiter, ready func(cont
 		r.Post("/v1/invoices", h.createInvoice)
 		r.Get("/v1/invoices/{id}", h.getInvoice)
 		r.Get("/v1/me", h.me)
+		for _, opt := range opts {
+			opt(r)
+		}
 	})
 	return otelhttp.NewHandler(r, "api-go")
 }
