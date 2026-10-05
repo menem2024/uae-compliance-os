@@ -9,7 +9,7 @@
 //! `export::XSD_AUDIT`), `008` to `010` the dates and times the official XPath casts accept and
 //! the XML Schema 1.0 datatypes reject.
 
-use crate::decimal;
+use crate::decimal::Cents;
 use crate::doc::{Dec, Doc, DocKind, text};
 use crate::export::writer::is_forbidden_xml_char;
 use crate::pb;
@@ -113,21 +113,25 @@ fn ae_exp_001(doc: &Doc<'_>, sink: &mut Sink<'_>) {
 /// The document-currency `TaxTotal` (which carries the breakdown) is written only with IBT-110,
 /// and `TaxTotal/TaxAmount` is XSD-mandatory (contract 0.2.1). The suggestion, when every
 /// breakdown IBT-117 parses, is the one IBT-110 `ibr-co-14` accepts:
-/// `xpath_round2(sum(tax_breakdown[#].tax_amount))`. An invalid IBT-110 is `AE-FMT-001`'s.
+/// `xpath_round2(sum(tax_breakdown[#].tax_amount))`, exact in [`Cents`] as `ibr-co-14` is. An
+/// invalid IBT-110 is `AE-FMT-001`'s.
 fn ae_exp_002(doc: &Doc<'_>, sink: &mut Sink<'_>) {
     if !doc.vat_amount.raw.is_empty() || doc.inv.tax_breakdown.is_empty() {
         return;
     }
-    let mut total = Some(rust_decimal::Decimal::ZERO);
+    let mut total = Some(Cents::ZERO);
     for t in &doc.tax_breakdown {
-        total = match (total, t.tax_amount.value) {
-            (Some(acc), Some(v)) => decimal::add(acc, v),
+        total = match (total, t.tax_amount.value.and_then(Cents::of)) {
+            (Some(acc), Some(v)) => acc.checked_add(v),
             _ => None,
         };
     }
     let f = sink.fail(&[]);
-    if let Some(total) = total {
-        f.suggest(decimal::xpath_round2(total));
+    if let Some(total) = total
+        .and_then(Cents::round_half_up)
+        .and_then(Cents::to_decimal)
+    {
+        f.suggest(total);
     }
 }
 
@@ -954,6 +958,21 @@ mod tests {
         assert_eq!(
             run("AE-EXP-002", &two)[0].suggested_value.as_deref(),
             Some("532.17")
+        );
+        // Exact like ibr-co-14 (decimal::Cents): 1e25 + 0.0049999999999999999999999 rounds to
+        // .00, where rust_decimal's sum would round to ...0.005 first and give .01.
+        let wide = patched(
+            &inv,
+            serde_json::json!({
+                "tax_breakdown[0].tax_amount": "10000000000000000000000000",
+                "tax_breakdown[1].tax_amount": "0.0049999999999999999999999",
+                "tax_breakdown[1].taxable_amount": "1",
+            }),
+            &[],
+        );
+        assert_eq!(
+            run("AE-EXP-002", &wide)[0].suggested_value.as_deref(),
+            Some("10000000000000000000000000.00")
         );
         // No suggestion when a breakdown amount is absent or invalid.
         for bad in ["", "1,0"] {

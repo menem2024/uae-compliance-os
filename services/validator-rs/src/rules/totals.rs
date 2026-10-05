@@ -23,11 +23,12 @@
 //! of up to 28 significant digits each. `rust_decimal` rounds a sum silently when the exact
 //! result needs more digits than its 96-bit mantissa holds (`1e25 + 0.0049…` becomes
 //! `…0.005`, which then rounds to `.01` where the exact value rounds to `.00`), while Saxon's
-//! `xs:decimal` is exact. The chain is therefore computed in [`Cents`]: whole cents plus an
-//! exact sub-cent remainder in checked `i128`, which holds every value the contract admits
-//! without rounding; a checked overflow is `None`, so the rule fires and nothing is suggested.
-//! `round(x * 10 * 10) div 100` is [`Cents::round_half_up`] (half toward positive infinity,
-//! `decimal::xpath_round2`'s semantics, cross-checked by a property test). No binary floating
+//! `xs:decimal` is exact. The chain is therefore computed in [`Cents`] (`decimal.rs`, shared with
+//! the `lines` and `vat` sums): whole cents plus an exact sub-cent remainder in checked `i128`,
+//! which holds every value the contract admits without rounding; a checked overflow is `None`,
+//! so the rule fires and nothing is suggested. `round(x * 10 * 10) div 100` is
+//! [`Cents::round_half_up`] (half toward positive infinity, `decimal::xpath_round2`'s semantics,
+//! cross-checked by a property test in `decimal.rs`). No binary floating
 //! point anywhere; `ibr-131-ae` and `ibr-146-ae`, which the XPath evaluates in `xs:double`, use
 //! exact decimal (contract upstream defect 5).
 //!
@@ -45,7 +46,7 @@
 
 use rust_decimal::Decimal;
 
-use crate::decimal;
+use crate::decimal::{self, Cents};
 use crate::doc::{AllowanceChargeDec, Dec, Doc, DocKind, TotalsDec, tax_scheme, text};
 use crate::pb;
 use crate::rule::{Finding, Rule, Sink};
@@ -207,119 +208,6 @@ pub static RULES: &[Rule] = &[
 const AED: &str = "AED";
 
 // ------------------------------------------------------------------------------ exact money
-
-/// One cent in sub-cent units (`10^26`): a decimal of scale at most 28 has at most 26 digits
-/// below the cent.
-const SUB_PER_CENT: i128 = 10i128.pow(26);
-
-/// An exact amount: `value * 100 = whole + sub / 10^26` with `0 <= sub < 10^26`. Every decimal
-/// the contract admits (28 significant digits, scale at most 28) converts without rounding:
-/// `|whole| < 10^31`, and sums of millions of them stay far below `i128::MAX` (`1.7 * 10^38`).
-/// All arithmetic is checked; `None` means overflow.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Cents {
-    whole: i128,
-    sub: i128,
-}
-
-impl Cents {
-    const ZERO: Cents = Cents { whole: 0, sub: 0 };
-
-    fn of(x: Decimal) -> Option<Cents> {
-        let (m, scale) = (x.mantissa(), x.scale());
-        if scale <= 2 {
-            let whole = m.checked_mul(10i128.checked_pow(2 - scale)?)?;
-            return Some(Cents { whole, sub: 0 });
-        }
-        // value * 100 = m / 10^(scale - 2), with 1 <= scale - 2 <= 26.
-        let unit = 10i128.checked_pow(scale - 2)?;
-        let sub = m
-            .rem_euclid(unit)
-            .checked_mul(10i128.checked_pow(28 - scale)?)?;
-        Some(Cents {
-            whole: m.div_euclid(unit),
-            sub,
-        })
-    }
-
-    fn add(self, other: Cents) -> Option<Cents> {
-        let whole = self.whole.checked_add(other.whole)?;
-        let sub = self.sub.checked_add(other.sub)?;
-        if sub >= SUB_PER_CENT {
-            Some(Cents {
-                whole: whole.checked_add(1)?,
-                sub: sub.checked_sub(SUB_PER_CENT)?,
-            })
-        } else {
-            Some(Cents { whole, sub })
-        }
-    }
-
-    fn neg(self) -> Option<Cents> {
-        if self.sub == 0 {
-            return Some(Cents {
-                whole: self.whole.checked_neg()?,
-                sub: 0,
-            });
-        }
-        Some(Cents {
-            whole: self.whole.checked_neg()?.checked_sub(1)?,
-            sub: SUB_PER_CENT.checked_sub(self.sub)?,
-        })
-    }
-
-    fn sub(self, other: Cents) -> Option<Cents> {
-        self.add(other.neg()?)
-    }
-
-    /// XPath `round(x * 10 * 10) div 100`: whole cents, a half rounded toward positive infinity
-    /// (`floor(x * 100 + 0.5)`).
-    fn round_half_up(self) -> Option<Cents> {
-        self.round(self.sub >= SUB_PER_CENT / 2)
-    }
-
-    /// Whole cents, a half rounded toward negative infinity (`ceil(x * 100 - 0.5)`): the one
-    /// two-decimal `y` with `x - 0.005 <= y < x + 0.005` (`ibr-co-16`'s rounding window).
-    fn round_half_down(self) -> Option<Cents> {
-        self.round(self.sub > SUB_PER_CENT / 2)
-    }
-
-    fn round(self, up: bool) -> Option<Cents> {
-        let whole = if up {
-            self.whole.checked_add(1)?
-        } else {
-            self.whole
-        };
-        Some(Cents { whole, sub: 0 })
-    }
-
-    /// The amount as a decimal with two decimals (fewer when 28 significant digits do not hold
-    /// two), or `None` when it has a sub-cent part or no form the contract grammar accepts.
-    fn to_decimal(self) -> Option<Decimal> {
-        if self.sub != 0 {
-            return None;
-        }
-        let mut whole = self.whole;
-        for scale in [2u32, 1, 0] {
-            if let Ok(d) = Decimal::try_from_i128_with_scale(whole, scale)
-                && decimal::parse(&d.to_string()).is_ok()
-            {
-                return Some(d);
-            }
-            if whole % 10 != 0 {
-                return None;
-            }
-            whole /= 10;
-        }
-        None
-    }
-}
-
-/// `sum()` of exact amounts; zero for none.
-fn sum_cents(xs: impl IntoIterator<Item = Decimal>) -> Option<Cents> {
-    xs.into_iter()
-        .try_fold(Cents::ZERO, |acc, x| acc.add(Cents::of(x)?))
-}
 
 /// `xs:decimal(field) = expected`: false when either side is absent.
 fn equals(field: &Dec<'_>, expected: Option<Cents>) -> bool {
@@ -909,7 +797,7 @@ fn ibr_co_10(doc: &Doc<'_>, sink: &mut Sink<'_>) {
     if !lmt_written(doc) {
         return;
     }
-    let expected = sum_cents(doc.lines.iter().filter_map(|l| l.net_amount.value))
+    let expected = Cents::sum(doc.lines.iter().filter_map(|l| l.net_amount.value))
         .and_then(Cents::round_half_up);
     if equals(&doc.totals.line_extension_amount, expected) {
         return;
@@ -939,7 +827,7 @@ fn document_total(doc: &Doc<'_>, sink: &mut Sink<'_>, charge: bool, total: &Dec<
     if !lmt_written(doc) {
         return;
     }
-    let expected = sum_cents(document(doc, charge).filter_map(|ac| ac.dec.amount.value))
+    let expected = Cents::sum(document(doc, charge).filter_map(|ac| ac.dec.amount.value))
         .and_then(Cents::round_half_up);
     let holds = if total.exists() {
         equals(total, expected)
@@ -978,9 +866,9 @@ fn expected_tax_exclusive(t: &TotalsDec<'_>) -> Option<Cents> {
     let charges = t.charge_total_amount.value.map(Cents::of);
     let allowances = t.allowance_total_amount.value.map(Cents::of);
     match (charges, allowances) {
-        (Some(c), Some(a)) => lines.add(c?)?.sub(a?)?.round_half_up(),
-        (None, Some(a)) => lines.sub(a?)?.round_half_up(),
-        (Some(c), None) => lines.add(c?)?.round_half_up(),
+        (Some(c), Some(a)) => lines.checked_add(c?)?.checked_sub(a?)?.round_half_up(),
+        (None, Some(a)) => lines.checked_sub(a?)?.round_half_up(),
+        (Some(c), None) => lines.checked_add(c?)?.round_half_up(),
         (None, None) => Some(lines),
     }
 }
@@ -998,7 +886,7 @@ fn ibr_co_15(doc: &Doc<'_>, sink: &mut Sink<'_>) {
         .and_then(|tax_exclusive| {
             let vat = first_tax_total_in_document_currency(doc)?;
             Cents::of(tax_exclusive)?
-                .add(Cents::of(vat)?)?
+                .checked_add(Cents::of(vat)?)?
                 .round_half_up()
         });
     if equals(&doc.total_amount, expected) {
@@ -1054,7 +942,7 @@ fn co16_holds(
 ) -> bool {
     let c = |x: Option<Decimal>| x.and_then(Cents::of);
     let rounded_difference = |a: Option<Decimal>, b: Option<Decimal>| -> Option<Cents> {
-        c(a)?.sub(c(b)?)?.round_half_up()
+        c(a)?.checked_sub(c(b)?)?.round_half_up()
     };
     let same = |x: Option<Cents>, y: Option<Cents>| matches!((x, y), (Some(x), Some(y)) if x == y);
     match (decimal::ebv(paid), decimal::ebv(rounding)) {
@@ -1081,15 +969,15 @@ fn co16_candidate(
 ) -> Option<Cents> {
     let c = |x: Option<Decimal>| x.and_then(Cents::of);
     let target = if decimal::ebv(paid) {
-        c(tax_inclusive)?.sub(c(paid)?)?.round_half_up()?
+        c(tax_inclusive)?.checked_sub(c(paid)?)?.round_half_up()?
     } else {
         c(tax_inclusive)?
     };
-    if target.sub != 0 {
+    if !target.is_whole() {
         return None;
     }
     let candidate = if decimal::ebv(rounding) {
-        target.add(c(rounding)?)?.round_half_down()?
+        target.checked_add(c(rounding)?)?.round_half_down()?
     } else {
         target
     };
@@ -2586,41 +2474,6 @@ mod tests {
 
     // ------------------------------------------------------------------ decimal properties
 
-    /// The exact cents agree with `decimal::{add, sub, xpath_round2}` wherever `rust_decimal`
-    /// is exact (operands of 12 integer digits and 6 decimals), and value equality is exact.
-    #[test]
-    fn cents_agree_with_the_decimal_helpers_wherever_those_are_exact() {
-        let mut rng = Rng(7);
-        let rounded =
-            |c: Option<Cents>| c.and_then(Cents::round_half_up).and_then(Cents::to_decimal);
-        for _ in 0..20_000 {
-            let (a, b) = (
-                rng.decimal(1_000_000_000_000, 6),
-                rng.decimal(1_000_000_000_000, 6),
-            );
-            let (ca, cb) = (Cents::of(a).unwrap(), Cents::of(b).unwrap());
-            assert_eq!(
-                rounded(ca.add(cb)),
-                Some(decimal::xpath_round2(decimal::add(a, b).unwrap())),
-                "{a} + {b}"
-            );
-            assert_eq!(
-                rounded(ca.sub(cb)),
-                Some(decimal::xpath_round2(decimal::sub(a, b).unwrap())),
-                "{a} - {b}"
-            );
-            assert_eq!(rounded(Some(ca)), Some(decimal::xpath_round2(a)), "{a}");
-            assert_eq!(ca == cb, a == b, "{a} {b}");
-            assert_eq!(ca.neg().and_then(Cents::neg), Some(ca));
-            // Half down is half up mirrored.
-            assert_eq!(
-                ca.round_half_down(),
-                ca.neg().and_then(Cents::round_half_up).and_then(Cents::neg),
-                "{a}"
-            );
-        }
-    }
-
     /// XPath `round` is half toward positive infinity, not half-even and not half away from
     /// zero; a negative zero is never suggested.
     #[test]
@@ -2758,7 +2611,7 @@ mod tests {
         // The extremes of rust_decimal itself never panic.
         for x in [Decimal::MAX, Decimal::MIN, Decimal::ZERO, d("-0.00")] {
             let c = Cents::of(x).unwrap();
-            assert!(c.add(c).is_some() && c.sub(c).is_some());
+            assert!(c.checked_add(c).is_some() && c.checked_sub(c).is_some());
             let _ = c.round_half_up().and_then(Cents::to_decimal);
         }
         assert_eq!(Cents::of(d("-0.00")), Some(Cents::ZERO));
@@ -2787,7 +2640,7 @@ mod tests {
                 .try_fold(Decimal::ZERO, decimal::add)
                 .and_then(|s| decimal::sub(s, paid.unwrap_or_default()))
                 .unwrap();
-            let centre = Cents::of(z).unwrap().whole;
+            let centre = Cents::of(z).unwrap().floor_cents();
             let passing: Vec<Decimal> = (centre - 3..=centre + 3)
                 .filter_map(|k| Decimal::try_from_i128_with_scale(k, 2).ok())
                 .filter(|y| co16_holds(Some(*y), tia, paid, rounding))
@@ -2801,50 +2654,5 @@ mod tests {
             found_some += usize::from(candidate.is_some());
         }
         assert!(found_some > 3_000, "{found_some}");
-    }
-
-    #[test]
-    fn cents_render_within_the_contract_grammar() {
-        let c = |s: &str| Cents::of(d(s)).unwrap();
-        assert_eq!(c("1050").to_decimal().unwrap().to_string(), "1050.00");
-        assert_eq!(c("-0.05").to_decimal().unwrap().to_string(), "-0.05");
-        assert_eq!(c("0.001").to_decimal(), None);
-        assert_eq!(
-            c("99999999999999999999999999.99")
-                .to_decimal()
-                .unwrap()
-                .to_string(),
-            "99999999999999999999999999.99"
-        );
-        assert_eq!(
-            c("999999999999999999999999999.9")
-                .to_decimal()
-                .unwrap()
-                .to_string(),
-            "999999999999999999999999999.9"
-        );
-        assert_eq!(
-            c("9999999999999999999999999999")
-                .to_decimal()
-                .unwrap()
-                .to_string(),
-            "9999999999999999999999999999"
-        );
-        let too_wide = Cents {
-            whole: 99_999_999_999_999_999_999_999_999_999,
-            sub: 0,
-        };
-        assert_eq!(too_wide.to_decimal(), None);
-        assert_eq!(
-            Cents::of(d("0.0000000000000000000000000001")),
-            Some(Cents { whole: 0, sub: 1 })
-        );
-        assert_eq!(
-            Cents::of(d("-0.0000000000000000000000000001")),
-            Some(Cents {
-                whole: -1,
-                sub: SUB_PER_CENT - 1
-            })
-        );
     }
 }
