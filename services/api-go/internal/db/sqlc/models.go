@@ -68,6 +68,25 @@ type AgentStep struct {
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
 }
 
+type AuditEvent struct {
+	ID         uuid.UUID          `json:"id"`
+	FirmID     uuid.UUID          `json:"firm_id"`
+	OccurredAt pgtype.Timestamptz `json:"occurred_at"`
+	ActorType  string             `json:"actor_type"`
+	ActorID    string             `json:"actor_id"`
+	Agent      string             `json:"agent"`
+	ProposalID uuid.NullUUID      `json:"proposal_id"`
+	Action     string             `json:"action"`
+	EntityType string             `json:"entity_type"`
+	EntityID   uuid.UUID          `json:"entity_id"`
+	InvoiceID  uuid.NullUUID      `json:"invoice_id"`
+	Changes    []byte             `json:"changes"`
+	Before     []byte             `json:"before"`
+	After      []byte             `json:"after"`
+	Reason     string             `json:"reason"`
+	TraceID    string             `json:"trace_id"`
+}
+
 type ClientCompany struct {
 	ID        uuid.UUID          `json:"id"`
 	FirmID    uuid.UUID          `json:"firm_id"`
@@ -107,6 +126,22 @@ type Document struct {
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Export struct {
+	ID             uuid.UUID          `json:"id"`
+	FirmID         uuid.UUID          `json:"firm_id"`
+	InvoiceID      uuid.UUID          `json:"invoice_id"`
+	RunID          uuid.UUID          `json:"run_id"`
+	PayloadVersion int32              `json:"payload_version"`
+	RulesetVersion string             `json:"ruleset_version"`
+	Format         string             `json:"format"`
+	DocumentKind   string             `json:"document_kind"`
+	ObjectKey      string             `json:"object_key"`
+	Sha256         string             `json:"sha256"`
+	SizeBytes      int32              `json:"size_bytes"`
+	CreatedBy      string             `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type Firm struct {
 	ID           uuid.UUID          `json:"id"`
 	ZitadelOrgID string             `json:"zitadel_org_id"`
@@ -116,21 +151,43 @@ type Firm struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type FixTask struct {
+	ID          uuid.UUID          `json:"id"`
+	FirmID      uuid.UUID          `json:"firm_id"`
+	InvoiceID   uuid.UUID          `json:"invoice_id"`
+	RunID       uuid.UUID          `json:"run_id"`
+	Mode        string             `json:"mode"`
+	Status      string             `json:"status"`
+	Outcome     string             `json:"outcome"`
+	ProposalID  uuid.NullUUID      `json:"proposal_id"`
+	AgentRunID  uuid.NullUUID      `json:"agent_run_id"`
+	ErrorCode   string             `json:"error_code"`
+	RequestedBy string             `json:"requested_by"`
+	RequestedAt pgtype.Timestamptz `json:"requested_at"`
+	PublishedAt pgtype.Timestamptz `json:"published_at"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+}
+
 type Invoice struct {
-	ID                   uuid.UUID          `json:"id"`
-	FirmID               uuid.UUID          `json:"firm_id"`
-	Status               string             `json:"status"`
-	Payload              []byte             `json:"payload"`
-	RulesetVersion       pgtype.Text        `json:"ruleset_version"`
-	Issues               []byte             `json:"issues"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
-	ClientCompanyID      uuid.NullUUID      `json:"client_company_id"`
-	DocumentID           uuid.NullUUID      `json:"document_id"`
-	SourceOrdinal        pgtype.Int4        `json:"source_ordinal"`
-	SourceRef            string             `json:"source_ref"`
-	ExtractionConfidence pgtype.Numeric     `json:"extraction_confidence"`
-	ExtractionRunID      uuid.NullUUID      `json:"extraction_run_id"`
+	ID                     uuid.UUID          `json:"id"`
+	FirmID                 uuid.UUID          `json:"firm_id"`
+	Status                 string             `json:"status"`
+	Payload                []byte             `json:"payload"`
+	RulesetVersion         pgtype.Text        `json:"ruleset_version"`
+	Issues                 []byte             `json:"issues"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	ClientCompanyID        uuid.NullUUID      `json:"client_company_id"`
+	DocumentID             uuid.NullUUID      `json:"document_id"`
+	SourceOrdinal          pgtype.Int4        `json:"source_ordinal"`
+	SourceRef              string             `json:"source_ref"`
+	ExtractionConfidence   pgtype.Numeric     `json:"extraction_confidence"`
+	ExtractionRunID        uuid.NullUUID      `json:"extraction_run_id"`
+	PayloadVersion         int32              `json:"payload_version"`
+	LatestRunID            uuid.NullUUID      `json:"latest_run_id"`
+	ApprovedPayloadVersion pgtype.Int4        `json:"approved_payload_version"`
+	ApprovedBy             pgtype.Text        `json:"approved_by"`
+	ApprovedAt             pgtype.Timestamptz `json:"approved_at"`
 }
 
 type Proposal struct {
@@ -157,4 +214,37 @@ type Proposal struct {
 	AppliedAt       pgtype.Timestamptz `json:"applied_at"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+}
+
+type ValidationIssue struct {
+	ID             uuid.UUID `json:"id"`
+	FirmID         uuid.UUID `json:"firm_id"`
+	RunID          uuid.UUID `json:"run_id"`
+	InvoiceID      uuid.UUID `json:"invoice_id"`
+	Seq            int32     `json:"seq"`
+	RuleID         string    `json:"rule_id"`
+	Severity       string    `json:"severity"`
+	Path           string    `json:"path"`
+	BusinessTerm   string    `json:"business_term"`
+	Message        string    `json:"message"`
+	MessageAr      string    `json:"message_ar"`
+	MessageArgs    []byte    `json:"message_args"`
+	Fixable        bool      `json:"fixable"`
+	SuggestedValue string    `json:"suggested_value"`
+}
+
+type ValidationRun struct {
+	ID             uuid.UUID          `json:"id"`
+	FirmID         uuid.UUID          `json:"firm_id"`
+	InvoiceID      uuid.UUID          `json:"invoice_id"`
+	PayloadVersion int32              `json:"payload_version"`
+	RulesetVersion string             `json:"ruleset_version"`
+	Trigger        string             `json:"trigger"`
+	ErrorCount     int32              `json:"error_count"`
+	WarningCount   int32              `json:"warning_count"`
+	RulesEvaluated int32              `json:"rules_evaluated"`
+	DurationUs     int64              `json:"duration_us"`
+	RequestedBy    string             `json:"requested_by"`
+	TraceID        string             `json:"trace_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }

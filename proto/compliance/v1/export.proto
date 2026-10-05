@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package compliance.v1;
+
+import "compliance/v1/invoice.proto";
+import "compliance/v1/validator.proto";
+
+service ExportService {
+  rpc Export(ExportRequest) returns (ExportResponse);
+}
+
+message ExportRequest {
+  Invoice invoice = 1;
+  // Empty means the default RuleSet.
+  string ruleset_version = 2;
+}
+
+message ExportResponse {
+  // UTF-8 UBL 2.1 Invoice or CreditNote. Empty when exported is false.
+  bytes xml = 1;
+  // Lowercase hex sha256 of xml. Empty when exported is false.
+  string sha256 = 2;
+  // "pint-ae-billing-1.0.4/ubl-2.1".
+  string format = 3;
+  // The run the export decision is based on.
+  ValidationRun run = 4;
+  // False when the run has at least one error issue.
+  bool exported = 5;
+  // "invoice" or "credit_note".
+  string document_kind = 6;
+}

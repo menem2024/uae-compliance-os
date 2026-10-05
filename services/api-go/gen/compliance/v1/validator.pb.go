@@ -71,10 +71,13 @@ func (Severity) EnumDescriptor() ([]byte, []int) {
 }
 
 type ValidateRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Invoice       *Invoice               `protobuf:"bytes,1,opt,name=invoice,proto3" json:"invoice,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Invoice *Invoice               `protobuf:"bytes,1,opt,name=invoice,proto3" json:"invoice,omitempty"`
+	// RuleSet to run, e.g. "pint-ae@1.0.4+r1". Empty means the validator's default RuleSet.
+	// An unknown version is INVALID_ARGUMENT.
+	RulesetVersion string `protobuf:"bytes,2,opt,name=ruleset_version,json=rulesetVersion,proto3" json:"ruleset_version,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ValidateRequest) Reset() {
@@ -112,6 +115,13 @@ func (x *ValidateRequest) GetInvoice() *Invoice {
 		return x.Invoice
 	}
 	return nil
+}
+
+func (x *ValidateRequest) GetRulesetVersion() string {
+	if x != nil {
+		return x.RulesetVersion
+	}
+	return ""
 }
 
 type ValidateResponse struct {
@@ -159,13 +169,26 @@ func (x *ValidateResponse) GetRun() *ValidationRun {
 }
 
 type ValidationIssue struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RuleId        string                 `protobuf:"bytes,1,opt,name=rule_id,json=ruleId,proto3" json:"rule_id,omitempty"`
-	Severity      Severity               `protobuf:"varint,2,opt,name=severity,proto3,enum=compliance.v1.Severity" json:"severity,omitempty"`
-	Path          string                 `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
-	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Official schematron assert id (e.g. "ibr-132-ae") or platform rule id (e.g. "AE-FMT-001").
+	RuleId   string   `protobuf:"bytes,1,opt,name=rule_id,json=ruleId,proto3" json:"rule_id,omitempty"`
+	Severity Severity `protobuf:"varint,2,opt,name=severity,proto3,enum=compliance.v1.Severity" json:"severity,omitempty"`
+	// Field path in the canonical-invoice grammar (contract rule 12), without an "invoice." prefix.
+	Path string `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
+	// English message.
+	Message string `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	// Primary PINT-AE business term, e.g. "IBT-031". May be empty.
+	BusinessTerm string `protobuf:"bytes,5,opt,name=business_term,json=businessTerm,proto3" json:"business_term,omitempty"`
+	// Named values used by the messages, e.g. {"expected": "1050.00"}. Never free text.
+	MessageArgs map[string]string `protobuf:"bytes,6,rep,name=message_args,json=messageArgs,proto3" json:"message_args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// True when the Fix agent may propose a change for this issue.
+	Fixable bool `protobuf:"varint,7,opt,name=fixable,proto3" json:"fixable,omitempty"`
+	// Arabic message.
+	MessageAr string `protobuf:"bytes,8,opt,name=message_ar,json=messageAr,proto3" json:"message_ar,omitempty"`
+	// The one value for `path` that resolves this issue, when the rule can compute it. Empty = none.
+	SuggestedValue string `protobuf:"bytes,9,opt,name=suggested_value,json=suggestedValue,proto3" json:"suggested_value,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ValidationIssue) Reset() {
@@ -226,10 +249,49 @@ func (x *ValidationIssue) GetMessage() string {
 	return ""
 }
 
+func (x *ValidationIssue) GetBusinessTerm() string {
+	if x != nil {
+		return x.BusinessTerm
+	}
+	return ""
+}
+
+func (x *ValidationIssue) GetMessageArgs() map[string]string {
+	if x != nil {
+		return x.MessageArgs
+	}
+	return nil
+}
+
+func (x *ValidationIssue) GetFixable() bool {
+	if x != nil {
+		return x.Fixable
+	}
+	return false
+}
+
+func (x *ValidationIssue) GetMessageAr() string {
+	if x != nil {
+		return x.MessageAr
+	}
+	return ""
+}
+
+func (x *ValidationIssue) GetSuggestedValue() string {
+	if x != nil {
+		return x.SuggestedValue
+	}
+	return ""
+}
+
 type ValidationRun struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	RulesetVersion string                 `protobuf:"bytes,1,opt,name=ruleset_version,json=rulesetVersion,proto3" json:"ruleset_version,omitempty"`
 	Issues         []*ValidationIssue     `protobuf:"bytes,2,rep,name=issues,proto3" json:"issues,omitempty"`
+	// Wall time of the RuleSet evaluation, in microseconds.
+	DurationUs int64 `protobuf:"varint,3,opt,name=duration_us,json=durationUs,proto3" json:"duration_us,omitempty"`
+	// Number of rules evaluated.
+	RulesEvaluated int32 `protobuf:"varint,4,opt,name=rules_evaluated,json=rulesEvaluated,proto3" json:"rules_evaluated,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -278,23 +340,395 @@ func (x *ValidationRun) GetIssues() []*ValidationIssue {
 	return nil
 }
 
+func (x *ValidationRun) GetDurationUs() int64 {
+	if x != nil {
+		return x.DurationUs
+	}
+	return 0
+}
+
+func (x *ValidationRun) GetRulesEvaluated() int32 {
+	if x != nil {
+		return x.RulesEvaluated
+	}
+	return 0
+}
+
+type FixTaskInput struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	InvoiceId       string                 `protobuf:"bytes,1,opt,name=invoice_id,json=invoiceId,proto3" json:"invoice_id,omitempty"`
+	PayloadVersion  int32                  `protobuf:"varint,2,opt,name=payload_version,json=payloadVersion,proto3" json:"payload_version,omitempty"`
+	ValidationRunId string                 `protobuf:"bytes,3,opt,name=validation_run_id,json=validationRunId,proto3" json:"validation_run_id,omitempty"`
+	RulesetVersion  string                 `protobuf:"bytes,4,opt,name=ruleset_version,json=rulesetVersion,proto3" json:"ruleset_version,omitempty"`
+	Invoice         *Invoice               `protobuf:"bytes,5,opt,name=invoice,proto3" json:"invoice,omitempty"`
+	// Error issues with fixable = true only.
+	Issues []*ValidationIssue `protobuf:"bytes,6,rep,name=issues,proto3" json:"issues,omitempty"`
+	// "auto" or "on_demand".
+	Mode          string `protobuf:"bytes,7,opt,name=mode,proto3" json:"mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FixTaskInput) Reset() {
+	*x = FixTaskInput{}
+	mi := &file_compliance_v1_validator_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FixTaskInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FixTaskInput) ProtoMessage() {}
+
+func (x *FixTaskInput) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_validator_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FixTaskInput.ProtoReflect.Descriptor instead.
+func (*FixTaskInput) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_validator_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *FixTaskInput) GetInvoiceId() string {
+	if x != nil {
+		return x.InvoiceId
+	}
+	return ""
+}
+
+func (x *FixTaskInput) GetPayloadVersion() int32 {
+	if x != nil {
+		return x.PayloadVersion
+	}
+	return 0
+}
+
+func (x *FixTaskInput) GetValidationRunId() string {
+	if x != nil {
+		return x.ValidationRunId
+	}
+	return ""
+}
+
+func (x *FixTaskInput) GetRulesetVersion() string {
+	if x != nil {
+		return x.RulesetVersion
+	}
+	return ""
+}
+
+func (x *FixTaskInput) GetInvoice() *Invoice {
+	if x != nil {
+		return x.Invoice
+	}
+	return nil
+}
+
+func (x *FixTaskInput) GetIssues() []*ValidationIssue {
+	if x != nil {
+		return x.Issues
+	}
+	return nil
+}
+
+func (x *FixTaskInput) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
+type FixChangeNote struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Path    string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	RuleIds []string               `protobuf:"bytes,2,rep,name=rule_ids,json=ruleIds,proto3" json:"rule_ids,omitempty"`
+	// "deterministic" or "llm".
+	Source string `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	// Short reason shown to the reviewer.
+	Rationale     string `protobuf:"bytes,4,opt,name=rationale,proto3" json:"rationale,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FixChangeNote) Reset() {
+	*x = FixChangeNote{}
+	mi := &file_compliance_v1_validator_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FixChangeNote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FixChangeNote) ProtoMessage() {}
+
+func (x *FixChangeNote) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_validator_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FixChangeNote.ProtoReflect.Descriptor instead.
+func (*FixChangeNote) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_validator_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *FixChangeNote) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FixChangeNote) GetRuleIds() []string {
+	if x != nil {
+		return x.RuleIds
+	}
+	return nil
+}
+
+func (x *FixChangeNote) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *FixChangeNote) GetRationale() string {
+	if x != nil {
+		return x.Rationale
+	}
+	return ""
+}
+
+type FixProposalDetail struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ValidationRunId string                 `protobuf:"bytes,1,opt,name=validation_run_id,json=validationRunId,proto3" json:"validation_run_id,omitempty"`
+	PayloadVersion  int32                  `protobuf:"varint,2,opt,name=payload_version,json=payloadVersion,proto3" json:"payload_version,omitempty"`
+	RulesetVersion  string                 `protobuf:"bytes,3,opt,name=ruleset_version,json=rulesetVersion,proto3" json:"ruleset_version,omitempty"`
+	Notes           []*FixChangeNote       `protobuf:"bytes,4,rep,name=notes,proto3" json:"notes,omitempty"`
+	// Error counts before and after the changes, predicted by re-validating the patched invoice.
+	ErrorsBefore    int32    `protobuf:"varint,5,opt,name=errors_before,json=errorsBefore,proto3" json:"errors_before,omitempty"`
+	ErrorsAfter     int32    `protobuf:"varint,6,opt,name=errors_after,json=errorsAfter,proto3" json:"errors_after,omitempty"`
+	ResolvedRuleIds []string `protobuf:"bytes,7,rep,name=resolved_rule_ids,json=resolvedRuleIds,proto3" json:"resolved_rule_ids,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *FixProposalDetail) Reset() {
+	*x = FixProposalDetail{}
+	mi := &file_compliance_v1_validator_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FixProposalDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FixProposalDetail) ProtoMessage() {}
+
+func (x *FixProposalDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_validator_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FixProposalDetail.ProtoReflect.Descriptor instead.
+func (*FixProposalDetail) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_validator_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *FixProposalDetail) GetValidationRunId() string {
+	if x != nil {
+		return x.ValidationRunId
+	}
+	return ""
+}
+
+func (x *FixProposalDetail) GetPayloadVersion() int32 {
+	if x != nil {
+		return x.PayloadVersion
+	}
+	return 0
+}
+
+func (x *FixProposalDetail) GetRulesetVersion() string {
+	if x != nil {
+		return x.RulesetVersion
+	}
+	return ""
+}
+
+func (x *FixProposalDetail) GetNotes() []*FixChangeNote {
+	if x != nil {
+		return x.Notes
+	}
+	return nil
+}
+
+func (x *FixProposalDetail) GetErrorsBefore() int32 {
+	if x != nil {
+		return x.ErrorsBefore
+	}
+	return 0
+}
+
+func (x *FixProposalDetail) GetErrorsAfter() int32 {
+	if x != nil {
+		return x.ErrorsAfter
+	}
+	return 0
+}
+
+func (x *FixProposalDetail) GetResolvedRuleIds() []string {
+	if x != nil {
+		return x.ResolvedRuleIds
+	}
+	return nil
+}
+
+type FixTaskResult struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "proposed", "no_fix" or "not_improving".
+	Outcome       string `protobuf:"bytes,1,opt,name=outcome,proto3" json:"outcome,omitempty"`
+	ProposalId    string `protobuf:"bytes,2,opt,name=proposal_id,json=proposalId,proto3" json:"proposal_id,omitempty"`
+	Changes       int32  `protobuf:"varint,3,opt,name=changes,proto3" json:"changes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FixTaskResult) Reset() {
+	*x = FixTaskResult{}
+	mi := &file_compliance_v1_validator_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FixTaskResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FixTaskResult) ProtoMessage() {}
+
+func (x *FixTaskResult) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_validator_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FixTaskResult.ProtoReflect.Descriptor instead.
+func (*FixTaskResult) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_validator_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *FixTaskResult) GetOutcome() string {
+	if x != nil {
+		return x.Outcome
+	}
+	return ""
+}
+
+func (x *FixTaskResult) GetProposalId() string {
+	if x != nil {
+		return x.ProposalId
+	}
+	return ""
+}
+
+func (x *FixTaskResult) GetChanges() int32 {
+	if x != nil {
+		return x.Changes
+	}
+	return 0
+}
+
 var File_compliance_v1_validator_proto protoreflect.FileDescriptor
 
 const file_compliance_v1_validator_proto_rawDesc = "" +
 	"\n" +
-	"\x1dcompliance/v1/validator.proto\x12\rcompliance.v1\x1a\x1bcompliance/v1/invoice.proto\"C\n" +
+	"\x1dcompliance/v1/validator.proto\x12\rcompliance.v1\x1a\x1bcompliance/v1/invoice.proto\"l\n" +
 	"\x0fValidateRequest\x120\n" +
-	"\ainvoice\x18\x01 \x01(\v2\x16.compliance.v1.InvoiceR\ainvoice\"B\n" +
+	"\ainvoice\x18\x01 \x01(\v2\x16.compliance.v1.InvoiceR\ainvoice\x12'\n" +
+	"\x0fruleset_version\x18\x02 \x01(\tR\x0erulesetVersion\"B\n" +
 	"\x10ValidateResponse\x12.\n" +
-	"\x03run\x18\x01 \x01(\v2\x1c.compliance.v1.ValidationRunR\x03run\"\x8d\x01\n" +
+	"\x03run\x18\x01 \x01(\v2\x1c.compliance.v1.ValidationRunR\x03run\"\xa8\x03\n" +
 	"\x0fValidationIssue\x12\x17\n" +
 	"\arule_id\x18\x01 \x01(\tR\x06ruleId\x123\n" +
 	"\bseverity\x18\x02 \x01(\x0e2\x17.compliance.v1.SeverityR\bseverity\x12\x12\n" +
 	"\x04path\x18\x03 \x01(\tR\x04path\x12\x18\n" +
-	"\amessage\x18\x04 \x01(\tR\amessage\"p\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12#\n" +
+	"\rbusiness_term\x18\x05 \x01(\tR\fbusinessTerm\x12R\n" +
+	"\fmessage_args\x18\x06 \x03(\v2/.compliance.v1.ValidationIssue.MessageArgsEntryR\vmessageArgs\x12\x18\n" +
+	"\afixable\x18\a \x01(\bR\afixable\x12\x1d\n" +
+	"\n" +
+	"message_ar\x18\b \x01(\tR\tmessageAr\x12'\n" +
+	"\x0fsuggested_value\x18\t \x01(\tR\x0esuggestedValue\x1a>\n" +
+	"\x10MessageArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xba\x01\n" +
 	"\rValidationRun\x12'\n" +
 	"\x0fruleset_version\x18\x01 \x01(\tR\x0erulesetVersion\x126\n" +
-	"\x06issues\x18\x02 \x03(\v2\x1e.compliance.v1.ValidationIssueR\x06issues*N\n" +
+	"\x06issues\x18\x02 \x03(\v2\x1e.compliance.v1.ValidationIssueR\x06issues\x12\x1f\n" +
+	"\vduration_us\x18\x03 \x01(\x03R\n" +
+	"durationUs\x12'\n" +
+	"\x0frules_evaluated\x18\x04 \x01(\x05R\x0erulesEvaluated\"\xa9\x02\n" +
+	"\fFixTaskInput\x12\x1d\n" +
+	"\n" +
+	"invoice_id\x18\x01 \x01(\tR\tinvoiceId\x12'\n" +
+	"\x0fpayload_version\x18\x02 \x01(\x05R\x0epayloadVersion\x12*\n" +
+	"\x11validation_run_id\x18\x03 \x01(\tR\x0fvalidationRunId\x12'\n" +
+	"\x0fruleset_version\x18\x04 \x01(\tR\x0erulesetVersion\x120\n" +
+	"\ainvoice\x18\x05 \x01(\v2\x16.compliance.v1.InvoiceR\ainvoice\x126\n" +
+	"\x06issues\x18\x06 \x03(\v2\x1e.compliance.v1.ValidationIssueR\x06issues\x12\x12\n" +
+	"\x04mode\x18\a \x01(\tR\x04mode\"t\n" +
+	"\rFixChangeNote\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x19\n" +
+	"\brule_ids\x18\x02 \x03(\tR\aruleIds\x12\x16\n" +
+	"\x06source\x18\x03 \x01(\tR\x06source\x12\x1c\n" +
+	"\trationale\x18\x04 \x01(\tR\trationale\"\xb9\x02\n" +
+	"\x11FixProposalDetail\x12*\n" +
+	"\x11validation_run_id\x18\x01 \x01(\tR\x0fvalidationRunId\x12'\n" +
+	"\x0fpayload_version\x18\x02 \x01(\x05R\x0epayloadVersion\x12'\n" +
+	"\x0fruleset_version\x18\x03 \x01(\tR\x0erulesetVersion\x122\n" +
+	"\x05notes\x18\x04 \x03(\v2\x1c.compliance.v1.FixChangeNoteR\x05notes\x12#\n" +
+	"\rerrors_before\x18\x05 \x01(\x05R\ferrorsBefore\x12!\n" +
+	"\ferrors_after\x18\x06 \x01(\x05R\verrorsAfter\x12*\n" +
+	"\x11resolved_rule_ids\x18\a \x03(\tR\x0fresolvedRuleIds\"d\n" +
+	"\rFixTaskResult\x12\x18\n" +
+	"\aoutcome\x18\x01 \x01(\tR\aoutcome\x12\x1f\n" +
+	"\vproposal_id\x18\x02 \x01(\tR\n" +
+	"proposalId\x12\x18\n" +
+	"\achanges\x18\x03 \x01(\x05R\achanges*N\n" +
 	"\bSeverity\x12\x18\n" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eSEVERITY_ERROR\x10\x01\x12\x14\n" +
@@ -316,27 +750,36 @@ func file_compliance_v1_validator_proto_rawDescGZIP() []byte {
 }
 
 var file_compliance_v1_validator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_compliance_v1_validator_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_compliance_v1_validator_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_compliance_v1_validator_proto_goTypes = []any{
-	(Severity)(0),            // 0: compliance.v1.Severity
-	(*ValidateRequest)(nil),  // 1: compliance.v1.ValidateRequest
-	(*ValidateResponse)(nil), // 2: compliance.v1.ValidateResponse
-	(*ValidationIssue)(nil),  // 3: compliance.v1.ValidationIssue
-	(*ValidationRun)(nil),    // 4: compliance.v1.ValidationRun
-	(*Invoice)(nil),          // 5: compliance.v1.Invoice
+	(Severity)(0),             // 0: compliance.v1.Severity
+	(*ValidateRequest)(nil),   // 1: compliance.v1.ValidateRequest
+	(*ValidateResponse)(nil),  // 2: compliance.v1.ValidateResponse
+	(*ValidationIssue)(nil),   // 3: compliance.v1.ValidationIssue
+	(*ValidationRun)(nil),     // 4: compliance.v1.ValidationRun
+	(*FixTaskInput)(nil),      // 5: compliance.v1.FixTaskInput
+	(*FixChangeNote)(nil),     // 6: compliance.v1.FixChangeNote
+	(*FixProposalDetail)(nil), // 7: compliance.v1.FixProposalDetail
+	(*FixTaskResult)(nil),     // 8: compliance.v1.FixTaskResult
+	nil,                       // 9: compliance.v1.ValidationIssue.MessageArgsEntry
+	(*Invoice)(nil),           // 10: compliance.v1.Invoice
 }
 var file_compliance_v1_validator_proto_depIdxs = []int32{
-	5, // 0: compliance.v1.ValidateRequest.invoice:type_name -> compliance.v1.Invoice
-	4, // 1: compliance.v1.ValidateResponse.run:type_name -> compliance.v1.ValidationRun
-	0, // 2: compliance.v1.ValidationIssue.severity:type_name -> compliance.v1.Severity
-	3, // 3: compliance.v1.ValidationRun.issues:type_name -> compliance.v1.ValidationIssue
-	1, // 4: compliance.v1.ValidatorService.Validate:input_type -> compliance.v1.ValidateRequest
-	2, // 5: compliance.v1.ValidatorService.Validate:output_type -> compliance.v1.ValidateResponse
-	5, // [5:6] is the sub-list for method output_type
-	4, // [4:5] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	10, // 0: compliance.v1.ValidateRequest.invoice:type_name -> compliance.v1.Invoice
+	4,  // 1: compliance.v1.ValidateResponse.run:type_name -> compliance.v1.ValidationRun
+	0,  // 2: compliance.v1.ValidationIssue.severity:type_name -> compliance.v1.Severity
+	9,  // 3: compliance.v1.ValidationIssue.message_args:type_name -> compliance.v1.ValidationIssue.MessageArgsEntry
+	3,  // 4: compliance.v1.ValidationRun.issues:type_name -> compliance.v1.ValidationIssue
+	10, // 5: compliance.v1.FixTaskInput.invoice:type_name -> compliance.v1.Invoice
+	3,  // 6: compliance.v1.FixTaskInput.issues:type_name -> compliance.v1.ValidationIssue
+	6,  // 7: compliance.v1.FixProposalDetail.notes:type_name -> compliance.v1.FixChangeNote
+	1,  // 8: compliance.v1.ValidatorService.Validate:input_type -> compliance.v1.ValidateRequest
+	2,  // 9: compliance.v1.ValidatorService.Validate:output_type -> compliance.v1.ValidateResponse
+	9,  // [9:10] is the sub-list for method output_type
+	8,  // [8:9] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_compliance_v1_validator_proto_init() }
@@ -351,7 +794,7 @@ func file_compliance_v1_validator_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_compliance_v1_validator_proto_rawDesc), len(file_compliance_v1_validator_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

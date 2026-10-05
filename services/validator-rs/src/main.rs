@@ -1,9 +1,4 @@
-pub mod pb {
-    tonic::include_proto!("compliance.v1");
-}
-mod rules;
-mod service;
-mod telemetry;
+use validator_rs::{pb, service, telemetry};
 
 use std::time::Duration;
 
@@ -44,16 +39,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     health_reporter
         .set_serving::<pb::validator_service_server::ValidatorServiceServer<service::Validator>>()
         .await;
+    health_reporter
+        .set_serving::<pb::export_service_server::ExportServiceServer<service::Exporter>>()
+        .await;
 
     let addr = "0.0.0.0:50051".parse()?;
     tracing::info!(%addr, "validator-rs listening");
 
+    // Both services carry messages up to `service::MAX_MESSAGE_SIZE` (16 MiB, spec 5.3.2).
     tonic::transport::Server::builder()
         .layer(telemetry::TraceContextLayer)
         .add_service(health_service)
-        .add_service(pb::validator_service_server::ValidatorServiceServer::new(
-            service::Validator,
-        ))
+        .add_service(service::validator_server())
+        .add_service(service::export_server())
         .serve_with_shutdown(addr, shutdown_signal())
         .await?;
 

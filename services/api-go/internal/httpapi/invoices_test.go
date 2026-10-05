@@ -120,3 +120,97 @@ func TestGetInvoiceIsRateLimited(t *testing.T) {
 		t.Errorf("get invoice: %d, want 429", rec.Code)
 	}
 }
+
+// capturingStore records the stored payload.
+type capturingStore struct {
+	fakeStore
+	payloads [][]byte
+}
+
+func (c *capturingStore) Create(_ context.Context, _ uuid.UUID, p []byte) (uuid.UUID, error) {
+	c.payloads = append(c.payloads, p)
+	return uuid.New(), nil
+}
+
+const fullBody = `{"invoice_number":"INV-2","issue_date":"2026-09-27","seller_trn":"100000000000003","buyer_trn":"100000000000011",` +
+	`"currency":"AED","total_amount":"1050.00","vat_amount":"50.00","invoice_type_code":"380","uuid":"u-1",` +
+	`"seller":{"name":"Seller LLC","postal_address":{"city":"Dubai","country_code":"AE"}},` +
+	`"lines":[{"id":"1","quantity":"2","unit_code":"C62"}]}`
+
+func newCapturingRouter(firm uuid.UUID) (http.Handler, *capturingStore, *fakePub) {
+	st := &capturingStore{fakeStore: fakeStore{firm: firm}}
+	pub := &fakePub{}
+	return NewRouter(fakeVerifier{}, st, pub, fakeLimiter{ok: true}, func(context.Context) error { return nil }), st, pub
+}
+
+func TestCreateInvoiceAcceptsAFullCanonicalInvoice(t *testing.T) {
+	h, st, pub := newCapturingRouter(uuid.New())
+	if rec := do(h, "POST", "/v1/invoices", "tok-a", fullBody); rec.Code != 202 {
+		t.Fatalf("full invoice: %d %s", rec.Code, rec.Body)
+	}
+	if len(pub.got) != 1 {
+		t.Fatalf("published %d events", len(pub.got))
+	}
+	inv := pub.got[0].GetInvoice()
+	if inv.GetInvoiceTypeCode() != "380" || inv.GetSeller().GetName() != "Seller LLC" || inv.GetSeller().GetPostalAddress().GetCity() != "Dubai" ||
+		len(inv.GetLines()) != 1 || inv.GetLines()[0].GetQuantity() != "2" || inv.GetTotalAmount() != "1050.00" {
+		t.Errorf("InvoiceSubmitted does not carry the full invoice: %v", inv)
+	}
+	// The stored payload uses proto field names (CI §11) and keeps nested data.
+	var got map[string]any
+	if err := json.Unmarshal(st.payloads[0], &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["invoice_type_code"] != "380" || got["seller_trn"] != "100000000000003" {
+		t.Errorf("payload keys: %s", st.payloads[0])
+	}
+	if _, camel := got["invoiceTypeCode"]; camel {
+		t.Errorf("payload uses camelCase JSON names: %s", st.payloads[0])
+	}
+	if seller, _ := got["seller"].(map[string]any); seller["name"] != "Seller LLC" {
+		t.Errorf("seller: %s", st.payloads[0])
+	}
+}
+
+func TestCreateInvoiceLegacySevenKeyBodyStillWorks(t *testing.T) {
+	h, st, pub := newCapturingRouter(uuid.New())
+	if rec := do(h, "POST", "/v1/invoices", "tok-a", body); rec.Code != 202 {
+		t.Fatalf("legacy: %d %s", rec.Code, rec.Body)
+	}
+	var got map[string]string
+	if err := json.Unmarshal(st.payloads[0], &got); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"invoice_number", "issue_date", "seller_trn", "buyer_trn", "currency", "total_amount", "vat_amount"} {
+		if got[k] == "" {
+			t.Errorf("legacy payload lost %s: %s", k, st.payloads[0])
+		}
+	}
+	if pub.got[0].GetInvoice().GetVatAmount() != "50.00" || pub.got[0].GetInvoice().GetInvoiceNumber() != "INV-1" {
+		t.Errorf("event invoice = %v", pub.got[0].GetInvoice())
+	}
+}
+
+func TestCreateInvoiceRejections(t *testing.T) {
+	h, st, pub := newCapturingRouter(uuid.New())
+	cases := map[string]string{
+		"unknown top-level field": strings.Replace(fullBody, `"uuid":"u-1"`, `"uuid":"u-1","bogus":"x"`, 1),
+		"unknown nested field":    strings.Replace(fullBody, `"city":"Dubai"`, `"city":"Dubai","bogus":"x"`, 1),
+		"trailing data":           fullBody + ` {}`,
+		"non-decimal total":       strings.Replace(fullBody, `"1050.00"`, `"abc"`, 1),
+		"non-decimal vat":         strings.Replace(fullBody, `"50.00"`, `"x"`, 1),
+		"missing totals":          `{"invoice_number":"INV-3"}`,
+		"number for a string":     strings.Replace(fullBody, `"50.00"`, `50.00`, 1),
+		"not json":                `{`,
+		"empty body":              ``,
+		"too large":               `{"invoice_number":"` + strings.Repeat("a", MaxBodyBytes) + `"}`,
+	}
+	for name, b := range cases {
+		if rec := do(h, "POST", "/v1/invoices", "tok-a", b); rec.Code != 400 {
+			t.Errorf("%s: %d, want 400 (%s)", name, rec.Code, rec.Body)
+		}
+	}
+	if len(st.payloads) != 0 || len(pub.got) != 0 {
+		t.Errorf("stored %d, published %d on rejected bodies", len(st.payloads), len(pub.got))
+	}
+}

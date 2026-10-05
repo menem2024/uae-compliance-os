@@ -13,7 +13,7 @@ import (
 )
 
 const createInvoice = `-- name: CreateInvoice :one
-INSERT INTO invoices (firm_id, status, payload) VALUES ($1, 'uploaded', $2) RETURNING id, firm_id, status, payload, ruleset_version, issues, created_at, updated_at, client_company_id, document_id, source_ordinal, source_ref, extraction_confidence, extraction_run_id
+INSERT INTO invoices (firm_id, status, payload) VALUES ($1, 'uploaded', $2) RETURNING id, firm_id, status, payload, ruleset_version, issues, created_at, updated_at, client_company_id, document_id, source_ordinal, source_ref, extraction_confidence, extraction_run_id, payload_version, latest_run_id, approved_payload_version, approved_by, approved_at
 `
 
 type CreateInvoiceParams struct {
@@ -39,12 +39,17 @@ func (q *Queries) CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (I
 		&i.SourceRef,
 		&i.ExtractionConfidence,
 		&i.ExtractionRunID,
+		&i.PayloadVersion,
+		&i.LatestRunID,
+		&i.ApprovedPayloadVersion,
+		&i.ApprovedBy,
+		&i.ApprovedAt,
 	)
 	return i, err
 }
 
 const getInvoice = `-- name: GetInvoice :one
-SELECT id, firm_id, status, payload, ruleset_version, issues, created_at, updated_at, client_company_id, document_id, source_ordinal, source_ref, extraction_confidence, extraction_run_id FROM invoices WHERE id = $1
+SELECT id, firm_id, status, payload, ruleset_version, issues, created_at, updated_at, client_company_id, document_id, source_ordinal, source_ref, extraction_confidence, extraction_run_id, payload_version, latest_run_id, approved_payload_version, approved_by, approved_at FROM invoices WHERE id = $1
 `
 
 func (q *Queries) GetInvoice(ctx context.Context, id uuid.UUID) (Invoice, error) {
@@ -65,6 +70,11 @@ func (q *Queries) GetInvoice(ctx context.Context, id uuid.UUID) (Invoice, error)
 		&i.SourceRef,
 		&i.ExtractionConfidence,
 		&i.ExtractionRunID,
+		&i.PayloadVersion,
+		&i.LatestRunID,
+		&i.ApprovedPayloadVersion,
+		&i.ApprovedBy,
+		&i.ApprovedAt,
 	)
 	return i, err
 }

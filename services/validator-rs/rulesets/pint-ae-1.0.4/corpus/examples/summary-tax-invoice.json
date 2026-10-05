@@ -1,0 +1,291 @@
+{
+  "invoice_number": "AE-010TEST",
+  "issue_date": "2025-02-07",
+  "seller_trn": "127890654301003",
+  "buyer_trn": "134780954301003",
+  "currency": "AED",
+  "total_amount": "14107.71",
+  "vat_amount": "530.37",
+  "uuid": "108f8b54-9d31-461f-b9be-1de67837f4d4",
+  "invoice_type_code": "380",
+  "transaction_type_code": "00010000",
+  "payment_due_date": "2025-02-21",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "seller": {
+    "name": "Supplier Legal Name",
+    "trading_name": "Supplier Trade Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "1278906543",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Abu Dhabi",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact number",
+      "email": "emailAddress"
+    }
+  },
+  "buyer": {
+    "name": "Noor Electronics",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "1347809543",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Sharjah",
+      "country_subdivision": "SHJ",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Emailaddress"
+    }
+  },
+  "invoicing_period": {
+    "start_date": "2025-01-31",
+    "end_date": "2025-02-07"
+  },
+  "payment_instructions": [
+    {
+      "means_code": "30",
+      "means_text": "Credit transfer",
+      "credit_transfer": {
+        "account": {
+          "id": "AE0000000001",
+          "scheme_id": "IBAN"
+        },
+        "account_name": "current account",
+        "service_provider_id": "236000"
+      }
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "Within 15 days"
+    }
+  ],
+  "allowances_charges": [
+    {
+      "amount": "80.16",
+      "base_amount": "10687.5",
+      "percentage": "0.75",
+      "reason": "Special rebate",
+      "reason_code": "100",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "13657.5",
+    "allowance_total_amount": "80.16",
+    "tax_exclusive_amount": "13577.34",
+    "rounding_amount": "0.29",
+    "payable_amount": "14108"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "10607.34",
+      "tax_amount": "530.367",
+      "category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "taxable_amount": "2970",
+      "tax_amount": "0",
+      "category": {
+        "code": "AE",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "supporting_documents": [
+    {
+      "reference": "DC",
+      "external_uri": "https://www.site.ae/deliverychallans.pdf"
+    },
+    {
+      "reference": "Delivery Challans",
+      "attachment": {
+        "mime_code": "application/pdf",
+        "filename": "Sample_invoice.pdf"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "quantity": "100",
+      "unit_code": "H87",
+      "net_amount": "1425",
+      "period": {
+        "start_date": "2025-01-31",
+        "end_date": "2025-02-07"
+      },
+      "price": {
+        "net_price": "14.25",
+        "discount": "0.75",
+        "gross_price": "15",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "1496.25",
+      "vat_amount_aed": "71.25",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "classifications": [
+          {
+            "code": "11223344",
+            "scheme_id": "HS"
+          }
+        ]
+      }
+    },
+    {
+      "id": "2",
+      "quantity": "150",
+      "unit_code": "H87",
+      "net_amount": "3562.5",
+      "period": {
+        "start_date": "2025-01-31",
+        "end_date": "2025-02-07"
+      },
+      "price": {
+        "net_price": "23.75",
+        "discount": "1.25",
+        "gross_price": "25",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "3740.625",
+      "vat_amount_aed": "178.125",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "classifications": [
+          {
+            "code": "224455",
+            "scheme_id": "HS"
+          }
+        ]
+      }
+    },
+    {
+      "id": "3",
+      "quantity": "200",
+      "unit_code": "H87",
+      "net_amount": "5700",
+      "period": {
+        "start_date": "2025-01-31",
+        "end_date": "2025-02-07"
+      },
+      "price": {
+        "net_price": "28.5",
+        "discount": "1.5",
+        "gross_price": "30",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "5985",
+      "vat_amount_aed": "285",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "classifications": [
+          {
+            "code": "123456",
+            "scheme_id": "HS"
+          }
+        ]
+      }
+    },
+    {
+      "id": "4",
+      "quantity": "30",
+      "unit_code": "K6",
+      "net_amount": "2970",
+      "period": {
+        "start_date": "2025-01-31",
+        "end_date": "2025-01-31"
+      },
+      "price": {
+        "net_price": "99",
+        "discount": "1",
+        "gross_price": "100",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "K6"
+      },
+      "tax": {
+        "code": "AE",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "2970",
+      "vat_amount_aed": "0",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "goods_service_type": "DL8.48.3.1",
+        "standard_id": {
+          "id": "34092834029",
+          "scheme_id": "0160"
+        },
+        "classifications": [
+          {
+            "code": "88098432324",
+            "scheme_id": "HS",
+            "scheme_version": "1.0"
+          }
+        ]
+      }
+    }
+  ]
+}

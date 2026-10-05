@@ -6,12 +6,14 @@ on:
     paths:
       - "services/validator-rs/**"
       - "proto/**"
+      - "scripts/fetch-upstream.sh"
       - ".github/workflows/rust.yml"
   pull_request:
     branches: [main]
     paths:
       - "services/validator-rs/**"
       - "proto/**"
+      - "scripts/fetch-upstream.sh"
       - ".github/workflows/rust.yml"
 
 concurrency:
@@ -38,6 +40,11 @@ jobs:
       # build.rs compiles the proto files with protox (a pure-Rust FileDescriptorSet
       # builder), reading ../../proto relative to the crate root. No system protoc
       # is required.
+
+      # Official PINT AE 1.0.4 artefacts and the UBL 2.1 XSDs are fetched, not vendored (owner
+      # decision D-3). The script fails on any sha256 mismatch against upstream/SHA256SUMS.
+      - name: fetch and verify upstream artefacts (SHA256SUMS)
+        run: scripts/fetch-upstream.sh
 
       - name: cargo fmt --check
         working-directory: services/validator-rs

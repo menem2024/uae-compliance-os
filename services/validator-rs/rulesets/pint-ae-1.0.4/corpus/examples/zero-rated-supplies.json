@@ -1,0 +1,126 @@
+{
+  "invoice_number": "AE-001-ZeroRated-TEST",
+  "issue_date": "2025-02-07",
+  "seller_trn": "132654987101003",
+  "currency": "AED",
+  "total_amount": "248750",
+  "vat_amount": "0",
+  "uuid": "65a5426a-b9ee-4190-9db7-1ada969b3eb2",
+  "issue_time": "17:31:00+04:00",
+  "invoice_type_code": "380",
+  "transaction_type_code": "00000000",
+  "tax_point_date": "2025-01-31",
+  "payment_due_date": "2025-02-22",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "references": {
+    "purchase_order_reference": "EXP-09",
+    "sales_order_reference": "EC-24-25-1001"
+  },
+  "seller": {
+    "name": "Supplier Legal Name",
+    "trading_name": "Seller Trade Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "1987654321",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "city": "Dubai",
+      "country_subdivision": "DXB",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Email Address"
+    }
+  },
+  "buyer": {
+    "name": "Buyer legal Name",
+    "trading_name": "Buyer Legal Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "1347809543",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "line2": "Additional Street Name",
+      "city": "Dubai",
+      "post_code": "Postal code",
+      "country_subdivision": "DXB",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "email": "Email Address"
+    }
+  },
+  "payment_instructions": [
+    {
+      "means_code": "1",
+      "means_text": "Instrument Not Defined"
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "within 15 days"
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "248750",
+    "tax_exclusive_amount": "248750",
+    "payable_amount": "248750"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "248750",
+      "tax_amount": "0",
+      "category": {
+        "code": "Z",
+        "rate": "0",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "quantity": "5000",
+      "unit_code": "H87",
+      "net_amount": "248750",
+      "price": {
+        "net_price": "49.75",
+        "discount": "0.25",
+        "gross_price": "50",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "Z",
+        "rate": "0",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "248750",
+      "vat_amount_aed": "0",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description"
+      }
+    }
+  ]
+}
