@@ -1,42 +1,42 @@
 rule_id	family	status	severity	business_term	path	fix	message_en	message_ar	note
-aligned-ibrp-032	totals	pending	error	IBG-20		none		ترجمة قيد المراجعة	
-aligned-ibrp-037	totals	pending	error	IBG-21		none		ترجمة قيد المراجعة	
-aligned-ibrp-057	totals	pending	error	IBT-093		none		ترجمة قيد المراجعة	
-aligned-ibrp-058	totals	pending	error	IBT-100		none		ترجمة قيد المراجعة	
-ibr-012	totals	pending	error	IBT-106		none		ترجمة قيد المراجعة	
-ibr-013	totals	pending	error	IBT-109		none		ترجمة قيد المراجعة	
-ibr-014	totals	pending	error	IBT-112		none		ترجمة قيد المراجعة	
-ibr-015	totals	pending	error	IBT-115		none		ترجمة قيد المراجعة	
-ibr-031	totals	pending	error	IBG-20		none		ترجمة قيد المراجعة	
-ibr-033	totals	pending	error	IBG-20		none		ترجمة قيد المراجعة	
-ibr-036	totals	pending	error	IBG-21		none		ترجمة قيد المراجعة	
-ibr-038	totals	pending	error	IBG-21		none		ترجمة قيد المراجعة	
-ibr-041	totals	pending	error	IBG-27		none		ترجمة قيد المراجعة	
-ibr-042	totals	pending	error	IBG-27		none		ترجمة قيد المراجعة	
-ibr-043	totals	pending	error	IBG-28		none		ترجمة قيد المراجعة	
-ibr-044	totals	pending	error	IBG-28		none		ترجمة قيد المراجعة	
-ibr-053	totals	pending	error	IBT-006		none		ترجمة قيد المراجعة	
-ibr-082	totals	pending	error			none		ترجمة قيد المراجعة	
-ibr-084	totals	pending	error	IBT-110		none		ترجمة قيد المراجعة	
-ibr-091	totals	pending	error	IBT-115		none		ترجمة قيد المراجعة	
-ibr-114-ae	totals	pending	error	IBT-102		none		ترجمة قيد المراجعة	
-ibr-115-ae	totals	pending	error	IBT-095		none		ترجمة قيد المراجعة	
-ibr-121	totals	pending	error	IBT-107		none		ترجمة قيد المراجعة	
-ibr-122	totals	pending	error	IBT-108		none		ترجمة قيد المراجعة	
-ibr-123	totals	pending	error	IBT-109		none		ترجمة قيد المراجعة	
-ibr-125	totals	pending	error	IBT-112		none		ترجمة قيد المراجعة	
-ibr-131-ae	totals	pending	error	IBT-092		none		ترجمة قيد المراجعة	
-ibr-146-ae	totals	pending	error	IBT-099		none		ترجمة قيد المراجعة	
-ibr-153-ae	totals	pending	error	IBT-006		none		ترجمة قيد المراجعة	
-ibr-168-ae	totals	pending	error	IBG-20		none		ترجمة قيد المراجعة	
-ibr-169-ae	totals	pending	error	IBG-21		none		ترجمة قيد المراجعة	
-ibr-175-ae	totals	pending	error	IBT-005		none		ترجمة قيد المراجعة	
-ibr-co-10	totals	pending	error	IBT-106		none		ترجمة قيد المراجعة	
-ibr-co-11	totals	pending	error	IBT-107		none		ترجمة قيد المراجعة	
-ibr-co-12	totals	pending	error	IBT-108		none		ترجمة قيد المراجعة	
-ibr-co-13	totals	pending	error	IBT-109		none		ترجمة قيد المراجعة	
-ibr-co-15	totals	pending	error	IBT-112		none		ترجمة قيد المراجعة	
-ibr-co-16	totals	pending	error	IBT-115		none		ترجمة قيد المراجعة	
-ibr-sr-30	totals	pending	error	IBT-097		none		ترجمة قيد المراجعة	
-ibr-sr-31	totals	pending	error	IBT-104		none		ترجمة قيد المراجعة	
-ibr-sr-61	totals	pending	error	IBT-197		none		ترجمة قيد المراجعة	
+aligned-ibrp-032	totals	implemented	error	IBT-095	allowances_charges[#].tax_category.code	llm		يجب أن يكون لكل خصم على مستوى المستند (IBG-20) رمز فئة ضريبة القيمة المضافة للخصم على مستوى المستند (IBT-095).	document-level allowances only (a line allowance's parent is the line): fails without a written category code in the VAT scheme (upper-cased, normalize-space); the category is written whenever one of its fields is set
+aligned-ibrp-037	totals	implemented	error	IBT-102	allowances_charges[#].tax_category.code	llm		يجب أن يكون لكل رسم على مستوى المستند (IBG-21) رمز فئة ضريبة القيمة المضافة للرسم على مستوى المستند (IBT-102).	document-level charges only: fails without a written category code in the VAT scheme
+aligned-ibrp-057	totals	implemented	error	IBT-093	allowances_charges[#].base_amount	llm		يجب تقديم المبلغ الأساسي للخصم (IBT-093) ونسبته (IBT-094) معاً أو عدم تقديم أي منهما.	path varies (F7): document and line allowances (IBT-093/IBT-094, IBT-137/IBT-138), at the missing one of base amount and percentage
+aligned-ibrp-058	totals	implemented	error	IBT-100	allowances_charges[#].base_amount	llm		يجب تقديم المبلغ الأساسي للرسم (IBT-100) ونسبته (IBT-101) معاً أو عدم تقديم أي منهما.	path varies (F7): document and line charges (IBT-100/IBT-101, IBT-142/IBT-143), at the missing one of base amount and percentage
+ibr-012	totals	implemented	error	IBT-106	totals.line_extension_amount	llm		يجب أن تتضمن الفاتورة مجموع صافي مبالغ بنود الفاتورة (IBT-106).	context LegalMonetaryTotal, written when any of IBT-106 to IBT-109 or IBT-112 to IBT-115 parses (otherwise AE-EXP-007 reports it); ibr-co-10 suggests the value
+ibr-013	totals	implemented	error	IBT-109	totals.tax_exclusive_amount	llm		يجب أن تتضمن الفاتورة إجمالي مبلغ الفاتورة دون الضريبة (IBT-109).	context LegalMonetaryTotal; ibr-co-13 suggests the value
+ibr-014	totals	implemented	error	IBT-112	total_amount	llm		يجب أن تتضمن الفاتورة إجمالي مبلغ الفاتورة مع الضريبة (IBT-112).	context LegalMonetaryTotal; ibr-co-15 suggests the value
+ibr-015	totals	implemented	error	IBT-115	totals.payable_amount	llm		يجب أن تتضمن الفاتورة المبلغ المستحق للدفع (IBT-115).	context LegalMonetaryTotal; ibr-co-16 suggests the value
+ibr-031	totals	implemented	error	IBT-092	allowances_charges[#].amount	llm		يجب أن يكون للخصم (IBG-20) مبلغ خصم (IBT-092).	document-level allowances only (a line allowance passes by the ancestor clause)
+ibr-033	totals	implemented	error	IBT-097	allowances_charges[#].reason	llm		يجب أن يكون لكل خصم على مستوى المستند (IBG-20) سبب للخصم (IBT-097) أو رمز سبب للخصم (IBT-098).	document-level allowances only
+ibr-036	totals	implemented	error	IBT-099	allowances_charges[#].amount	llm		يجب أن يكون للرسم (IBG-21) مبلغ رسم (IBT-099).	document-level charges only
+ibr-038	totals	implemented	error	IBT-104	allowances_charges[#].reason	llm		يجب أن يكون لكل رسم على مستوى المستند (IBG-21) سبب للرسم (IBT-104) أو رمز سبب للرسم (IBT-105).	document-level charges only; ibr-044 fails with it
+ibr-041	totals	implemented	error	IBT-136	lines[#].allowances_charges[#].amount	llm		يجب أن يكون لكل خصم على بند الفاتورة (IBG-27) مبلغ خصم البند (IBT-136).	line allowances only; the price discount is matched first by the cac:Price/cac:AllowanceCharge rule of the same pattern
+ibr-042	totals	implemented	error	IBT-139	lines[#].allowances_charges[#].reason	llm		يجب أن يكون لكل خصم على بند الفاتورة (IBG-27) سبب خصم البند (IBT-139) أو رمز سبب خصم البند (IBT-140).	line allowances only, not the price discount
+ibr-043	totals	implemented	error	IBT-141	lines[#].allowances_charges[#].amount	llm		يجب أن يكون لكل رسم على بند الفاتورة (IBG-28) مبلغ رسم البند (IBT-141).	line charges only
+ibr-044	totals	implemented	error	IBT-144	lines[#].allowances_charges[#].reason	llm		يجب أن يكون لكل رسم على بند الفاتورة (IBG-28) سبب رسم البند (IBT-144) أو رمز سبب رسم البند (IBT-145).	path varies (F7): the XPath has no line condition, so a document-level charge without reason or reason code fails it too (at allowances_charges[#].reason, IBT-104)
+ibr-053	totals	implemented	error	IBT-111	totals.tax_amount_accounting_currency	llm		إذا وُجد رمز عملة المحاسبة الضريبية (IBT-006) فيجب تقديم إجمالي مبلغ ضريبة الفاتورة بعملة المحاسبة (IBT-111).	fails when IBT-006 is present and no TaxTotal/TaxAmount anywhere has currencyID IBT-006: IBT-111, IBT-110 when IBT-005 equals IBT-006, and the line BTAE-08 amounts (currencyID AED) all count
+ibr-082	totals	structural	error		allowances_charges[#].is_charge	none		يجب أن تكون قيمة مؤشر الخصم/الرسم «true» أو «false».	structural: every exported AllowanceCharge has exactly one ChargeIndicator, true or false (is_charge is a bool; the price discount is always false), so the generic cac:AllowanceCharge rule is never reached; test: src/rules/totals.rs::tests::structural_rules_hold_on_every_exported_allowance_charge
+ibr-084	totals	implemented	error	IBT-111	totals.tax_amount_accounting_currency	llm		يجب أن تكون إشارة إجمالي مبلغ ضريبة الفاتورة (IBT-110) وإشارة إجمالي مبلغ ضريبة الفاتورة بعملة المحاسبة (IBT-111) متماثلتين.	existential comparisons over the root TaxTotal amounts whose currencyID equals normalize-space(IBT-006) and normalize-space(IBT-005) (an empty IBT-005 selects currencyID ""); fails when either set is empty
+ibr-091	totals	implemented	error	IBT-115	totals.payable_amount	llm		يجب ألا يتجاوز المبلغ المستحق للدفع (IBT-115) منزلتين عشريتين.	lexical: characters after the first point of the written value (decimal::fraction_digits), so 1050.000 fails
+ibr-114-ae	totals	implemented	error	IBT-102	allowances_charges[#].tax_category.code	llm		لا يجوز أن يكون رمز فئة ضريبة القيمة المضافة للرسم على مستوى المستند (IBT-102) «معدل قياسي بضريبة إضافية».	document-level charges (a line charge has no tax category); the trimmed code equals N
+ibr-115-ae	totals	implemented	error	IBT-095	allowances_charges[#].tax_category.code	llm		لا يجوز أن يكون رمز فئة الضريبة للخصم على مستوى المستند (IBT-095) «معدل قياسي بضريبة إضافية».	document-level allowances; the trimmed code equals N
+ibr-121	totals	implemented	error	IBT-107	totals.allowance_total_amount	llm		يجب ألا يتجاوز مبلغ الخصم على مستوى المستند (IBT-107) منزلتين عشريتين.	lexical decimals of the written value
+ibr-122	totals	implemented	error	IBT-108	totals.charge_total_amount	llm		يجب ألا يتجاوز مبلغ الرسم على مستوى المستند (IBT-108) منزلتين عشريتين.	lexical decimals of the written value
+ibr-123	totals	implemented	error	IBT-109	totals.tax_exclusive_amount	llm		يجب ألا يتجاوز إجمالي مبلغ الفاتورة دون الضريبة (IBT-109) منزلتين عشريتين.	lexical decimals of the written value
+ibr-125	totals	implemented	error	IBT-112	total_amount	llm		يجب ألا يتجاوز إجمالي مبلغ الفاتورة مع الضريبة (IBT-112) منزلتين عشريتين.	lexical decimals of the written value
+ibr-131-ae	totals	implemented	error	IBT-092	allowances_charges[#].amount	llm		يجب أن يساوي مبلغ الخصم (IBT-092، IBT-136) المبلغ الأساسي (IBT-093، IBT-137) × النسبة (IBT-094، IBT-138) ÷ 100 إذا وُجد المبلغ الأساسي والنسبة.	path varies (F7): document and line allowances; exact decimal instead of xs:double (contract upstream defect 5): the amount equals base x percentage / 100 or that value rounded half up to two decimals; not fix=value because a new amount changes ibr-co-11, ibr-147-ae and the VAT breakdown, which may have passed
+ibr-146-ae	totals	implemented	error	IBT-099	allowances_charges[#].amount	llm		يجب أن يساوي مبلغ الرسم (IBT-099، IBT-141) المبلغ الأساسي (IBT-100، IBT-142) × النسبة (IBT-101، IBT-143) ÷ 100 إذا وُجد المبلغ الأساسي والنسبة.	path varies (F7): document and line charges; exact decimal (contract upstream defect 5), as ibr-131-ae
+ibr-153-ae	totals	implemented	error	BTAE-04	exchange_rate	llm		عندما تكون عملة المحاسبة الضريبية (IBT-006) هي الدرهم الإماراتي (AED) ويختلف رمز عملة الفاتورة (IBT-005) عن AED، يجب تحديد العملة المصدر على أنها رمز عملة الفاتورة (IBT-005) والعملة الهدف على أنها عملة المحاسبة الضريبية (IBT-006)، مع توفير سعر صرف العملة (BTAE-04).	TaxExchangeRate is written only with BTAE-04 and then always carries IBT-005 to IBT-006, so the rule fails exactly when IBT-006 is AED, IBT-005 is present and not AED, and BTAE-04 is absent
+ibr-168-ae	totals	implemented	error	IBT-098	allowances_charges[#].reason_code	llm		يجب أن يكون للخصومات على مستوى المستند (IBG-20) التي يكون رمز فئة ضريبة القيمة المضافة لها (IBT-095) «معفى من ضريبة القيمة المضافة» رمز سبب الإعفاء من ضريبة القيمة المضافة للخصم على مستوى المستند (IBT-196).	the XPath tests the allowance reason code (cbc:AllowanceChargeReasonCode, IBT-098), not the exemption reason code its message names (contract rule 13)
+ibr-169-ae	totals	implemented	error	IBT-105	allowances_charges[#].reason_code	llm		يجب أن يكون للرسم على مستوى المستند (IBG-21) الذي يكون رمز فئة ضريبة القيمة المضافة له (IBT-102) «معفى من ضريبة القيمة المضافة» رمز سبب الإعفاء من ضريبة القيمة المضافة للرسم على مستوى المستند (IBT-198).	the XPath tests the charge reason code (IBT-105), as ibr-168-ae
+ibr-175-ae	totals	implemented	error	BTAE-20	totals.total_with_tax_aed	llm		عندما يكون رمز عملة الفاتورة [IBT-005] غير «AED» وتكون عملة المحاسبة الضريبية [IBT-006] «AED»، يجب تقديم إجمالي مبلغ ضريبة القيمة المضافة للفاتورة بعملة المحاسبة الضريبية [IBT-111] وإجمالي مبلغ الفاتورة (أو الإشعار الدائن) مع ضريبة القيمة المضافة بالدرهم الإماراتي [BTAE-20].	path varies (F7), first failing condition: currency (IBT-005, absent fails too), tax_currency (IBT-006 not AED), totals.tax_amount_accounting_currency (IBT-111), else BTAE-20
+ibr-co-10	totals	implemented	error	IBT-106	totals.line_extension_amount	value		مجموع صافي مبالغ بنود الفاتورة (IBT-106) = Σ صافي مبلغ بند الفاتورة (IBT-131).	suggested_value = xpath_round2(sum of IBT-131) when every line's IBT-131 parses; chain IBT-106 -> IBT-109: the suggestion can break only ibr-co-13, which then suggests from the new value
+ibr-co-11	totals	implemented	error	IBT-107	totals.allowance_total_amount	value		مجموع الخصومات على مستوى المستند (IBT-107) = Σ مبلغ الخصم على مستوى المستند (IBT-092).	suggested_value = xpath_round2(sum of IBT-092) when there is a document-level allowance and every amount parses; none without allowances (zero and absent both pass); can break only ibr-co-13
+ibr-co-12	totals	implemented	error	IBT-108	totals.charge_total_amount	value		مجموع الرسوم على مستوى المستند (IBT-108) = Σ مبلغ الرسم على مستوى المستند (IBT-099).	suggested_value = xpath_round2(sum of IBT-099) when there is a document-level charge and every amount parses; can break only ibr-co-13
+ibr-co-13	totals	implemented	error	IBT-109	totals.tax_exclusive_amount	value		إجمالي مبلغ الفاتورة دون الضريبة (IBT-109) = Σ صافي مبلغ بند الفاتورة (IBT-131) - مجموع الخصومات على مستوى المستند (IBT-107) + مجموع الرسوم على مستوى المستند (IBT-108).	holds when IBT-200 is written (true, with IBT-110); branches by the presence of IBT-107 and IBT-108; suggested_value = xpath_round2(IBT-106 + IBT-108 - IBT-107) from the current values, or IBT-106 itself when neither total is present and it has at most two decimals; can break only ibr-co-15
+ibr-co-15	totals	implemented	error	IBT-112	total_amount	value		إجمالي مبلغ الفاتورة مع الضريبة (IBT-112) = إجمالي مبلغ الفاتورة دون الضريبة (IBT-109) + إجمالي مبلغ ضريبة الفاتورة (IBT-110).	VAT term = the first root TaxTotal's amount in IBT-005 (IBT-110, or IBT-111 when IBT-110 is absent and IBT-006 = IBT-005); suggested_value = xpath_round2(IBT-109 + that amount); can break only ibr-co-16
+ibr-co-16	totals	implemented	error	IBT-115	totals.payable_amount	value		المبلغ المستحق للدفع (IBT-115) = إجمالي مبلغ الفاتورة مع الضريبة (IBT-112) - المبلغ المدفوع (IBT-113) + مبلغ التقريب (IBT-114).	IBT-113 and IBT-114 count only when non-zero (decimal::ebv); suggested_value = the one two-decimal IBT-115 that passes (with a rounding amount: the two-decimal value nearest IBT-112 - IBT-113 + IBT-114, halves down), withheld when it would newly make ibr-127-ae fail
+ibr-sr-30	totals	structural	error	IBT-097	allowances_charges[#].reason	none		يجب ألا يتكرر سبب الخصم (IBT-097) أكثر من مرة.	structural: reason is a single string, so every allowance carries at most one AllowanceChargeReason; test: src/rules/totals.rs::tests::structural_rules_hold_on_every_exported_allowance_charge
+ibr-sr-31	totals	structural	error	IBT-104	allowances_charges[#].reason	none		يجب ألا يتكرر سبب الرسم (IBT-104) أكثر من مرة.	structural: reason is a single string, so every charge carries at most one AllowanceChargeReason; test: src/rules/totals.rs::tests::structural_rules_hold_on_every_exported_allowance_charge
+ibr-sr-61	totals	structural	error	IBT-197	allowances_charges[#].tax_category.exemption_reason_text	none		يجب ألا يتكرر سبب الإعفاء الضريبي للخصم/الرسم (IBT-197) (IBT-199) أكثر من مرة.	structural: exemption_reason_text is a single string and only document-level allowances and charges carry a TaxCategory; test: src/rules/totals.rs::tests::structural_rules_hold_on_every_exported_allowance_charge
