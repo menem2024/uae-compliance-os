@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientCompanyPath, documentPath, runPath, withQuery } from "./bff-paths";
+import { clientCompanyPath, documentPath, exportXmlPath, invoiceValidationPath, runPath, withQuery } from "./bff-paths";
 
 describe("bff paths", () => {
   it("encode ids so they cannot escape the resource", () => {
@@ -16,5 +16,13 @@ describe("bff paths", () => {
       "/v1/client-companies?status=all&q=oasis&limit=20",
     );
     expect(withQuery("/v1/documents", new URLSearchParams("evil=1"), ["status"])).toBe("/v1/documents");
+  });
+
+  it("build the invoice review and export paths with encoded ids", () => {
+    expect(invoiceValidationPath("i1")).toBe("/v1/invoices/i1/validation");
+    expect(invoiceValidationPath("i1", "corrections")).toBe("/v1/invoices/i1/validation/corrections");
+    expect(invoiceValidationPath("../x", "approve")).toBe("/v1/invoices/..%2Fx/validation/approve");
+    expect(invoiceValidationPath("i1", "audit")).toBe("/v1/invoices/i1/validation/audit");
+    expect(exportXmlPath("e/1")).toBe("/v1/exports/e%2F1/xml");
   });
 });

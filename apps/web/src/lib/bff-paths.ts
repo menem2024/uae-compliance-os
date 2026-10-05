@@ -20,3 +20,9 @@ export function withQuery(path: string, search: URLSearchParams, allowed: readon
   const qs = out.toString();
   return qs ? `${path}?${qs}` : path;
 }
+
+/** Track C invoice review: `/v1/invoices/{id}/validation[/corrections|approve|audit]`. */
+export const invoiceValidationPath = (id: string, sub?: "corrections" | "approve" | "audit"): string =>
+  `/v1/invoices/${seg(id)}/validation${sub ? `/${sub}` : ""}`;
+
+export const exportXmlPath = (id: string): string => `/v1/exports/${seg(id)}/xml`;
