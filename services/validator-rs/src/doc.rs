@@ -416,6 +416,79 @@ impl<'a> Doc<'a> {
             visit(32, &[i], false, &l.rate);
         }
     }
+
+    /// Whether `cac:InvoiceLine` / `cac:CreditNoteLine` number `i` is written. The exporter
+    /// drops an aggregate without a written child (`export::B::line`), so a model line with,
+    /// say, only a unit code (an attribute of the absent quantity) is no element at all: no line
+    /// context of the official schematron sees it, and alone it leaves the invoice without a
+    /// line (`ibr-016`).
+    pub fn line_written(&self, i: usize) -> bool {
+        match (self.inv.lines.get(i), self.lines.get(i)) {
+            (Some(l), Some(d)) => line_written(l, d),
+            _ => false,
+        }
+    }
+
+    /// `exists(cac:InvoiceLine) or exists(cac:CreditNoteLine)`: some line is written.
+    pub fn lines_exist(&self) -> bool {
+        (0..self.inv.lines.len()).any(|i| self.line_written(i))
+    }
+}
+
+/// Whether a `cac:TaxCategory` / `cac:ClassifiedTaxCategory` is written: any of its code, rate
+/// (a valid decimal), exemption reason code or text, or tax scheme is present
+/// (`export::tax_category`).
+pub fn tax_category_written(c: Option<&pb::TaxCategory>, rate: Dec<'_>) -> bool {
+    c.is_some_and(|c| {
+        text(&c.code).is_some()
+            || rate.exists()
+            || text(&c.exemption_reason_code).is_some()
+            || text(&c.exemption_reason_text).is_some()
+            || text(&c.tax_scheme).is_some()
+    })
+}
+
+/// [`Doc::line_written`] for one line and its decimals: any child of the line is written.
+fn line_written(l: &pb::InvoiceLine, d: &LineDec<'_>) -> bool {
+    let classified = |list: &[pb::Classification]| list.iter().any(|c| text(&c.code).is_some());
+    text(&l.id).is_some()
+        || text(&l.note).is_some()
+        || d.quantity.exists()
+        || d.net_amount.exists()
+        || text(&l.accounting_reference).is_some()
+        || l.period
+            .as_ref()
+            .is_some_and(|p| text(&p.start_date).is_some() || text(&p.end_date).is_some())
+        || text(&l.order_reference).is_some()
+        || text(&l.order_line_reference).is_some()
+        || text(&l.despatch_advice_reference).is_some()
+        || l.object_identifier
+            .as_ref()
+            .is_some_and(|o| text(&o.id).is_some())
+        || !l.allowances_charges.is_empty()
+        || tax_category_written(l.tax.as_ref(), d.rate)
+        || text(&l.batch_number).is_some()
+        || l.item.as_ref().is_some_and(|it| {
+            text(&it.description).is_some()
+                || text(&it.name).is_some()
+                || text(&it.buyer_item_id).is_some()
+                || text(&it.seller_item_id).is_some()
+                || it
+                    .standard_id
+                    .as_ref()
+                    .is_some_and(|s| text(&s.id).is_some())
+                || classified(&it.service_accounting_codes)
+                || text(&it.origin_country).is_some()
+                || text(&it.goods_service_type).is_some()
+                || text(&it.item_type).is_some()
+                || classified(&it.classifications)
+                || it.attributes.iter().any(|a| text(&a.name).is_some())
+        })
+        || d.price.net_price.exists()
+        || d.price.base_quantity.exists()
+        || d.price.discount.exists()
+        || d.price.gross_price.exists()
+        || d.amount_aed.exists()
 }
 
 fn rate(category: Option<&pb::TaxCategory>) -> Dec<'_> {

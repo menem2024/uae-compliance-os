@@ -17,7 +17,7 @@ use rust_decimal::Decimal;
 
 use crate::codelists::sets;
 use crate::decimal;
-use crate::doc::{Doc, LineDec, text};
+use crate::doc::{Doc, LineDec, tax_category_written, text};
 use crate::pb;
 use crate::rule::{Rule, Sink};
 use crate::rules::platform::is_xsd_date;
@@ -173,7 +173,9 @@ pub static RULES: &[Rule] = &[
 
 // ------------------------------------------------------------------------------ what is written
 
-/// `(index, line, decimals)` for every line; the decimal table mirrors the lines index for index.
+/// `(index, line, decimals)` for every written line ([`Doc::line_written`]: a line without a
+/// written child is no `cac:InvoiceLine`, so no line context sees it); the decimal table mirrors
+/// the lines index for index and the index is the model's.
 fn each<'d, 'a>(
     doc: &'d Doc<'a>,
 ) -> impl Iterator<Item = (usize, &'a pb::InvoiceLine, &'d LineDec<'a>)> + 'd {
@@ -182,6 +184,7 @@ fn each<'d, 'a>(
         .iter()
         .zip(&doc.lines)
         .enumerate()
+        .filter(|&(i, _)| doc.line_written(i))
         .map(|(i, (l, d))| (i, l, d))
 }
 
@@ -193,13 +196,7 @@ fn tax_code(l: &pb::InvoiceLine) -> Option<&str> {
 /// Whether `cac:ClassifiedTaxCategory` is written: any of IBT-151, IBT-152 (a valid decimal),
 /// IBT-186, IBT-185 or the tax scheme IBT-167 is present (`export::tax_category`).
 fn tax_written(l: &pb::InvoiceLine, d: &LineDec<'_>) -> bool {
-    l.tax.as_ref().is_some_and(|c| {
-        text(&c.code).is_some()
-            || d.rate.exists()
-            || text(&c.exemption_reason_code).is_some()
-            || text(&c.exemption_reason_text).is_some()
-            || text(&c.tax_scheme).is_some()
-    })
+    tax_category_written(l.tax.as_ref(), d.rate)
 }
 
 /// Whether `cac:Item` is written: the VAT information, the batch number or any item field.
@@ -273,10 +270,10 @@ fn has_sac(l: &pb::InvoiceLine) -> bool {
 // ------------------------------------------------------------------------------------- rules
 
 /// `ibr-016`, context `/ubl:Invoice | /cn:CreditNote`, test
-/// `exists(cac:InvoiceLine) or exists(cac:CreditNoteLine)`. Every line is written, so it fails
-/// exactly when the invoice has none.
+/// `exists(cac:InvoiceLine) or exists(cac:CreditNoteLine)`. A line without a written child is
+/// not written, so it fails when no line is ([`Doc::lines_exist`]), not only when there is none.
 fn ibr_016(doc: &Doc<'_>, sink: &mut Sink<'_>) {
-    if doc.inv.lines.is_empty() {
+    if !doc.lines_exist() {
         sink.fail(&[]);
     }
 }
@@ -1181,5 +1178,42 @@ mod tests {
     fn credit_note_lines_are_checked_like_invoice_lines() {
         let inv = patched("standard-tax-credit-note", json!({"lines[0].id": ""}), &[]);
         assert_eq!(paths(run(ibr_021, "lines[#].id", &inv)), ["lines[0].id"]);
+    }
+
+    /// A line with no written child is not an element of the exported XML (the unit code is an
+    /// attribute of the absent quantity), so no line context sees it and, alone, it leaves the
+    /// invoice without a line (Saxon: `ibr-016` and nothing of this family on the line).
+    #[test]
+    fn a_line_the_exporter_drops_is_not_a_line() {
+        let ids = |inv: &pb::Invoice| -> Vec<String> {
+            let doc = Doc::new(inv);
+            let mut out = Vec::new();
+            let catalog = default_ruleset().catalog();
+            for rule in RULES {
+                let mut sink = Sink::new(catalog.get(rule.id).unwrap().path);
+                (rule.check)(&doc, &mut sink);
+                out.extend(
+                    sink.into_findings()
+                        .into_iter()
+                        .map(|_| rule.id.to_string()),
+                );
+            }
+            out
+        };
+        let extra = patched(
+            "standard-tax-invoice",
+            json!({"lines[1].unit_code": "C62"}),
+            &[],
+        );
+        assert_eq!(extra.lines.len(), 2);
+        assert!(ids(&extra).is_empty(), "{:?}", ids(&extra));
+        let alone = patched(
+            "standard-invoice-mandatory-fields",
+            json!({"lines[1].unit_code": "C62"}),
+            &["lines[0]"],
+        );
+        assert_eq!(alone.lines.len(), 1);
+        assert_eq!(ids(&alone), ["ibr-016"]);
+        assert!(!export_str(&alone).contains("InvoiceLine"));
     }
 }

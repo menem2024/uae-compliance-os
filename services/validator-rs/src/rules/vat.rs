@@ -338,12 +338,7 @@ fn category<'a>(c: Option<&'a pb::TaxCategory>, rate: Dec<'a>) -> Option<Cat<'a>
     let code = text(&c.code);
     let reason_code = text(&c.exemption_reason_code);
     let reason = text(&c.exemption_reason_text);
-    let written = code.is_some()
-        || rate.exists()
-        || reason_code.is_some()
-        || reason.is_some()
-        || text(&c.tax_scheme).is_some();
-    written.then(|| Cat {
+    doc::tax_category_written(Some(c), rate).then(|| Cat {
         code,
         rate,
         scheme: doc::tax_scheme(c),
@@ -462,59 +457,6 @@ impl Ln<'_> {
     }
 }
 
-/// Whether `cac:InvoiceLine` / `cac:CreditNoteLine` number `l` is written: any child is
-/// (`export::B::line`).
-fn line_written(l: &pb::InvoiceLine, d: &doc::LineDec<'_>) -> bool {
-    let classified = |list: &[pb::Classification]| list.iter().any(|c| text(&c.code).is_some());
-    text(&l.id).is_some()
-        || text(&l.note).is_some()
-        || d.quantity.exists()
-        || d.net_amount.exists()
-        || text(&l.accounting_reference).is_some()
-        || l.period
-            .as_ref()
-            .is_some_and(|p| text(&p.start_date).is_some() || text(&p.end_date).is_some())
-        || text(&l.order_reference).is_some()
-        || text(&l.order_line_reference).is_some()
-        || text(&l.despatch_advice_reference).is_some()
-        || l.object_identifier
-            .as_ref()
-            .is_some_and(|o| text(&o.id).is_some())
-        || !l.allowances_charges.is_empty()
-        || category(l.tax.as_ref(), d.rate).is_some()
-        || text(&l.batch_number).is_some()
-        || l.item.as_ref().is_some_and(|it| {
-            text(&it.description).is_some()
-                || text(&it.name).is_some()
-                || text(&it.buyer_item_id).is_some()
-                || text(&it.seller_item_id).is_some()
-                || it
-                    .standard_id
-                    .as_ref()
-                    .is_some_and(|s| text(&s.id).is_some())
-                || classified(&it.service_accounting_codes)
-                || text(&it.origin_country).is_some()
-                || text(&it.goods_service_type).is_some()
-                || text(&it.item_type).is_some()
-                || classified(&it.classifications)
-                || it.attributes.iter().any(|a| text(&a.name).is_some())
-        })
-        || d.price.net_price.exists()
-        || d.price.base_quantity.exists()
-        || d.price.discount.exists()
-        || d.price.gross_price.exists()
-        || d.amount_aed.exists()
-}
-
-/// `exists(//cac:InvoiceLine)` (or `CreditNoteLine`): some line is written.
-fn lines_exist(doc: &Doc<'_>) -> bool {
-    doc.inv
-        .lines
-        .iter()
-        .zip(&doc.lines)
-        .any(|(l, d)| line_written(l, d))
-}
-
 /// The written type code (IBT-003).
 fn type_code<'a>(doc: &Doc<'a>) -> Option<&'a str> {
     text(&doc.inv.invoice_type_code)
@@ -597,7 +539,7 @@ fn tax_amount_is_zero(doc: &Doc<'_>, sink: &mut Sink<'_>, code: &str) {
 /// official test is false whatever the amounts are. The suggestion is the sum, when there is a
 /// line and the sum fits.
 fn taxable_is_exact(doc: &Doc<'_>, sink: &mut Sink<'_>, code: &str) {
-    let lines = lines_exist(doc);
+    let lines = doc.lines_exist();
     let expected = if lines {
         net_of(doc, code, None, true)
     } else {
@@ -1824,7 +1766,7 @@ mod tests {
         for inv in &docs {
             let doc = Doc::new(inv);
             assert_eq!(
-                lines_exist(&doc),
+                doc.lines_exist(),
                 line_elements(inv) > 0,
                 "{:?}",
                 inv.lines.first()
