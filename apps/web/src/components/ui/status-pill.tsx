@@ -1,12 +1,16 @@
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
-export type InvoiceStatus = "uploaded" | "extracted" | "validated" | "has_issues" | "ready";
+export type InvoiceStatus =
+  | "uploaded" | "classified" | "extracted" | "needs_review" | "validated" | "has_issues" | "fixed" | "ready";
 
 /** Token colours per status: ok = validated/ready, warn = has_issues, info = in progress. */
 const TONE: Record<InvoiceStatus, string> = {
   uploaded: "bg-info-soft text-info",
+  classified: "bg-info-soft text-info",
   extracted: "bg-info-soft text-info",
+  needs_review: "bg-warn-soft text-warn",
+  fixed: "bg-info-soft text-info",
   validated: "bg-ok-soft text-ok",
   ready: "bg-ok-soft text-ok",
   has_issues: "bg-warn-soft text-warn",

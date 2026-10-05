@@ -24,4 +24,9 @@ describe("nav items", () => {
   it("enable agents as the live page (Task 26)", () => {
     expect(activeNavItem("/agents")).toMatchObject({ key: "agents", live: true, titleKey: "P1Agents.title" });
   });
+
+  it("enable invoices with the review pages' heading, also for a detail path", () => {
+    expect(activeNavItem("/invoices")).toMatchObject({ key: "invoices", titleKey: "P2Invoices.title" });
+    expect(activeNavItem("/invoices/0b9c")).toMatchObject({ key: "invoices", titleKey: "P2Invoices.title" });
+  });
 });

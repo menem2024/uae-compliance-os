@@ -120,7 +120,10 @@
     "extracted": "Extracted",
     "validated": "Validated",
     "has_issues": "Has issues",
-    "ready": "Ready to export"
+    "ready": "Ready to export",
+    "classified": "Classified",
+    "fixed": "Fixed",
+    "needs_review": "Needs review"
   },
   "Auth": {
     "welcome": "Welcome back",
@@ -470,6 +473,158 @@
         "superseded": "Superseded",
         "expired": "Expired"
       }
+    }
+  },
+  "P2Invoices": {
+    "title": "Invoices",
+    "subtitle": "Review each invoice, fix what the validator flags, approve it and export PINT-AE XML",
+    "list": {
+      "title": "Your invoices",
+      "columns": {
+        "invoice": "Invoice",
+        "seller": "Seller",
+        "buyer": "Buyer",
+        "total": "Total",
+        "status": "Status",
+        "issues": "Issues",
+        "created": "Created"
+      },
+      "issuesCount": "{errors} errors, {warnings} warnings",
+      "noIssues": "None",
+      "empty": "No invoices yet. Create a demo invoice above to see the review flow.",
+      "loadError": "Could not load the invoices.",
+      "retry": "Try again",
+      "loadMore": "Load more",
+      "unnamed": "Untitled"
+    },
+    "samples": {
+      "title": "New demo invoice",
+      "hint": "Each sample is a real canonical invoice. It goes to the live backend exactly as it is, and the validator decides what is wrong with it.",
+      "create": "Create and review",
+      "creating": "Creating",
+      "createError": "Could not create the invoice.",
+      "expected": {
+        "validated": "Expected: validated",
+        "has_issues": "Expected: has issues"
+      },
+      "valid": {
+        "title": "Valid invoice",
+        "description": "The official PINT-AE example. It should pass validation, then be approved and exported."
+      },
+      "totalsMismatch": {
+        "title": "Totals do not add up",
+        "description": "The amount due differs from the invoice total. The validator suggests the right value."
+      },
+      "badTrn": {
+        "title": "Invalid seller TRN",
+        "description": "The seller tax registration number has 14 digits instead of 15."
+      },
+      "missingFields": {
+        "title": "Missing required fields",
+        "description": "No issue date, no buyer name and no buyer address."
+      }
+    },
+    "review": {
+      "back": "All invoices",
+      "title": "Invoice review",
+      "loading": "Loading the invoice",
+      "notFound": "This invoice was not found. It may belong to another firm.",
+      "loadError": "Could not load the invoice.",
+      "retry": "Try again",
+      "pending": "The invoice is being processed. This page updates by itself.",
+      "timeout": "Processing is taking longer than expected. Refresh to check again.",
+      "refresh": "Refresh",
+      "live": "Live",
+      "status": "Status",
+      "ruleset": "Ruleset",
+      "seller": "Seller",
+      "buyer": "Buyer",
+      "total": "Total",
+      "version": "Version {version}",
+      "stats": {
+        "errors": "Errors",
+        "warnings": "Warnings",
+        "rules": "Rules evaluated",
+        "duration": "Duration"
+      },
+      "traceId": "Trace ID",
+      "invoiceId": "Invoice ID",
+      "copy": "Copy",
+      "copied": "Copied",
+      "noRun": "Not validated yet",
+      "next": {
+        "has_issues": "Fix every error below, then re-validate. Warnings do not block approval.",
+        "validated": "No errors. Approve the invoice to make it ready for export.",
+        "ready": "Approved and ready. Export the PINT-AE XML.",
+        "needs_review": "This invoice needs a human look before it can be validated.",
+        "fixed": "Your change is saved. Re-validation is running."
+      },
+      "approvedBy": "Approved by {who}"
+    },
+    "actions": {
+      "title": "Next step",
+      "revalidate": "Re-validate",
+      "revalidating": "Validating",
+      "approve": "Approve",
+      "approving": "Approving",
+      "export": "Export PINT-AE XML",
+      "exporting": "Exporting",
+      "download": "Download again",
+      "exported": "Exported {filename}",
+      "exportMeta": "{size} bytes, SHA-256 {sha}"
+    },
+    "issues": {
+      "title": "Issues",
+      "none": "No issues. The validator found nothing to fix.",
+      "severity": {
+        "error": "Error",
+        "warning": "Warning"
+      },
+      "path": "Field",
+      "term": "Business term",
+      "suggested": "Suggested value",
+      "apply": "Apply suggestion",
+      "applying": "Applying",
+      "correct": "Correct",
+      "correctLabel": "New value for {path}",
+      "save": "Save",
+      "saving": "Saving",
+      "cancel": "Cancel",
+      "current": "Current value",
+      "empty": "empty",
+      "noField": "This issue is about the whole document, so there is no single field to edit."
+    },
+    "audit": {
+      "title": "Audit trail",
+      "empty": "Nothing recorded yet.",
+      "loadError": "Could not load the audit trail.",
+      "by": "by {who}",
+      "system": "System",
+      "reason": "Reason",
+      "trace": "Trace",
+      "actions": {
+        "validation_requested": "Validation requested",
+        "fields_changed": "Fields changed",
+        "approved": "Approved",
+        "approval_revoked": "Approval revoked",
+        "exported": "Exported",
+        "fix_requested": "Fix requested"
+      }
+    },
+    "errors": {
+      "generic": "Something went wrong. Try again.",
+      "stale_payload": "Someone changed this invoice while you were editing. It was reloaded, so check it and try again.",
+      "old_value_mismatch": "The field no longer holds the value you saw. It was reloaded, so try again.",
+      "bad_path": "That field cannot be edited here.",
+      "not_validated": "Only a validated invoice can be approved. Re-validate it first.",
+      "not_ready": "Only an approved invoice can be exported. Approve it first.",
+      "revalidation_required": "The invoice changed since it was approved. Re-validate and approve it again.",
+      "validator_unavailable": "The validator is not reachable right now. Try again in a moment.",
+      "exporter_unavailable": "The exporter is not reachable right now. Try again in a moment.",
+      "not_found": "Not found. It may belong to another firm.",
+      "rate_limited": "Too many requests. Wait a moment and try again.",
+      "unauthenticated": "Your session expired. Sign in again.",
+      "upstream_unavailable": "The backend is not reachable right now. Try again in a moment."
     }
   }
 }
