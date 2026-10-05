@@ -93,16 +93,16 @@ func TestTrackCReadyNeedsApproval(t *testing.T) {
 	wantViolation(t, "payload change keeps ready", err, "23514", "invoices_ready_needs_approval")
 }
 
-// seeded holds one row of every Track C table for one invoice of firm A.
-type seeded struct {
+// seededC holds one row of every Track C table for one invoice of firm A.
+type seededC struct {
 	inv, run, issue, audit, export, fixTask uuid.UUID
 }
 
 // seedRaw inserts one row in every Track C table as compliance_app with plain SQL.
-func seedRaw(t *testing.T, e trackctest.Env, firm uuid.UUID) seeded {
+func seedRaw(t *testing.T, e trackctest.Env, firm uuid.UUID) seededC {
 	t.Helper()
 	ctx := context.Background()
-	s := seeded{inv: e.SeedInvoice(t, firm, `{}`), issue: uuid.New(), export: uuid.New(), fixTask: uuid.New()}
+	s := seededC{inv: e.SeedInvoice(t, firm, `{}`), issue: uuid.New(), export: uuid.New(), fixTask: uuid.New()}
 	err := e.AppTx(ctx, firm, func(tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx, `INSERT INTO validation_runs (firm_id, invoice_id, payload_version, ruleset_version,
 			trigger, error_count, warning_count, rules_evaluated, duration_us)
