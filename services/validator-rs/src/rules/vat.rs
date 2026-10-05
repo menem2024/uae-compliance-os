@@ -50,7 +50,7 @@
 use rust_decimal::Decimal;
 
 use crate::codelists::sets;
-use crate::decimal;
+use crate::decimal::{self, Cents};
 use crate::doc::{self, Dec, Doc, text};
 use crate::pb;
 use crate::rule::{Rule, Sink, fill};
@@ -284,8 +284,17 @@ pub static RULES: &[Rule] = &[
     },
 ];
 
-/// `u:slack` of the `-08`, `-09` and `ibr-102-ae` tests.
+/// `u:slack` of the `-08`, `-09` and `ibr-102-ae` tests: 0.02.
 const SLACK: Decimal = Decimal::from_parts(2, 0, 0, false, 2);
+
+/// `u:slack(expected, value, 0.02)` in exact [`Cents`]: the sums and bounds of the slack tests
+/// are `xs:decimal` (exact) in the official stylesheet, so they must not round here either.
+fn within_slack(expected: Decimal, value: Option<Cents>) -> bool {
+    match (Cents::of(expected), value, Cents::of(SLACK)) {
+        (Some(e), Some(v), Some(s)) => Cents::slack(e, v, s),
+        _ => false,
+    }
+}
 
 // ------------------------------------------------------------------------------ what is written
 
@@ -492,8 +501,8 @@ fn rate_is(rate: Dec<'_>, want: Option<Decimal>) -> bool {
 
 /// `sum(../../../cac:InvoiceLine[cac:Item/cac:ClassifiedTaxCategory/normalize-space(cbc:ID)=code]
 /// [... xs:decimal(cbc:Percent) = $rate]/xs:decimal(cbc:LineExtensionAmount))`; no scheme test.
-fn sum_lines(doc: &Doc<'_>, code: &str, rate: Option<Decimal>) -> Option<Decimal> {
-    decimal::sum(
+fn sum_lines(doc: &Doc<'_>, code: &str, rate: Option<Decimal>) -> Option<Cents> {
+    Cents::sum(
         line_cats(doc)
             .filter(|n| n.cat.code_is(code) && rate_is(n.cat.rate, rate))
             .filter_map(|n| n.net.value),
@@ -502,8 +511,8 @@ fn sum_lines(doc: &Doc<'_>, code: &str, rate: Option<Decimal>) -> Option<Decimal
 
 /// `sum(../../../cac:AllowanceCharge[cbc:ChargeIndicator = charge][cac:TaxCategory/normalize-space(cbc:ID)=code]
 /// [... xs:decimal(cbc:Percent) = $rate]/xs:decimal(cbc:Amount))`; no scheme test.
-fn sum_acs(doc: &Doc<'_>, code: &str, charge: bool, rate: Option<Decimal>) -> Option<Decimal> {
-    decimal::sum(
+fn sum_acs(doc: &Doc<'_>, code: &str, charge: bool, rate: Option<Decimal>) -> Option<Cents> {
+    Cents::sum(
         acs(doc)
             .filter(|a| a.charge == charge && a.cat.code_is(code) && rate_is(a.cat.rate, rate))
             .filter_map(|a| a.amount.value),
@@ -511,15 +520,16 @@ fn sum_acs(doc: &Doc<'_>, code: &str, charge: bool, rate: Option<Decimal>) -> Op
 }
 
 /// `lines + charges - allowances` of `code` (and `rate`), with `lines` the sum over the lines or
-/// 0 for the other line kind. `None` on overflow.
-fn net_of(doc: &Doc<'_>, code: &str, rate: Option<Decimal>, with_lines: bool) -> Option<Decimal> {
+/// 0 for the other line kind, exactly (`xs:decimal`). `None` on overflow.
+fn net_of(doc: &Doc<'_>, code: &str, rate: Option<Decimal>, with_lines: bool) -> Option<Cents> {
     let lines = if with_lines {
         sum_lines(doc, code, rate)?
     } else {
-        Decimal::ZERO
+        Cents::ZERO
     };
-    let plus = decimal::add(lines, sum_acs(doc, code, true, rate)?)?;
-    decimal::sub(plus, sum_acs(doc, code, false, rate)?)
+    lines
+        .checked_add(sum_acs(doc, code, true, rate)?)?
+        .checked_sub(sum_acs(doc, code, false, rate)?)
 }
 
 // ------------------------------------------------------------------------------ shared tests
@@ -536,8 +546,8 @@ fn tax_amount_is_zero(doc: &Doc<'_>, sink: &mut Sink<'_>, code: &str) {
 
 /// Breakdown entries of category `code` (VAT scheme) whose taxable amount is not exactly the
 /// lines plus charges minus allowances of that code (`-08` tests). Without a written line the
-/// official test is false whatever the amounts are. The suggestion is the sum, when there is a
-/// line and the sum fits.
+/// official test is false whatever the amounts are. The suggestion is the exact sum, when there
+/// is a line and the sum has a form the contract grammar accepts.
 fn taxable_is_exact(doc: &Doc<'_>, sink: &mut Sink<'_>, code: &str) {
     let lines = doc.lines_exist();
     let expected = if lines {
@@ -546,10 +556,11 @@ fn taxable_is_exact(doc: &Doc<'_>, sink: &mut Sink<'_>, code: &str) {
         None
     };
     for s in subs(doc).filter(|s| s.is(code)) {
-        let holds = lines && matches!((s.taxable.value, expected), (Some(t), Some(e)) if t == e);
+        let taxable = s.taxable.value.and_then(Cents::of);
+        let holds = lines && matches!((taxable, expected), (Some(t), Some(e)) if t == e);
         if !holds {
             let f = sink.fail(&[s.i]);
-            if let Some(e) = expected {
+            if let Some(e) = expected.and_then(Cents::to_decimal_exact) {
                 f.suggest(e);
             }
         }
@@ -843,9 +854,7 @@ fn aligned_ibrp_s_08(doc: &Doc<'_>, sink: &mut Sink<'_>) {
                 let any_line =
                     line_cats(doc).any(|n| n.cat.code_is("S") && rate_is(n.cat.rate, want));
                 let any_ac = acs(doc).any(|a| a.cat.code_is("S") && rate_is(a.cat.rate, want));
-                let within = |sum: Option<Decimal>| {
-                    sum.is_some_and(|value| decimal::slack(taxable, value, SLACK))
-                };
+                let within = |sum: Option<Cents>| within_slack(taxable, sum);
                 ((any_line || any_ac) && within(net_of(doc, "S", want, true)))
                     || (any_ac && within(net_of(doc, "S", want, false)))
             }
@@ -872,7 +881,7 @@ fn aligned_ibrp_s_09(doc: &Doc<'_>, sink: &mut Sink<'_>) {
                 let expected = decimal::mul(taxable.abs(), rate)
                     .and_then(|product| product.checked_div(Decimal::ONE_HUNDRED))
                     .map(decimal::xpath_round2);
-                expected.is_some_and(|e| decimal::slack(tax.abs(), e, SLACK))
+                within_slack(tax.abs(), expected.and_then(Cents::of))
             }
             _ => false,
         };
@@ -950,8 +959,7 @@ fn ibr_102_ae(doc: &Doc<'_>, sink: &mut Sink<'_>) {
             (Some(rate), Some(taxable)) => {
                 let want = Some(rate);
                 line_cats(doc).any(|n| n.cat.code_is("N") && rate_is(n.cat.rate, want))
-                    && sum_lines(doc, "N", want)
-                        .is_some_and(|sum| decimal::slack(taxable, sum, SLACK))
+                    && within_slack(taxable, sum_lines(doc, "N", want))
             }
             _ => false,
         };
@@ -1288,10 +1296,10 @@ fn ibr_co_14(doc: &Doc<'_>, sink: &mut Sink<'_>) {
     if subs(doc).next().is_none() {
         return;
     }
-    let expected = decimal::sum(subs(doc).filter_map(|s| s.tax.value)).map(decimal::xpath_round2);
-    if expected.is_none() || doc.vat_amount.value != expected {
+    let expected = Cents::sum(subs(doc).filter_map(|s| s.tax.value)).and_then(Cents::round_half_up);
+    if expected.is_none() || doc.vat_amount.value.and_then(Cents::of) != expected {
         let f = sink.fail(&[]);
-        if let Some(e) = expected {
+        if let Some(e) = expected.and_then(Cents::to_decimal) {
             f.suggest(e);
         }
     }
@@ -1699,8 +1707,8 @@ mod tests {
         let found = findings(rule, "aligned-ibrp-z-08", &inv);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].path, "tax_breakdown[0].taxable_amount");
-        // 1000 (line) + 200 (charge).
-        assert_eq!(found[0].suggested_value.as_deref(), Some("1200"));
+        // 1000 (line) + 200 (charge), exact in `Cents`: whole cents render with two decimals.
+        assert_eq!(found[0].suggested_value.as_deref(), Some("1200.00"));
         let exact = patched(
             "doc-level-charge-z-category",
             json!({"tax_breakdown[0].taxable_amount": "1200.00"}),

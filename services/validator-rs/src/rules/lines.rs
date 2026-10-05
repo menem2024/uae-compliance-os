@@ -16,7 +16,7 @@
 use rust_decimal::Decimal;
 
 use crate::codelists::sets;
-use crate::decimal;
+use crate::decimal::{self, Cents};
 use crate::doc::{Doc, LineDec, tax_category_written, text};
 use crate::pb;
 use crate::rule::{Rule, Sink};
@@ -415,14 +415,19 @@ fn aligned_ibrp_004(doc: &Doc<'_>, sink: &mut Sink<'_>) {
         let Some(gross) = p.gross_price.value else {
             continue;
         };
-        let expected = p.discount.value.and_then(|disc| decimal::sub(gross, disc));
-        let holds = match (p.net_price.value, expected) {
+        // Exact (`xs:decimal`): `decimal::sub` would round a difference wider than its
+        // mantissa (gross 1e25 less a discount of 1e-25 is not 1e25).
+        let expected = p
+            .discount
+            .value
+            .and_then(|disc| Cents::of(gross)?.checked_sub(Cents::of(disc)?));
+        let holds = match (p.net_price.value.and_then(Cents::of), expected) {
             (Some(net), Some(expected)) => net == expected,
             _ => false,
         };
         if !holds {
             let f = sink.fail(&[i]);
-            if let Some(expected) = expected {
+            if let Some(expected) = expected.and_then(Cents::to_decimal_exact) {
                 f.suggest(expected);
             }
         }
@@ -508,10 +513,11 @@ fn ibr_145_ae(doc: &Doc<'_>, sink: &mut Sink<'_>) {
 }
 
 /// IBT-131 computed by `ibr-147-ae`: `qty * (price div base) + sum(charges) - sum(allowances)`,
-/// in exact decimal (`qty * price` first, so the quotient is rounded once). `None` where the XPath
-/// has an empty or non-finite operand: a missing quantity, price or base quantity, a zero base
-/// quantity (`INF` or `NaN` in `xs:double`), or an overflow.
-fn expected_net_amount(l: &pb::InvoiceLine, d: &LineDec<'_>) -> Option<Decimal> {
+/// in decimal (`qty * price` first, so the quotient is rounded once, at 28 digits), the sum and
+/// difference exact in [`Cents`]. `None` where the XPath has an empty or non-finite operand: a
+/// missing quantity, price or base quantity, a zero base quantity (`INF` or `NaN` in
+/// `xs:double`), or an overflow.
+fn expected_net_amount(l: &pb::InvoiceLine, d: &LineDec<'_>) -> Option<Cents> {
     let quantity = d.quantity.value?;
     let price = d.price.net_price.value?;
     let base = d.price.base_quantity.value?;
@@ -525,9 +531,11 @@ fn expected_net_amount(l: &pb::InvoiceLine, d: &LineDec<'_>) -> Option<Decimal> 
             .zip(&d.allowances_charges)
             .filter_map(|(a, ad)| ad.amount.value.map(|v| (a.is_charge, v)))
     };
-    let charges = decimal::sum(amounts().filter(|(c, _)| *c).map(|(_, v)| v))?;
-    let allowances = decimal::sum(amounts().filter(|(c, _)| !*c).map(|(_, v)| v))?;
-    decimal::sub(decimal::add(extended, charges)?, allowances)
+    let charges = Cents::sum(amounts().filter(|(c, _)| *c).map(|(_, v)| v))?;
+    let allowances = Cents::sum(amounts().filter(|(c, _)| !*c).map(|(_, v)| v))?;
+    Cents::of(extended)?
+        .checked_add(charges)?
+        .checked_sub(allowances)
 }
 
 /// `ibr-147-ae`, context line, test
@@ -535,14 +543,19 @@ fn expected_net_amount(l: &pb::InvoiceLine, d: &LineDec<'_>) -> Option<Decimal> 
 /// Both sides are rounded to two decimals, half toward positive infinity.
 fn ibr_147_ae(doc: &Doc<'_>, sink: &mut Sink<'_>) {
     for (i, l, d) in each(doc) {
-        let expected = expected_net_amount(l, d).map(decimal::xpath_round2);
-        let holds = match (d.net_amount.value.map(decimal::xpath_round2), expected) {
+        let expected = expected_net_amount(l, d).and_then(Cents::round_half_up);
+        let net = d
+            .net_amount
+            .value
+            .and_then(Cents::of)
+            .and_then(Cents::round_half_up);
+        let holds = match (net, expected) {
             (Some(net), Some(expected)) => net == expected,
             _ => false,
         };
         if !holds {
             let f = sink.fail(&[i]);
-            if let Some(expected) = expected {
+            if let Some(expected) = expected.and_then(Cents::to_decimal) {
                 f.suggest(expected);
             }
         }
