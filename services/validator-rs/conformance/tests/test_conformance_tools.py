@@ -181,6 +181,32 @@ def test_runner_detects_a_mutation(tmp_path: Path):
     assert failed, "removing the UUID must fail at least one official assert"
 
 
+def test_runner_records_a_stylesheet_error_per_document_and_continues(tmp_path: Path):
+    # A VAT breakdown entry without IBT-116 makes the official aligned stylesheet raise
+    # XPTY0004 in u:slack() (Task 9 concern). That document gets {"error": ...}; the others are
+    # still validated.
+    src = EXAMPLES / "trn-invoice" / "Standard tax invoice.xml"
+    text = src.read_text(encoding="utf-8")
+    import re
+
+    crashing, n = re.subn(r"<cbc:TaxableAmount[^>]*>[^<]*</cbc:TaxableAmount>", "", text)
+    assert n == 1
+    d = tmp_path / "m"
+    d.mkdir()
+    (d / "a-crash.xml").write_text(crashing, encoding="utf-8")
+    (d / "b-ok.xml").write_text(text, encoding="utf-8")
+    out = tmp_path / "s.json"
+    res = run("run_schematron.py", str(d), "--out", str(out))
+    assert res.returncode == 0, res.stderr
+    got = json.loads(out.read_text())
+    assert set(got) == {"a-crash.xml", "b-ok.xml"}
+    assert "u:slack()" in got["a-crash.xml"]["error"]
+    assert "failed" not in got["a-crash.xml"]
+    assert got["a-crash.xml"]["kind"] == "invoice"
+    assert got["b-ok.xml"] == {"kind": "invoice", "failed": {}}
+    assert "1 stylesheet error" in res.stdout
+
+
 # ---------------------------------------------------------------- compare.py
 
 
@@ -266,6 +292,40 @@ def test_compare_missing_document_fails(tmp_path: Path):
     rust = {"a.xml": {"rules": {}, "errors": 0, "exported": True}}
     r = cmp(tmp_path, rust, {}, {"a.xml": OK_XSD})
     assert r.returncode == 1 and "a.xml" in r.stdout
+
+
+SLACK_ERROR = " An empty sequence is not allowed as the first argument of u:slack()"
+
+
+def crashed(kind="invoice", error=SLACK_ERROR):
+    return {"kind": kind, "error": error}
+
+
+def test_compare_skips_a_known_stylesheet_error_on_a_document_rust_rejects(tmp_path: Path):
+    rust = {
+        "a.xml": {"rules": {"aligned-ibrp-045": 1}, "errors": 1, "exported": False},
+        "b.xml": {"rules": {}, "errors": 0, "exported": True},
+    }
+    saxon = {"a.xml": crashed(), "b.xml": doc()}
+    r = cmp(tmp_path, rust, saxon, {"a.xml": OK_XSD, "b.xml": OK_XSD})
+    assert r.returncode == 0, r.stdout
+    assert "SKIP a.xml" in r.stdout and "u:slack" in r.stdout
+    assert "1 skipped" in r.stdout
+
+
+def test_compare_a_stylesheet_error_on_a_document_rust_accepts_fails(tmp_path: Path):
+    rust = {"a.xml": {"rules": {}, "errors": 0, "exported": True}}
+    r = cmp(tmp_path, rust, {"a.xml": crashed()}, {"a.xml": OK_XSD})
+    assert r.returncode == 1
+    assert "a.xml" in r.stdout and "SKIP" not in r.stdout
+
+
+def test_compare_an_unknown_stylesheet_error_fails(tmp_path: Path):
+    rust = {"a.xml": {"rules": {"ibr-co-10": 1}, "errors": 1, "exported": False}}
+    saxon = {"a.xml": crashed(error="XTDE0640 something else")}
+    r = cmp(tmp_path, rust, saxon, {"a.xml": OK_XSD})
+    assert r.returncode == 1
+    assert "a.xml" in r.stdout and "XTDE0640" in r.stdout
 
 
 if __name__ == "__main__":
