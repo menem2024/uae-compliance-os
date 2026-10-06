@@ -112,7 +112,9 @@ async def test_the_packaged_default_answers_every_phase1_prompt_and_always_accep
     monkeypatch.delenv("AI_FAKE_LATENCY_MS", raising=False)
     gw = ScenarioGateway.from_env()
     assert gw.source == DEFAULT_SCENARIO and gw.latency_ms == 0
-    assert set(OUTPUT_MODELS) == set(PROMPT_VERSIONS)  # the eval manifest lists every Phase 1 prompt id
+    # the eval manifest lists every Phase 1 prompt id (and Phase 2's fix.invoice_fields, which the compose
+    # default scenario deliberately does not answer: the Fix agent's model step is skipped on the fake gateway)
+    assert set(OUTPUT_MODELS) == set(PROMPT_VERSIONS) - {"fix.invoice_fields"}
     assert set(gw.prompt_ids) == set(OUTPUT_MODELS)
     parsed = {pid: (await gw.complete(req(pid, model))).parsed for pid, model in OUTPUT_MODELS.items()}
     for pid, model in OUTPUT_MODELS.items():

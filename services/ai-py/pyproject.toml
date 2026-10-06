@@ -33,6 +33,7 @@ extraction = "ai.evals.suites.extraction:ExtractionSuite"
 intake = "ai.evals.suites.intake:IntakeSuite"
 importer = "ai.evals.suites.importer:ImporterSuite"
 verifier = "ai.evals.suites.verifier:VerifierSuite"
+fix = "ai.agents.fix.evals:FixSuite"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]

@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ai.agents.extraction import prompts as extraction_prompts
+from ai.agents.fix import prompts as fix_prompts
 from ai.agents.intake import agent as intake_agent
 from ai.agents.verifier import critic as verifier_critic
 from ai.canonical import canonical_json
@@ -20,6 +21,7 @@ MANIFEST_NAME = "MANIFEST.json"
 PROMPT_VERSIONS: dict[str, int] = {
     extraction_prompts.PROMPT_ID: extraction_prompts.PROMPT_VERSION,
     extraction_prompts.REVISE_PROMPT_ID: extraction_prompts.PROMPT_VERSION,
+    fix_prompts.PROMPT_ID: fix_prompts.PROMPT_VERSION,
     intake_agent.PROMPT_ID: intake_agent.PROMPT_VERSION,
     verifier_critic.CRITIC_PROMPT_ID: verifier_critic.PROMPT_VERSION,
     verifier_critic.ESCALATION_PROMPT_ID: verifier_critic.PROMPT_VERSION,
