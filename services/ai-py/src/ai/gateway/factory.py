@@ -5,13 +5,16 @@ semaphore slot, so queued calls neither pass the cap check together nor hold res
 Only the fake gateway may run without the spend limiter's store (`live=False`); every other provider fails
 closed when Valkey is down.
 
-The provider is chosen by AI_GATEWAY: `anthropic` (the only live adapter), `replay` (recordings under
+The provider is chosen by AI_GATEWAY (alias AI_PROVIDER): `anthropic`, `openai_compat` (any OpenAI-compatible
+chat-completions endpoint, AI_OPENAI_*; live like anthropic: same spend cap, fail-closed limiter and
+cache layers), `replay` (recordings under
 AI_RECORDINGS_DIR) or `fake` (ScenarioGateway, the compose default). AI_CACHE picks the backing store of both
 the response cache and the per-Firm spend counters: `valkey` shares them across replicas through one client,
 `memory` keeps them in the process, `none` drops the response cache (the spend cap stays, in memory).
 
 Everything is lazy: no Valkey connection, provider call or API-key check happens here. A missing
-ANTHROPIC_API_KEY or an unreachable Valkey surfaces on the first call, as a node failure the runtime handles.
+ANTHROPIC_API_KEY (or AI_OPENAI_API_KEY) or an unreachable Valkey surfaces on the first call, as a node
+failure the runtime handles.
 """
 
 from __future__ import annotations
@@ -38,6 +41,14 @@ def _provider(settings: Settings) -> ModelGateway:
             from ai.gateway.anthropic_gw import make_gateway  # the SDK is imported only when it is used
 
             return make_gateway()
+        case "openai_compat":
+            from ai.gateway.openai_compat_gw import make_gateway as make_openai_gateway
+
+            return make_openai_gateway(
+                base_url=settings.openai_base_url, api_key=settings.openai_api_key,
+                model_fast=settings.openai_model_fast, model_smart=settings.openai_model_smart,
+                price_input_micro=settings.openai_price_input_micro,
+                price_output_micro=settings.openai_price_output_micro)
         case "replay":
             return ReplayGateway(settings.recordings_dir)
         case "fake":
@@ -62,6 +73,9 @@ def build_gateway(settings: Settings) -> ModelGateway:
         return gw
     # Canned fake responses live under their own prefix: after a switch to a live gateway, a reprocessed
     # document must never be served a cached fake extraction (Valkey keeps entries for 30 days).
-    prefix = f"{VALKEY_PREFIX}fake:" if settings.gateway == "fake" else VALKEY_PREFIX
+    # The same goes for openai_compat: its cache key (tier, prompt, input) matches Anthropic's, but its answers
+    # come from another model and must never be served to, or from, an Anthropic-backed run.
+    prefix = (f"{VALKEY_PREFIX}{settings.gateway}:" if settings.gateway in ("fake", "openai_compat")
+              else VALKEY_PREFIX)
     cache: ResponseCache = ValkeyCache(client=client, prefix=prefix) if client is not None else MemoryCache()
     return CachingGateway(gw, cache)

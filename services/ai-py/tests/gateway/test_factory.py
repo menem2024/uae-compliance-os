@@ -141,3 +141,34 @@ def test_fake_responses_never_share_the_live_cache_namespace():
 
     assert cache_prefix("anthropic") == cache_prefix("replay") == "llmcache:v1:"
     assert cache_prefix("fake") == "llmcache:v1:fake:"
+
+
+async def test_openai_compat_builds_lazily_live_and_in_its_own_cache_namespace():
+    from ai.gateway.openai_compat_gw import OpenAICompatGateway
+
+    s = Settings(gateway="openai_compat", cache="valkey", valkey_url=UNREACHABLE_VALKEY, openai_api_key="k",
+                 openai_base_url="https://x.example/v1", openai_model_fast="f", openai_model_smart="m")
+    gw = build_gateway(s)
+    stack = layers(gw)
+    assert [type(x) for x in stack] == [CachingGateway, ConcurrencyLimitedGateway, SpendLimitedGateway,
+                                        OpenAICompatGateway]
+    assert stack[2]._live is True  # type: ignore[attr-defined]  fails closed like anthropic
+    assert stack[0]._cache._prefix.endswith("openai_compat:")  # type: ignore[attr-defined]
+    assert stack[0]._cache._prefix != cache_prefix_of("anthropic")  # type: ignore[attr-defined]
+    with pytest.raises(SpendLimiterUnavailable):  # the cap fails closed; no provider call
+        await gw.complete(intake_req())
+
+
+def cache_prefix_of(gateway: str) -> str:
+    s = Settings(gateway=gateway, cache="valkey", valkey_url=UNREACHABLE_VALKEY)
+    return layers(build_gateway(s))[0]._cache._prefix  # type: ignore[attr-defined]
+
+
+def test_openai_compat_results_are_not_forced_nor_auto_accepted_by_the_consumer():
+    """Live gateways are judged by the verifier alone (documents_consumer.synthetic_results is fake-only):
+    openai_compat is a live gateway, so it gets the same verifier gate as anthropic, nothing weaker."""
+    from ai.service.documents_consumer import synthetic_results
+
+    assert synthetic_results(Settings(gateway="openai_compat")) is False
+    assert synthetic_results(Settings(gateway="anthropic")) is False
+    assert synthetic_results(Settings(gateway="fake")) is True
