@@ -19,6 +19,7 @@ import (
 	"github.com/menem2024/uae-platform/services/api-go/internal/auth"
 	"github.com/menem2024/uae-platform/services/api-go/internal/db"
 	"github.com/menem2024/uae-platform/services/api-go/internal/exports"
+	"github.com/menem2024/uae-platform/services/api-go/internal/proposals"
 	"github.com/menem2024/uae-platform/services/api-go/internal/validation"
 )
 
@@ -145,6 +146,8 @@ type Module struct {
 
 	// Fixes is nil until Task 20 (gate GB-2) wires the Fix agent: POST .../fixes answers fix_unavailable.
 	Fixes FixRequester
+	// Proposals maps every proposal kind to its Applier (built by wireProposals).
+	Proposals *proposals.Registry
 	// Mounts are extra routes added by wireProposals (Task 19).
 	Mounts []Mount
 }
