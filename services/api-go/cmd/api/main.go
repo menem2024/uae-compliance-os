@@ -324,6 +324,7 @@ func serve(ctx context.Context) (err error) {
 		ReadLimiter:  trackc.NamedLimiter("c-read", ratelimit.New(rdb, tcCfg.ReadPerMinute)),
 		WriteLimiter: trackc.NamedLimiter("c-write", ratelimit.New(rdb, tcCfg.WritePerMinute)),
 		Config:       tcCfg,
+		JS:           jsh,
 	})
 	if err != nil {
 		return err
@@ -334,7 +335,7 @@ func serve(ctx context.Context) (err error) {
 	consumerCtx, stopConsumer := context.WithCancel(ctx)
 	defer stopConsumer()
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		consumer.Run(consumerCtx)
@@ -342,6 +343,10 @@ func serve(ctx context.Context) (err error) {
 	go func() {
 		defer wg.Done()
 		tc.Sweeper().Run(consumerCtx)
+	}()
+	go func() {
+		defer wg.Done()
+		tc.Run(consumerCtx) // the Fix agent's api-fix-tasks consumer and task sweeper
 	}()
 
 	app, err := trackb.Build(ctx, trackb.Deps{
@@ -366,7 +371,7 @@ func serve(ctx context.Context) (err error) {
 
 	srv := newHTTPServer(cfg.HTTPAddr,
 		httpapi.NewRouter(verifier, store, events.NewPublisher(jsh), ratelimit.New(rdb, cfg.RateLimitPerMinute),
-			readiness(pool, nc, rdb, mc, consumer, app), httpapi.WithTrackB(app), httpapi.WithTrackC(tc)))
+			readiness(pool, nc, rdb, mc, consumer, app, tc), httpapi.WithTrackB(app), httpapi.WithTrackC(tc)))
 	srvErr := make(chan error, 1)
 	go func() {
 		slog.Info("http server listening", "addr", cfg.HTTPAddr)
@@ -421,7 +426,7 @@ func connectNATS(ctx context.Context, url string) (*nats.Conn, jetstream.JetStre
 }
 
 // readiness checks every dependency the API needs to serve traffic.
-func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.Client, consumer *events.ValidationConsumer, app *trackb.App) func(context.Context) error {
+func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.Client, consumer *events.ValidationConsumer, app *trackb.App, tc *trackc.Module) func(context.Context) error {
 	return func(ctx context.Context) error {
 		if err := pool.Ping(ctx); err != nil {
 			return fmt.Errorf("postgres: %w", err)
@@ -434,6 +439,9 @@ func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.C
 		}
 		if err := app.Ready(ctx); err != nil {
 			return fmt.Errorf("track b: %w", err)
+		}
+		if err := tc.Ready(ctx); err != nil {
+			return fmt.Errorf("track c: %w", err)
 		}
 		if err := rdb.Ping(ctx).Err(); err != nil {
 			return fmt.Errorf("valkey: %w", err)

@@ -22,6 +22,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -102,13 +103,15 @@ type propStack struct {
 	http *http.Client
 }
 
-func newPropStack(t *testing.T) *propStack {
+func newPropStack(t *testing.T) *propStack { return newPropStackJS(t, nil) }
+
+func newPropStackJS(t *testing.T, js jetstream.JetStream) *propStack {
 	t.Helper()
 	env := trackctest.Setup(t)
 	val := &propValidator{}
 	tc, err := trackc.New(trackc.Deps{Pool: env.App, Validator: val, Exporter: propExporter{}, Store: propStore{},
 		Firms: propFirms{"org-a": env.FirmA, "org-b": env.FirmB}, ReadLimiter: allowAll{}, WriteLimiter: allowAll{},
-		Config: trackc.Config{ReadPerMinute: 1000, WritePerMinute: 1000, ExportsBucket: "documents"}})
+		Config: trackc.Config{FixAgentAuto: true, ReadPerMinute: 1000, WritePerMinute: 1000, ExportsBucket: "documents"}, JS: js})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,11 +10,13 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/menem2024/uae-platform/services/api-go/internal/auth"
 	"github.com/menem2024/uae-platform/services/api-go/internal/db"
@@ -144,8 +146,15 @@ type Module struct {
 	WriteLimiter Limiter
 	Config       Config
 
+	js jetstream.JetStream
+
 	// Fixes is nil until Task 20 (gate GB-2) wires the Fix agent: POST .../fixes answers fix_unavailable.
 	Fixes FixRequester
+	// Fixes' background work (api-fix-tasks consumer, fix task sweeper) is registered by wireFixes; Run
+	// starts it, Ready reports on it.
+	loops []func(context.Context)
+	ready []func(context.Context) error
+
 	// Proposals maps every proposal kind to its Applier (built by wireProposals).
 	Proposals *proposals.Registry
 	// Mounts are extra routes added by wireProposals (Task 19).
@@ -162,6 +171,9 @@ type Deps struct {
 	ReadLimiter  Limiter // already named c-read (see NamedLimiter)
 	WriteLimiter Limiter // already named c-write
 	Config       Config
+	// JS is the JetStream handle the Fix agent requests and answers travel on. Optional: when nil the
+	// module serves no Fix agent (POST .../fixes answers fix_unavailable and runs trigger nothing).
+	JS jetstream.JetStream
 }
 
 // New builds the module and runs the wiring steps.
@@ -179,6 +191,7 @@ func New(d Deps) (*Module, error) {
 		WriteLimiter: d.WriteLimiter,
 		Config:       d.Config,
 	}
+	m.js = d.JS
 	wireProposals(m)
 	wireFixes(m)
 	return m, nil
@@ -187,4 +200,25 @@ func New(d Deps) (*Module, error) {
 // Sweeper returns the background re-validation of invoices left in status "fixed" (spec §5.6.2).
 func (m *Module) Sweeper() *validation.Sweeper {
 	return &validation.Sweeper{Svc: m.Validation, Pool: m.Pool, Interval: 30 * time.Second, MinAge: 30 * time.Second}
+}
+
+// Run starts the module's background work (the Fix agent's consumer and sweeper) and blocks until ctx
+// is done and every loop has returned. Without a Fix agent it only waits for ctx.
+func (m *Module) Run(ctx context.Context) {
+	var wg sync.WaitGroup
+	for _, loop := range m.loops {
+		wg.Go(func() { loop(ctx) })
+	}
+	<-ctx.Done()
+	wg.Wait()
+}
+
+// Ready reports whether the module's consumers are running.
+func (m *Module) Ready(ctx context.Context) error {
+	for _, r := range m.ready {
+		if err := r(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
