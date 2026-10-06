@@ -25,6 +25,12 @@
 //! `rust.json` in `<dir>` are replaced; any other file there is an error, so a mistyped
 //! directory is never cleaned.
 //!
+//! `fix-dataset --out <file>` generates the Fix agent's eval dataset (`FixSuite`, Phase 2 Task 22):
+//! 40 cases, each one corpus example with exactly one injected defect, its real RuleSet issues
+//! and the truth `(path, value)`. A defect is kept only when the injected invoice fails with
+//! nothing but that field (plus issues the rules fix with a suggested value) and restoring the
+//! truth makes it pass with zero errors. The output is deterministic.
+//!
 //! `corpus`, `coverage-md` and `snapshot` arrive with Task 15.
 
 use std::collections::{BTreeMap, HashSet};
@@ -42,7 +48,7 @@ use validator_rs::export;
 use validator_rs::pb;
 use validator_rs::ruleset::{self, RuleSet};
 
-const USAGE: &str = "usage:\n  conformance export --in <canonical json> --out <xml>\n  conformance mutations --family <family> --out <dir>";
+const USAGE: &str = "usage:\n  conformance export --in <canonical json> --out <xml>\n  conformance mutations --family <family> --out <dir>\n  conformance fix-dataset --out <file>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -69,6 +75,10 @@ fn run(args: &[String]) -> Result<String, String> {
             let family = Family::parse(&o["--family"])
                 .ok_or_else(|| format!("unknown family {:?}", o["--family"]))?;
             mutations_cmd(family, Path::new(&o["--out"]), ruleset::default_ruleset())
+        }
+        Some("fix-dataset") => {
+            let o = opts(&args[1..], &["--out"])?;
+            fix_dataset_cmd(Path::new(&o["--out"]), ruleset::default_ruleset())
         }
         _ => Err(USAGE.into()),
     }
@@ -207,10 +217,302 @@ fn mutations_cmd(family: Family, dir: &Path, rs: &RuleSet) -> Result<String, Str
     Ok(summary)
 }
 
+/// One injected defect: `path` gets `bad` (`""` clears the field) and the truth is `truth`.
+struct Defect {
+    path: String,
+    bad: String,
+    truth: String,
+}
+
+/// Defect kinds with their case quotas (40 in all). The first case of each kind is the `pr`
+/// subset (10 cases).
+const FIX_KINDS: [(&str, usize); 10] = [
+    ("emirate_seller", 5),
+    ("emirate_buyer", 4),
+    ("tax_category", 5),
+    ("due_date", 5),
+    ("period_start", 3),
+    ("tax_point", 3),
+    ("exemption_reason", 3),
+    ("unit_code", 5),
+    ("country_code", 5),
+    ("time_format", 2),
+];
+
+fn json_get(v: &serde_json::Value, path: &str) -> Option<String> {
+    let mut cur = v;
+    for seg in path.split('.') {
+        cur = match seg.split_once('[') {
+            Some((name, rest)) => {
+                let i: usize = rest.strip_suffix(']')?.parse().ok()?;
+                cur.get(name)?.get(i)?
+            }
+            None => cur.get(seg)?,
+        };
+    }
+    cur.as_str().map(str::to_string)
+}
+
+fn emirate_of(city: &str) -> Option<&'static str> {
+    match city {
+        "Abu Dhabi" => Some("AUH"),
+        "Dubai" => Some("DXB"),
+        "Sharjah" => Some("SHJ"),
+        _ => None,
+    }
+}
+
+/// `2025-02-13` as `13/02/2025`.
+fn dd_mm_yyyy(iso: &str) -> Option<String> {
+    let b = iso.as_bytes();
+    if b.len() != 10 || b[4] != b'-' || b[7] != b'-' {
+        return None;
+    }
+    Some(format!("{}/{}/{}", &iso[8..10], &iso[5..7], &iso[..4]))
+}
+
+fn lower_differs(v: &str) -> Option<String> {
+    Some(v.to_lowercase()).filter(|l| l != v)
+}
+
+fn defect_for(kind: &str, inv: &serde_json::Value) -> Option<Defect> {
+    let simple = |path: &str, bad: &dyn Fn(&str) -> Option<String>| {
+        let truth = json_get(inv, path)?;
+        Some(Defect {
+            path: path.to_string(),
+            bad: bad(&truth)?,
+            truth,
+        })
+    };
+    let emirate = |party: &str| {
+        let base = format!("{party}.postal_address");
+        let city = json_get(inv, &format!("{base}.city"))?;
+        let code = json_get(inv, &format!("{base}.country_subdivision"))?;
+        (json_get(inv, &format!("{base}.country_code")).as_deref() == Some("AE")
+            && emirate_of(&city) == Some(code.as_str()))
+        .then(|| Defect {
+            path: format!("{base}.country_subdivision"),
+            bad: String::new(),
+            truth: code,
+        })
+    };
+    match kind {
+        "emirate_seller" => emirate("seller"),
+        "emirate_buyer" => emirate("buyer"),
+        "tax_category" => simple("tax_breakdown[0].category.code", &lower_differs),
+        "due_date" => simple("payment_due_date", &dd_mm_yyyy),
+        "period_start" => simple("invoicing_period.start_date", &dd_mm_yyyy),
+        "tax_point" => simple("tax_point_date", &dd_mm_yyyy),
+        "exemption_reason" => {
+            let lines = inv.get("lines")?.as_array()?;
+            (0..lines.len()).find_map(|i| {
+                if json_get(inv, &format!("lines[{i}].tax.code")).as_deref() != Some("E") {
+                    return None;
+                }
+                let path = format!("lines[{i}].tax.exemption_reason_code");
+                json_get(inv, &path).map(|truth| Defect {
+                    path,
+                    bad: String::new(),
+                    truth,
+                })
+            })
+        }
+        "unit_code" => simple("lines[0].unit_code", &lower_differs),
+        "country_code" => simple("buyer.postal_address.country_code", &|v| {
+            lower_differs(v).filter(|_| v.len() == 2)
+        }),
+        "time_format" => simple("issue_time", &|v| {
+            (v.len() > 8).then(|| format!("{}{}", v[..8].replace(':', "."), &v[8..]))
+        }),
+        _ => None,
+    }
+}
+
+fn issue_json(i: &pb::ValidationIssue) -> serde_json::Value {
+    let args: BTreeMap<&String, &String> = i.message_args.iter().collect();
+    json!({
+        "rule_id": i.rule_id,
+        "severity": if i.severity() == pb::Severity::Error { "error" } else { "warning" },
+        "path": i.path,
+        "message": i.message,
+        "business_term": i.business_term,
+        "fixable": i.fixable,
+        "suggested_value": i.suggested_value,
+        "message_args": args,
+    })
+}
+
+fn set_of(path: &str, value: &str) -> serde_json::Map<String, serde_json::Value> {
+    let mut m = serde_json::Map::new();
+    m.insert(
+        path.to_string(),
+        serde_json::Value::String(value.to_string()),
+    );
+    m
+}
+
+fn has_errors(run: &pb::ValidationRun) -> bool {
+    run.issues
+        .iter()
+        .any(|i| i.severity() == pb::Severity::Error)
+}
+
+/// The case of one defect on one example, or `None` when the defect is not a clean single-field
+/// one (see the module docs).
+fn fix_case(
+    rs: &RuleSet,
+    kind: &str,
+    slug: &str,
+    base: &pb::Invoice,
+    d: &Defect,
+) -> Option<serde_json::Value> {
+    let mut bad = base.clone();
+    conformance::apply_patch(&mut bad, &set_of(&d.path, &d.bad), &[]).ok()?;
+    let run = rs.validate(&bad);
+    let errors: Vec<&pb::ValidationIssue> = run
+        .issues
+        .iter()
+        .filter(|i| i.severity() == pb::Severity::Error)
+        .collect();
+    let targets: Vec<&&pb::ValidationIssue> = errors
+        .iter()
+        .filter(|i| i.fixable && i.suggested_value.is_empty())
+        .collect();
+    if targets.is_empty()
+        || targets.iter().any(|i| i.path != d.path)
+        || errors
+            .iter()
+            .any(|i| i.path != d.path && i.suggested_value.is_empty())
+    {
+        return None;
+    }
+    let mut fixed = bad.clone();
+    conformance::apply_patch(&mut fixed, &set_of(&d.path, &d.truth), &[]).ok()?;
+    if has_errors(&rs.validate(&fixed)) {
+        return None;
+    }
+    let invoice: serde_json::Value =
+        serde_json::from_str(&validator_rs::canonical_json::to_canonical_json(&bad)).ok()?;
+    Some(json!({
+        "base": slug,
+        "invoice": invoice,
+        "issues": run.issues.iter().map(issue_json).collect::<Vec<_>>(),
+        "kind": kind,
+        "truth": [{"path": d.path, "value": d.truth}],
+    }))
+}
+
+/// The dataset as JSONL text: 40 cases, `fix-001`..`fix-040`, grouped by defect kind.
+fn fix_dataset(rs: &RuleSet) -> Result<String, String> {
+    let bases = conformance::examples();
+    let mut docs = Vec::new();
+    for (slug, inv) in &bases {
+        let v = serde_json::from_str::<serde_json::Value>(
+            &validator_rs::canonical_json::to_canonical_json(inv),
+        )
+        .map_err(|e| format!("{slug}: {e}"))?;
+        docs.push(v);
+    }
+    let mut out = String::new();
+    let mut n = 0;
+    for (kind, quota) in FIX_KINDS {
+        let mut eligible = Vec::new();
+        for ((slug, inv), doc) in bases.iter().zip(&docs) {
+            if let Some(d) = defect_for(kind, doc)
+                && let Some(case) = fix_case(rs, kind, slug, inv, &d)
+            {
+                eligible.push(case);
+            }
+        }
+        if eligible.len() < quota {
+            return Err(format!(
+                "{kind}: {} clean cases, {quota} needed",
+                eligible.len()
+            ));
+        }
+        for i in 0..quota {
+            let mut case = eligible[i * eligible.len() / quota].clone();
+            n += 1;
+            let mut tags = vec![format!("defect:{kind}")];
+            if i == 0 {
+                tags.push("subset:pr".to_string());
+            }
+            let obj = case.as_object_mut().expect("case is an object");
+            obj.remove("kind");
+            obj.insert("case_id".into(), json!(format!("fix-{n:03}")));
+            obj.insert("tags".into(), json!(tags));
+            out.push_str(&serde_json::to_string(&case).map_err(|e| e.to_string())?);
+            out.push('\n');
+        }
+    }
+    Ok(out)
+}
+
+fn fix_dataset_cmd(out: &Path, rs: &RuleSet) -> Result<String, String> {
+    let text = fix_dataset(rs)?;
+    if let Some(dir) = out.parent() {
+        fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    }
+    fs::write(out, &text).map_err(|e| format!("{}: {e}", out.display()))?;
+    Ok(format!(
+        "wrote {} ({} cases, sha256 {})",
+        out.display(),
+        text.lines().count(),
+        hex::encode(Sha256::digest(text.as_bytes()))
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn fix_dataset_has_40_clean_cases_and_a_10_case_pr_subset() {
+        let rs = ruleset::default_ruleset();
+        let text = fix_dataset(rs).unwrap();
+        assert_eq!(text, fix_dataset(rs).unwrap(), "deterministic");
+        let cases: Vec<serde_json::Value> = text
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
+        assert_eq!(cases.len(), 40);
+        let pr = cases
+            .iter()
+            .filter(|c| {
+                c["tags"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|t| t == "subset:pr")
+            })
+            .count();
+        assert_eq!(pr, 10);
+        for c in &cases {
+            let truth = c["truth"].as_array().unwrap();
+            assert_eq!(truth.len(), 1);
+            let path = truth[0]["path"].as_str().unwrap();
+            assert!(
+                c["issues"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|i| i["path"] == path)
+            );
+        }
+    }
+
+    #[test]
+    fn committed_fix_dataset_is_current() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let file = root.join("../ai-py/evals/datasets/fix/cases.jsonl");
+        let on_disk =
+            fs::read_to_string(&file).unwrap_or_else(|e| panic!("{}: {e}", file.display()));
+        assert!(
+            on_disk == fix_dataset(ruleset::default_ruleset()).unwrap(),
+            "stale: cargo run --bin conformance -- fix-dataset --out ../ai-py/evals/datasets/fix/cases.jsonl"
+        );
+    }
 
     fn s(v: &[&str]) -> Vec<String> {
         v.iter().map(|x| x.to_string()).collect()
