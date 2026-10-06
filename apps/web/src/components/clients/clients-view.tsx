@@ -52,6 +52,9 @@ export function ClientsView() {
     getNextPageParam: (last) => last.next_cursor,
   });
   const rows = list.data?.pages.flatMap((p) => p.items) ?? [];
+  // The counts are uploaded documents. Invoices created through the API carry no client, so while nothing
+  // was uploaded for any listed company the columns would only show misleading zeros: hide them.
+  const showDocCounts = rows.some((c) => (c.documents_total ?? 0) > 0);
 
   const toggle = useMutation({
     mutationFn: (c: ClientCompany) =>
@@ -102,8 +105,8 @@ export function ClientsView() {
               <th className="px-4 py-2 text-start font-medium">{t("columns.name")}</th>
               <th className="px-4 py-2 text-start font-medium">{t("columns.trn")}</th>
               <th className="px-4 py-2 text-start font-medium">{t("columns.emirate")}</th>
-              <th className="px-4 py-2 text-end font-medium">{t("columns.documents")}</th>
-              <th className="px-4 py-2 text-end font-medium">{t("columns.needsReview")}</th>
+              {showDocCounts && <th className="px-4 py-2 text-end font-medium">{t("columns.documents")}</th>}
+              {showDocCounts && <th className="px-4 py-2 text-end font-medium">{t("columns.needsReview")}</th>}
               <th className="px-4 py-2" />
             </tr>
           </thead>
@@ -116,12 +119,14 @@ export function ClientsView() {
                 </td>
                 <td className="px-4 py-2.5 font-mono tabular-nums" dir="ltr">{c.trn ?? "—"}</td>
                 <td className="px-4 py-2.5">{c.emirate ? t(`emirates.${c.emirate}`) : "—"}</td>
-                <td className="px-4 py-2.5 text-end tabular-nums">{formatInt(c.documents_total ?? 0)}</td>
-                <td className="px-4 py-2.5 text-end tabular-nums">
-                  <span className={cn((c.documents_needs_review ?? 0) > 0 && "font-medium text-warn")}>
-                    {formatInt(c.documents_needs_review ?? 0)}
-                  </span>
-                </td>
+                {showDocCounts && <td className="px-4 py-2.5 text-end tabular-nums">{formatInt(c.documents_total ?? 0)}</td>}
+                {showDocCounts && (
+                  <td className="px-4 py-2.5 text-end tabular-nums">
+                    <span className={cn((c.documents_needs_review ?? 0) > 0 && "font-medium text-warn")}>
+                      {formatInt(c.documents_needs_review ?? 0)}
+                    </span>
+                  </td>
+                )}
                 <td className="px-4 py-2.5">
                   <div className="flex justify-end gap-1">
                     <Button variant="ghost" size="icon-sm" aria-label={t("edit")} onClick={() => setEditing(c)}>
