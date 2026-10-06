@@ -18,8 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The runner user is uid 1001, not the compose default 1000. The bootstrap runs as
+      # HOST_UID:HOST_GID so it can write deploy/compose/.env.generated into the checkout.
       - name: make up
-        run: make up
+        run: HOST_UID="$(id -u)" HOST_GID="$(id -g)" make up
 
       - name: compose-check
         run: bash scripts/compose-check.sh
