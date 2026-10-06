@@ -6,7 +6,8 @@
   "scripts": {
     "test": "playwright test",
     "test:list": "playwright test --list",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p seed",
+    "seed:test": "node --no-warnings --test seed/generate.test.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

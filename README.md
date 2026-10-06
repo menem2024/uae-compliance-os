@@ -94,6 +94,34 @@ unmeasured. See [`docs/STATUS.md`](docs/STATUS.md).
 
 The four sample invoices are in [`demo/samples/`](demo/samples) and derive from the official example.
 
+### Seed demo data
+
+So the app does not open empty, `scripts/seed-demo.sh` fills a running stack with synthetic UAE data through the
+real path only (no direct database writes): it signs in through the normal Zitadel login in a headless browser and
+calls the app's own `/api` routes, so everything is validated by the Rust engine, goes through the state machine and
+lands in the audit log.
+
+```bash
+bash scripts/seed-demo.sh                      # http://localhost:3000, a@firm-a.test / b@firm-b.test, dev password
+BASE_URL=https://demo.example SEED_PASSWORD=... bash scripts/seed-demo.sh     # another stack
+bash scripts/seed-demo.sh --dry-run            # print the plan, touch nothing
+```
+
+Firm A gets 10 fictional client companies (English and Arabic names, all seven emirates, synthetic 15-digit TRNs)
+and 30 invoices derived from the canonical samples with deterministic variation (all in 2026): 16 valid, 6 totals
+mismatches, 4 bad seller TRNs, 4 missing buyer fields. Then the human steps run through the API: 10 valid invoices are
+approved (5 of them exported to PINT-AE XML) and 2 mismatches get the suggested correction, which leaves
+10 `ready`, 8 `validated` and 12 `has_issues`, with audit trails on the touched ones. Firm B gets 2 clients and 3 invoices,
+and the script ends with an isolation check (neither firm sees the other's data).
+
+It is idempotent: clients are matched by TRN and invoices by their deterministic number before anything is created, each
+human step runs only when the invoice is in the state it needs, and nothing is ever deleted. Settings (environment,
+all optional): `BASE_URL`, `SEED_EMAIL`, `SEED_PASSWORD` (falls back to `SEED_USER_PASSWORD`, then the local dev password;
+never committed), `SEED_EMAIL_B`, `SEED_PASSWORD_B`, `SEED_FIRM_B=0`, `SEED_BRAND=0`. Needs Node 22.18+ and the
+Playwright Chromium from `e2e/` (installed on first run; on a minimal Linux also `npx playwright install-deps chromium`).
+Documents and the AI `needs_review` queue are not seeded: presigned uploads need MinIO to be reachable from the script,
+and extraction needs a model. The generator is unit-tested with `cd e2e && npm run seed:test`.
+
 ## Tests
 
 ```bash
