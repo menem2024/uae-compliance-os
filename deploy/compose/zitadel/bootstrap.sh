@@ -15,6 +15,7 @@
 #   ZITADEL_CONNECT_TO   optional curl --connect-to HOST1:PORT1:HOST2:PORT2
 #   ZITADEL_PAT_FILE     PAT of the FirstInstance machine user (default /machinekey/admin.pat)
 #   ZITADEL_PROJECT_ID   required, fixed project id
+#   SEED_USER_PASSWORD   password of the seeded firm users (default Password1!, dev only)
 #   WEB_URL              web origin for redirect URIs (default http://localhost:3000)
 #   DATABASE_OWNER_URL   required, owner connection to the compliance database
 #   ENV_FILE             generated env file (default /generated/.env.generated)
@@ -28,7 +29,7 @@ WEB_URL=${WEB_URL:-http://localhost:3000}
 DB_URL=${DATABASE_OWNER_URL:?DATABASE_OWNER_URL is required}
 ENV_FILE=${ENV_FILE:-/generated/.env.generated}
 HOST_ENV_FILE=${HOST_ENV_FILE:-}
-DEV_PASSWORD='Password1!'
+DEV_PASSWORD=${SEED_USER_PASSWORD:-Password1!}
 
 log() { echo "bootstrap: $*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
