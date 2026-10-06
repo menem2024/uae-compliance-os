@@ -8,6 +8,27 @@ firms have to get their SME clients' invoices ready before the mandate reaches t
 > verified end to end. Language-model features are built but not yet measured against a real model. See
 > [`docs/STATUS.md`](docs/STATUS.md) for exactly what is verified, what is only implemented, and what is blocked.
 
+## Screenshots
+
+Taken from the running demo with synthetic data (10 fictional clients, 30 invoices), in English and Arabic (right-to-left).
+
+| | |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard-en.png) | ![Dashboard in Arabic](docs/screenshots/dashboard-ar.png) |
+| **Dashboard**: live counts, pipeline, countdown to the 2027-07-01 mandate | **Dashboard in Arabic**, mirrored for right-to-left |
+| ![Invoices](docs/screenshots/invoices-en.png) | ![Clients](docs/screenshots/clients-en.png) |
+| **Invoices** with status and issue date | **Client companies** |
+| ![Review with findings](docs/screenshots/review-issues-en.png) | ![Review in Arabic](docs/screenshots/review-issues-ar.png) |
+| **Review**: finding with the official business term, suggested fix, re-validate | **Review in Arabic**: rule messages in Arabic |
+| ![Agent activity](docs/screenshots/agents-en.png) | |
+| **Agent activity**: the live orchestra feed | |
+
+## Try it
+
+- **Live demo:** the owner can share a temporary link and demo account (a Cloudflare quick tunnel to their machine, so it is only up while that machine is running; the password is sent privately and is never in this repo). Document upload and AI extraction are off in that public copy.
+- **Run it yourself** (Docker needed, no API key needed): `bash scripts/demo.sh`, then open http://localhost:3000/en/invoices. Details below under "Run the demo". Fill it with realistic synthetic data using `bash scripts/seed-demo.sh` (see "Seed demo data").
+- **Honest status:** [`docs/STATUS.md`](docs/STATUS.md) lists what is verified, implemented, in progress, blocked and planned. Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 ## What it does today
 
 ```
