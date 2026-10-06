@@ -22,8 +22,10 @@ gen:
 	cd services/ai-py && uv run python -m grpc_tools.protoc -I ../../proto \
 	  --python_out=src/ai/gen --pyi_out=src/ai/gen \
 	  ../../proto/compliance/v1/*.proto
+	cd services/ai-py && uv run python -m grpc_tools.protoc -I ../../proto \
+	  --grpc_python_out=src/ai/gen ../../proto/compliance/v1/validator.proto
 	find services/ai-py/src/ai/gen -type d -exec touch {}/__init__.py \;
-	sed -i 's/^from compliance\.v1 import/from ai.gen.compliance.v1 import/' services/ai-py/src/ai/gen/compliance/v1/*_pb2.py services/ai-py/src/ai/gen/compliance/v1/*_pb2.pyi
+	sed -i 's/^from compliance\.v1 import/from ai.gen.compliance.v1 import/' services/ai-py/src/ai/gen/compliance/v1/*_pb2.py services/ai-py/src/ai/gen/compliance/v1/*_pb2.pyi services/ai-py/src/ai/gen/compliance/v1/*_pb2_grpc.py
 
 proto-lint:
 	cd proto && buf lint && buf format -d --exit-code
