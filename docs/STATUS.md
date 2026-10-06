@@ -51,7 +51,7 @@ official examples and on tens of thousands of mutated documents (per rule family
 | Blocker | Needs | Effect |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | owner | No real extraction from PDFs/images, no measured accuracy (the exit criterion is 90% on 200 invoices), no Fix agent. Scores in `make evals` come from a scripted fake model and prove the harness, not the AI. With the fake gateway, results are forced to `needs_review`. |
-| Free model key (`AI_OPENAI_API_KEY`, e.g. OpenRouter or Google AI Studio) | owner | `openai_compat` is implemented but has never called a real endpoint. Extraction accuracy on free models is unmeasured and likely below the 90% target; the default free model ids may have been renamed or retired (override with `AI_OPENAI_MODEL_FAST` / `_SMART`). |
+| Free-tier quota for live measurement | owner | Measured on a real Gemini key (2026-10-06). Cause of the earlier 7/24 errors: the free tier allows only 20 requests per day per model (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, HTTP 429 RESOURCE_EXHAUSTED, reset ~16 h), plus an occasional 503 UNAVAILABLE overload. Per-minute pacing cannot fix a daily quota. A 24-case sample needs about 40 calls, so it cannot finish on one free model per day: `gemini-3.5-flash` finished 16/24 cases (field accuracy 88.0%, exact match 78.6% of the 14 that ran, PDFs 100%, images 79.7%, 0 transient errors with pacing) before the 20/day limit. Earlier `gemini-2.5-flash` run: 95.1% on cases that ran, 68.6% overall. Needs a paid key (or several models over several days) for a full, honest 24- or 200-case number. Reports: `services/ai-py/evals/reports/openai_compat/`. |
 | Docker Desktop running | owner | Live stack, Playwright, and the 1000-document chaos test (`scripts/phase1-chaos.sh`) need it. |
 | GitHub remote | owner | CI never ran. |
 | Licence decision D-3 | owner | Official OpenPeppol artefacts are fetched by pinned sha256 script, not vendored. |
@@ -64,6 +64,12 @@ official examples and on tens of thousands of mutated documents (per rule family
 - Phase 3: legal knowledge (RAG over official sources, Legal agent, RegulationWatcher) — plan written, no code.
 - Phase 4: client portal and communications. Phase 5: data science. Phase 6: Zoho/QuickBooks/Tally.
   Phase 7: hardening, load test, security review, cloud dry run.
+- Verifier scope (by design, ADR 006): it checks that the extraction matches the document, not that the invoice is
+  compliant. A source with a missing buyer TRN or amounts off by a cent is accepted when extracted faithfully
+  (arithmetic findings are marked `confirmed_by_critic`); validator-rs judges the document. Real residual gap:
+  the critic only runs when a check flags something or a critical field's confidence is below 0.8, so a wrong
+  value with no arithmetic effect (e.g. invoice_number) can be accepted (1 of 3 wrong extractions in the
+  partial sample). Fixing it means always running the critic, which doubles calls against a 20/day quota.
 - Known gaps recorded in `.ship/tasks/*/concerns.md`: SSE stream lifetime/re-auth, node timeout equals provider
   timeout, spend counters on a non-persistent Valkey, a few review P3s, no visual QA of the UI (RTL, contrast; first screenshot pass done 2026-10-05: sample titles showed raw i18n keys (fixed); invoices table narrowed so it fits at 1280px; a few agent-feed lines stay English in /ar because ai-py emits that text, not the web).
 

@@ -83,3 +83,24 @@ async def test_quota_exhaustion_is_not_retried_with_case_backoff_and_stops_the_s
 
     r = await run_case(Flaky(), None, cases[0], None, sleep)  # type: ignore[arg-type]
     assert r.error == "model_transient" and r.attempts == 4 and slept == [30.0, 60.0, 120.0]
+
+
+def test_verifier_is_scored_on_extraction_fidelity_not_on_source_defects():
+    def case(cid, tags, *, exact, verdict, codes=()):
+        return CaseResult(cid, tags, counted=4, correct=4 if exact else 3, exact=exact, verdict=verdict,
+                          finding_codes=list(codes), per_field={"total_amount": (1, 1 if exact else 0)})
+
+    rs = [case("a", ["lang:en", "format:pdf"], exact=True, verdict="accept"),
+          case("b", ["lang:en", "format:pdf", "defect:missing_buyer_trn"], exact=True, verdict="accept"),
+          case("c", ["lang:en", "format:pdf"], exact=False, verdict="accept",
+               codes=["arithmetic.line_net.confirmed_by_critic"]),
+          case("d", ["lang:en", "format:pdf"], exact=False, verdict="escalate"),
+          case("e", ["lang:en", "format:pdf"], exact=True, verdict="escalate")]
+    v = summarize(rs, gateway="g", models=["m"], planned=5)["verifier"]
+    assert v["by_extraction"] == {
+        "correct": {"verified": 3, "accept": 2, "review": 1},
+        "wrong": {"verified": 2, "accept": 1, "review": 1, "false_accept_rate": 0.5}}
+    assert v["by_defect"] == {"missing_buyer_trn": {"verified": 1, "accept": 1}}
+    assert v["confirmed_by_critic_accepts_on_wrong_extractions"] == 1
+    md = to_markdown(summarize(rs, gateway="g", models=["m"], planned=5))
+    assert "Verifier by extraction correctness" in md and "false accept" in md.lower()

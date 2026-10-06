@@ -190,6 +190,22 @@ def summarize(results: Sequence[CaseResult], *, gateway: str, models: Sequence[s
         v = Counter(r.verdict for r in sel)
         by_kind[kind] = {"verified": len(sel), "accept": v["accept"], "revise": v["revise"],
                          "escalate": v["escalate"], "accept_rate": _ratio(v["accept"], len(sel))}
+    by_extraction: dict[str, dict[str, Any]] = {}
+    for label, pick_exact in (("correct", True), ("wrong", False)):
+        sel = [r for r in verified if r.exact is pick_exact]
+        acc = sum(1 for r in sel if r.verdict == "accept")
+        by_extraction[label] = {"verified": len(sel), "accept": acc, "review": len(sel) - acc}
+    by_extraction["wrong"]["false_accept_rate"] = _ratio(by_extraction["wrong"]["accept"],
+                                                          by_extraction["wrong"]["verified"])
+    by_defect: dict[str, dict[str, int]] = {}
+    for r in verified:
+        for t in r.tags:
+            if t.startswith("defect:"):
+                d = by_defect.setdefault(t.removeprefix("defect:"), {"verified": 0, "accept": 0})
+                d["verified"] += 1
+                d["accept"] += int(r.verdict == "accept")
+    laundered = sum(1 for r in verified if r.verdict == "accept" and not r.exact
+                    and any(c.endswith(".confirmed_by_critic") for c in r.finding_codes))
     by_tag: dict[str, dict[str, Any]] = {}
     for tag in sorted({t for r in results for t in r.tags if t.split(":")[0] in ("lang", "format")}):
         sel = [r for r in results if tag in r.tags]
@@ -212,7 +228,8 @@ def summarize(results: Sequence[CaseResult], *, gateway: str, models: Sequence[s
                      "accept_rate": _ratio(verdicts["accept"], len(verified)),
                      "review_rate": _ratio(len(verified) - verdicts["accept"], len(verified)),
                      "verifier_errors": dict(Counter(r.verifier_error for r in results if r.verifier_error)),
-                     "by_kind": by_kind,
+                     "by_kind": by_kind, "by_extraction": by_extraction, "by_defect": by_defect,
+                     "confirmed_by_critic_accepts_on_wrong_extractions": laundered,
                      "finding_codes": dict(Counter(c for r in verified for c in r.finding_codes))},
         "usage": {"extraction": eu, "verifier": vu,
                   "total": {k: eu[k] + vu[k] for k in eu}},
@@ -245,9 +262,24 @@ def to_markdown(s: Mapping[str, Any]) -> str:
               for t, d in s["per_tag"].items()]
     lines += ["", "## Per field", "", "| field | correct | counted | accuracy |", "|---|---|---|---|"]
     lines += [f"| {n} | {d['correct']} | {d['counted']} | {pct(d['accuracy'])} |" for n, d in s["per_field"].items()]
-    lines += ["", "## Verifier by kind", "", "| kind | verified | accept | revise | escalate |", "|---|---|---|---|---|"]
+    lines += ["", "## Verifier by extraction correctness", "",
+              ("The verifier judges whether the extraction matches the document, so this is its real score. "
+               "A false accept is a wrong extraction the verifier let through."), "",
+              "| extraction | verified | accept | review |", "|---|---|---|---|"]
+    lines += [f"| {k} | {d['verified']} | {d['accept']} | {d['review']} |" for k, d in v["by_extraction"].items()]
+    far = v["by_extraction"]["wrong"]["false_accept_rate"]
+    lines += ["", (f"False accept rate: {pct(far)}. Wrong extractions accepted after the critic 'confirmed' the "
+                   f"flagged values: {v['confirmed_by_critic_accepts_on_wrong_extractions']}.")]
+    lines += ["", "## Verifier by source kind", "",
+              ("`defect` marks a source document that is itself defective (missing buyer TRN, amounts off by a "
+               "cent). A faithful extraction of it is correct, and judging the document is validator-rs's job "
+               "(ADR 006), so accepting these is expected, not a miss."), "",
+              "| kind | verified | accept | revise | escalate |", "|---|---|---|---|---|"]
     lines += [f"| {k} | {d['verified']} | {d['accept']} | {d['revise']} | {d['escalate']} |"
               for k, d in v["by_kind"].items()]
+    if v["by_defect"]:
+        lines += ["", "| source defect | verified | accept |", "|---|---|---|"]
+        lines += [f"| {k} | {d['verified']} | {d['accept']} |" for k, d in sorted(v["by_defect"].items())]
     lines += ["", "## Failure causes", "", f"- Errors: {s['failure_causes']['errors'] or 'none'}",
               f"- Cases with wrong values (no error): {s['failure_causes']['cases_with_wrong_values']}",
               f"- Cases retried after a transient error: {s['failure_causes']['retried_cases']}", "",
