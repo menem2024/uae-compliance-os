@@ -59,7 +59,7 @@ official examples and on tens of thousands of mutated documents (per rule family
 - Phase 4: client portal and communications. Phase 5: data science. Phase 6: Zoho/QuickBooks/Tally.
   Phase 7: hardening, load test, security review, cloud dry run.
 - Known gaps recorded in `.ship/tasks/*/concerns.md`: SSE stream lifetime/re-auth, node timeout equals provider
-  timeout, spend counters on a non-persistent Valkey, a few review P3s, no visual QA of the UI (RTL, contrast; screenshots never reviewed).
+  timeout, spend counters on a non-persistent Valkey, a few review P3s, no visual QA of the UI (RTL, contrast; first screenshot pass done 2026-10-05: sample titles showed raw i18n keys (fixed); the invoices table clips its last column at 1280px (scrolls horizontally, not fixed); a few agent-feed lines stay English in /ar).
 
 ## Phase checklist
 

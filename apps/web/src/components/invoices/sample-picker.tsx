@@ -13,7 +13,7 @@ import { useErrorText } from "./use-error-text";
 
 /** "New demo invoice": POSTs one of the canonical samples as it is, then opens its review page. */
 export function SamplePicker() {
-  const t = useTranslations("P2Invoices.samples");
+  const t = useTranslations("P2Invoices");
   const errorText = useErrorText();
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
@@ -30,9 +30,9 @@ export function SamplePicker() {
       <header className="flex flex-col gap-1">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold">
           <FlaskConical className="size-4 text-brand-ink" aria-hidden />
-          {t("title")}
+          {t("samples.title")}
         </h2>
-        <p className="text-xs text-muted-foreground">{t("hint")}</p>
+        <p className="text-xs text-muted-foreground">{t("samples.hint")}</p>
       </header>
 
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -51,7 +51,7 @@ export function SamplePicker() {
                   s.expected === "validated" ? "bg-ok-soft text-ok" : "bg-warn-soft text-warn",
                 )}
               >
-                {t(`expected.${s.expected}`)}
+                {t(`samples.expected.${s.expected}`)}
               </span>
             </div>
             <Button
@@ -66,7 +66,7 @@ export function SamplePicker() {
               ) : (
                 <Send className="rtl:-scale-x-100" aria-hidden />
               )}
-              {pending === s.id ? t("creating") : t("create")}
+              {pending === s.id ? t("samples.creating") : t("samples.create")}
             </Button>
           </li>
         ))}
@@ -74,7 +74,7 @@ export function SamplePicker() {
 
       {create.isError && (
         <p role="alert" data-testid="sample-error" className="text-sm text-bad">
-          {t("createError")} {errorText(create.error)}
+          {t("samples.createError")} {errorText(create.error)}
         </p>
       )}
     </section>
