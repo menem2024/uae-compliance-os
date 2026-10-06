@@ -116,6 +116,14 @@ def build_body(req: ModelRequest, model_id: str) -> dict[str, Any]:
     return body
 
 
+def _pdfs_as_image_url(body: dict[str, Any]) -> None:
+    """Gemini's OpenAI endpoint rejects `file` parts (HTTP 400) but reads a PDF sent as an image_url data URL."""
+    for m in body["messages"]:
+        if isinstance(m.get("content"), list):
+            m["content"] = [{"type": "image_url", "image_url": {"url": c["file"]["file_data"]}}
+                            if c.get("type") == "file" else c for c in m["content"]]
+
+
 def _retry_after(response: httpx2.Response) -> float | None:
     raw = response.headers.get("retry-after", "")
     try:
@@ -157,6 +165,7 @@ class OpenAICompatGateway:
                  price_input_micro: int = 0, price_output_micro: int = 0,
                  client: httpx2.AsyncClient | None = None) -> None:
         self._url = f"{base_url.rstrip('/')}/chat/completions"
+        self._gemini = "generativelanguage.googleapis.com" in base_url
         self._key = api_key
         self._models = {HAIKU: model_fast, SONNET: model_smart, OPUS: model_smart}
         price = Price(input=price_input_micro, output=price_output_micro, cache_read=price_input_micro,
@@ -169,6 +178,8 @@ class OpenAICompatGateway:
             raise PermanentModelError("AI_OPENAI_API_KEY is not set")
         model_id = self._models[req.model]
         body = build_body(req, model_id)
+        if self._gemini:
+            _pdfs_as_image_url(body)
         started = time.monotonic()
         try:
             response = await self._client.post(self._url, json=body, headers={

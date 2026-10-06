@@ -203,3 +203,15 @@ async def test_tools_roundtrip():
     assert roles == ["system", "user", "assistant", "tool"]
     assert srv2.sent["messages"][2]["tool_calls"][0]["function"]["arguments"] == '{"q": "trn"}'
     assert srv2.sent["messages"][3] == {"role": "tool", "tool_call_id": "c1", "content": "found"}
+
+
+def test_gemini_pdf_goes_as_image_url() -> None:
+    from ai.gateway.openai_compat_gw import _pdfs_as_image_url
+
+    body = {"messages": [{"role": "user", "content": [
+        {"type": "file", "file": {"filename": "document.pdf", "file_data": "data:application/pdf;base64,AAA"}},
+        {"type": "text", "text": "x"}]}]}
+    _pdfs_as_image_url(body)
+    assert body["messages"][0]["content"][0] == {
+        "type": "image_url", "image_url": {"url": "data:application/pdf;base64,AAA"}}
+    assert body["messages"][0]["content"][1]["type"] == "text"
