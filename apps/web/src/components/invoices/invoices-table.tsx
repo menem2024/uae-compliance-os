@@ -30,7 +30,7 @@ export function InvoicesTable({ rows, loading, error, hasMore, loadingMore, onLo
   const t = useTranslations("P2Invoices.list");
   const locale = useLocale();
   const when = useMemo(
-    () => new Intl.DateTimeFormat(`${locale}-u-nu-latn`, { dateStyle: "medium", timeStyle: "short" }),
+    () => new Intl.DateTimeFormat(`${locale}-u-nu-latn`, { dateStyle: "medium" }),
     [locale],
   );
 
@@ -110,7 +110,7 @@ export function InvoicesTable({ rows, loading, error, hasMore, loadingMore, onLo
                       key={header.id}
                       scope="col"
                       aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"}
-                      className="px-4 py-2 text-start font-medium"
+                      className="px-3 py-2 text-start font-medium"
                     >
                       {header.isPlaceholder ? null : (
                         <button
@@ -132,7 +132,7 @@ export function InvoicesTable({ rows, loading, error, hasMore, loadingMore, onLo
             {table.getRowModel().rows.map((row) => (
               <tr key={row.id} data-testid="invoice-row" data-status={row.original.status} className="border-b last:border-0">
                 {row.getAllCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-2.5">
+                  <td key={cell.id} className="px-3 py-2.5">
                     <table.FlexRender cell={cell} />
                   </td>
                 ))}
