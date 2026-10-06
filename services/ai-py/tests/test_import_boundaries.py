@@ -34,6 +34,17 @@ def test_adapter_is_reached_only_through_the_factory_and_eval_runner():
     assert users <= allowed
 
 
+def test_only_the_openai_compat_adapter_imports_httpx():
+    offenders = [rel for rel, mods in _sources().items()
+                 if any(m in ("httpx", "httpx2") or m.startswith(("httpx.", "httpx2.")) for m in mods)]
+    assert offenders == ["gateway/openai_compat_gw.py"]
+
+
+def test_openai_compat_adapter_is_reached_only_through_the_factory():
+    users = {rel for rel, mods in _sources().items() if "ai.gateway.openai_compat_gw" in mods}
+    assert users <= {"gateway/factory.py"}
+
+
 def test_gateway_never_imports_the_runtime():
     offenders = [rel for rel, mods in _sources().items()
                  if rel.startswith("gateway/") and any(m.startswith("ai.runtime") for m in mods)]
