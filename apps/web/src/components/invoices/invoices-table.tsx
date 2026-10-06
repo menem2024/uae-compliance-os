@@ -9,6 +9,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { StatusPill, isInvoiceStatus } from "@/components/ui/status-pill";
 import { Link } from "@/i18n/navigation";
+import { dateOnlyFormat, formatMoney, parseDateOnly } from "@/lib/format";
 import type { InvoiceListItem } from "@/lib/p2/types";
 import { cn } from "@/lib/utils";
 
@@ -29,10 +30,7 @@ type Props = {
 export function InvoicesTable({ rows, loading, error, hasMore, loadingMore, onLoadMore, onRetry }: Props) {
   const t = useTranslations("P2Invoices.list");
   const locale = useLocale();
-  const when = useMemo(
-    () => new Intl.DateTimeFormat(`${locale}-u-nu-latn`, { dateStyle: "medium" }),
-    [locale],
-  );
+  const when = useMemo(() => dateOnlyFormat(locale), [locale]);
 
   const columns = useMemo(
     () =>
@@ -62,7 +60,7 @@ export function InvoicesTable({ rows, loading, error, hasMore, loadingMore, onLo
           header: t("columns.total"),
           cell: (c) => (
             <span className="whitespace-nowrap tabular-nums" dir="ltr">
-              {c.getValue()} {c.row.original.currency}
+              {formatMoney(c.getValue())} {c.row.original.currency}
             </span>
           ),
         }),
@@ -80,14 +78,21 @@ export function InvoicesTable({ rows, loading, error, hasMore, loadingMore, onLo
             return errors + warnings === 0 ? (
               <span className="text-muted-foreground">{t("noIssues")}</span>
             ) : (
-              <span className="text-xs whitespace-nowrap tabular-nums">{t("issuesCount", { errors, warnings })}</span>
+              <span className="flex flex-wrap gap-x-2 text-xs whitespace-nowrap">
+                {errors > 0 && <span className="text-bad">{t("errorsCount", { count: errors })}</span>}
+                {warnings > 0 && <span className="text-warn">{t("warningsCount", { count: warnings })}</span>}
+              </span>
             );
           },
         }),
-        col.accessor("created_at", {
-          header: t("columns.created"),
+        // The invoice's own issue date (ISO, so string order is date order); rows without one show a dash.
+        col.accessor("issue_date", {
+          header: t("columns.issueDate"),
           sortDescFirst: true,
-          cell: (c) => <span className="whitespace-nowrap tabular-nums">{when.format(new Date(c.getValue()))}</span>,
+          cell: (c) => {
+            const d = parseDateOnly(c.getValue());
+            return <span className="whitespace-nowrap tabular-nums">{d ? when.format(d) : "—"}</span>;
+          },
         }),
       ]),
     [t, when],

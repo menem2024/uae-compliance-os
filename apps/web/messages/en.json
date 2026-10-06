@@ -76,7 +76,20 @@
     "pipelineBody": "Every invoice moves through these stages until it is ready to export.",
     "countdownDate": "Go-live",
     "countdownScope": "Scope",
-    "countdownScopeValue": "SMEs"
+    "countdownScopeValue": "SMEs",
+    "overviewTitle": "Overview",
+    "overviewBody": "What your firm has in the system right now.",
+    "clients": "Client companies",
+    "invoices": "Invoices",
+    "capped": "Counts cover the latest {count} records only.",
+    "loadError": "Could not load your overview.",
+    "retry": "Try again",
+    "recentTitle": "Recent invoices",
+    "recentBody": "The five newest. Open one to review it.",
+    "recentEmpty": "No invoices yet. Create a demo invoice to see the review flow.",
+    "recentEmptyCta": "Create a demo invoice",
+    "viewAll": "All invoices",
+    "issueDate": "Issued {date}"
   },
   "DemoPage": {
     "subtitle": "Submit a demo invoice and follow the validation result live",
@@ -396,7 +409,7 @@
       },
       "verifier": {
         "check": {
-          "flagged": "{family} checks flagged {count} issue(s)",
+          "flagged": "{family} checks flagged {count, plural, one {# issue} other {# issues}}",
           "passed": "{family} checks passed"
         },
         "critic": {
@@ -487,9 +500,10 @@
         "total": "Total",
         "status": "Status",
         "issues": "Issues",
-        "created": "Created"
+        "issueDate": "Issue date"
       },
-      "issuesCount": "{errors} errors, {warnings} warnings",
+      "errorsCount": "{count, plural, one {# error} other {# errors}}",
+      "warningsCount": "{count, plural, one {# warning} other {# warnings}}",
       "noIssues": "None",
       "empty": "No invoices yet. Create a demo invoice above to see the review flow.",
       "loadError": "Could not load the invoices.",

@@ -76,7 +76,20 @@
     "pipelineBody": "كل فاتورة تمر بهذه المراحل حتى تصبح جاهزة للتصدير.",
     "countdownDate": "الموعد",
     "countdownScope": "الفئة المشمولة",
-    "countdownScopeValue": "الشركات الصغيرة والمتوسطة"
+    "countdownScopeValue": "الشركات الصغيرة والمتوسطة",
+    "overviewTitle": "نظرة عامة",
+    "overviewBody": "ما تملكه مؤسستك في النظام الآن.",
+    "clients": "الشركات العميلة",
+    "invoices": "الفواتير",
+    "capped": "الأعداد تشمل آخر {count} سجل فقط.",
+    "loadError": "تعذّر تحميل النظرة العامة.",
+    "retry": "حاول مرة أخرى",
+    "recentTitle": "أحدث الفواتير",
+    "recentBody": "أحدث خمس فواتير. افتح أي واحدة لمراجعتها.",
+    "recentEmpty": "لا توجد فواتير بعد. أنشئ فاتورة تجريبية لتجرّب مسار المراجعة.",
+    "recentEmptyCta": "أنشئ فاتورة تجريبية",
+    "viewAll": "كل الفواتير",
+    "issueDate": "صدرت {date}"
   },
   "DemoPage": {
     "subtitle": "أرسل فاتورة تجريبية وتابع نتيجة التحقق لحظة بلحظة",
@@ -396,7 +409,7 @@
       },
       "verifier": {
         "check": {
-          "flagged": "فحوص {family} رصدت {count} ملاحظة",
+          "flagged": "فحوص {family} رصدت {count, plural, =0 {لا ملاحظات} one {ملاحظة واحدة} two {ملاحظتين} few {# ملاحظات} many {# ملاحظة} other {# ملاحظة}}",
           "passed": "اجتازت فحوص {family}"
         },
         "critic": {
@@ -487,9 +500,10 @@
         "total": "الإجمالي",
         "status": "الحالة",
         "issues": "المشاكل",
-        "created": "تاريخ الإنشاء"
+        "issueDate": "تاريخ الإصدار"
       },
-      "issuesCount": "{errors} أخطاء، {warnings} تحذيرات",
+      "errorsCount": "{count, plural, =0 {لا أخطاء} one {خطأ واحد} two {خطآن} few {# أخطاء} many {# خطأً} other {# خطأ}}",
+      "warningsCount": "{count, plural, =0 {لا تحذيرات} one {تحذير واحد} two {تحذيران} few {# تحذيرات} many {# تحذيراً} other {# تحذير}}",
       "noIssues": "لا شيء",
       "empty": "لا توجد فواتير بعد. أنشئ فاتورة تجريبية من الأعلى لتجرّب مسار المراجعة.",
       "loadError": "تعذّر تحميل الفواتير.",
