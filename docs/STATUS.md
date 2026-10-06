@@ -15,6 +15,16 @@ Playwright against the real UI: **all 8 end-to-end tests pass** (2026-10-05, `--
 The legacy `/demo` skeleton invoice no longer demonstrates the TRN rule (the official `ibr-132-ae` applies to
 AE parties); TRN checking is shown by the "Bad TRN" sample on `/invoices`.
 
+Demo UI fixes verified on the public stack (compose project `compliance-pub`, wiped and re-seeded, 2026-10-06,
+Playwright screenshots in en and ar): the dashboard shows live client and invoice counts, the pipeline counts and
+the five newest invoices (counts come from the list endpoints, bounded to 500 records each, there is no counts
+endpoint); the invoice list shows the invoice issue date, totals with thousands separators and ICU plural error and
+warning counts (Arabic has the six plural forms, covered by a unit test); the clients table hides the Documents and
+Needs review columns while no uploaded documents exist (`POST /v1/invoices` has no client id, so API-created
+invoices cannot be linked to a client). web: 199 unit tests, `tsc` and eslint clean. The local-stack e2e suite was
+not run in this pass (the local stack was down). The empty-dashboard hero (no clients, no invoices) was not
+re-checked live because both seeded firms have data.
+
 Verified without Docker against real Postgres 17 and the real Rust validator (`TestDemoFlow`):
 all four sample invoices through POST -> validate -> correct -> re-validate -> approve -> export; XML digest
 matches; 9 cross-tenant routes return 404; audit trail asserted.
