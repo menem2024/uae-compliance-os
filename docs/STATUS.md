@@ -6,14 +6,14 @@
 ## VERIFIED / WORKING
 
 Verified on a real running stack (Docker Compose, all 10 services healthy, `compose-check.sh` OK) with
-Playwright against the real UI: **7 of 9 end-to-end tests passed**, including
+Playwright against the real UI: **all 8 end-to-end tests pass** (2026-10-05, `--retries=0`):
 - invoice review: valid official invoice -> validated -> approved -> exported as PINT-AE XML;
 - invoice review: totals mismatch -> validator's suggested value applied -> re-validated -> validated;
 - Firm user flow: create a client, brand colour, upload a document, see the agent run;
-- cross-firm isolation through the BFF (404), signed-out landing, RTL, mandate countdown.
-The two failing tests were legacy Phase 0 `/demo` tests that assumed the old one-rule engine; they were
-rewritten for the full engine but **not re-run** (Docker Desktop stopped afterwards). A second full run
-during the same session failed en masse while Docker was going down and is not counted.
+- one connected trace across the four services (Tempo), cross-firm isolation through the BFF (404),
+  signed-out landing, RTL, mandate countdown.
+The legacy `/demo` skeleton invoice no longer demonstrates the TRN rule (the official `ibr-132-ae` applies to
+AE parties); TRN checking is shown by the "Bad TRN" sample on `/invoices`.
 
 Verified without Docker against real Postgres 17 and the real Rust validator (`TestDemoFlow`):
 all four sample invoices through POST -> validate -> correct -> re-validate -> approve -> export; XML digest
@@ -59,7 +59,7 @@ official examples and on tens of thousands of mutated documents (per rule family
 - Phase 4: client portal and communications. Phase 5: data science. Phase 6: Zoho/QuickBooks/Tally.
   Phase 7: hardening, load test, security review, cloud dry run.
 - Known gaps recorded in `.ship/tasks/*/concerns.md`: SSE stream lifetime/re-auth, node timeout equals provider
-  timeout, spend counters on a non-persistent Valkey, a few review P3s, no visual QA of the UI (RTL, contrast).
+  timeout, spend counters on a non-persistent Valkey, a few review P3s, no visual QA of the UI (RTL, contrast; screenshots never reviewed).
 
 ## Phase checklist
 
