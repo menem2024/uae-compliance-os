@@ -249,6 +249,14 @@ services:
       S3_REGION: us-east-1
       AI_CACHE: valkey
       VALKEY_URL: redis://valkey:6379/0
+      # Model provider passthrough: all unset/empty = the fake gateway (today's behaviour). Set them in
+      # the shell or deploy/compose/.env, e.g. AI_PROVIDER=openai_compat plus AI_OPENAI_BASE_URL and
+      # AI_OPENAI_API_KEY (never commit the key). Empty values fall back to the service defaults.
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_OPENAI_BASE_URL: ${AI_OPENAI_BASE_URL:-}
+      AI_OPENAI_API_KEY: ${AI_OPENAI_API_KEY:-}
+      AI_OPENAI_MODEL_FAST: ${AI_OPENAI_MODEL_FAST:-}
+      AI_OPENAI_MODEL_SMART: ${AI_OPENAI_MODEL_SMART:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
       OTEL_SERVICE_NAME: ai-py
     healthcheck:

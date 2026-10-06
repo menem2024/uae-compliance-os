@@ -33,6 +33,11 @@ official examples and on tens of thousands of mutated documents (per rule family
 - Agent runtime, model gateway (spend cap, cache, record/replay), intake/extraction/verifier agents, document
   ingestion workflow, signed uploads with sha256 dedup, SSE agent feed, `/agents` and `/documents` pages,
   landing page, clients and settings, eval harness with four suites.
+- `openai_compat` model provider (`services/ai-py/src/ai/gateway/openai_compat_gw.py`): runs extraction through
+  any OpenAI-compatible chat-completions endpoint (OpenRouter free models, Google Gemini's OpenAI endpoint)
+  with no Anthropic key. Selected with `AI_PROVIDER=openai_compat` (alias of `AI_GATEWAY`); it is a live
+  gateway, so the spend cap, fail-closed limiter and response cache wrap it, and its results still land as
+  `needs_review` unless the verifier agrees. Tested against a mocked HTTP transport only.
 - Independent security and agent-core reviews done and their fixes merged.
 
 ## IN PROGRESS
@@ -46,6 +51,7 @@ official examples and on tens of thousands of mutated documents (per rule family
 | Blocker | Needs | Effect |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | owner | No real extraction from PDFs/images, no measured accuracy (the exit criterion is 90% on 200 invoices), no Fix agent. Scores in `make evals` come from a scripted fake model and prove the harness, not the AI. With the fake gateway, results are forced to `needs_review`. |
+| Free model key (`AI_OPENAI_API_KEY`, e.g. OpenRouter or Google AI Studio) | owner | `openai_compat` is implemented but has never called a real endpoint. Extraction accuracy on free models is unmeasured and likely below the 90% target; the default free model ids may have been renamed or retired (override with `AI_OPENAI_MODEL_FAST` / `_SMART`). |
 | Docker Desktop running | owner | Live stack, Playwright, and the 1000-document chaos test (`scripts/phase1-chaos.sh`) need it. |
 | GitHub remote | owner | CI never ran. |
 | Licence decision D-3 | owner | Official OpenPeppol artefacts are fetched by pinned sha256 script, not vendored. |

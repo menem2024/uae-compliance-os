@@ -66,6 +66,21 @@ bash scripts/demo.sh          # = make up + health check; first build takes seve
 
 Stop with `make down`.
 
+### Real extraction without an Anthropic key
+
+The demo runs a canned fake model by default. To read real PDFs and images through any OpenAI-compatible
+endpoint (a free OpenRouter or Google AI Studio key is enough), set three variables before `make up`:
+
+```bash
+export AI_PROVIDER=openai_compat
+export AI_OPENAI_BASE_URL=https://openrouter.ai/api/v1   # or https://generativelanguage.googleapis.com/v1beta/openai/
+export AI_OPENAI_API_KEY=...                              # your key; never commit it
+```
+
+For Gemini also set `AI_OPENAI_MODEL_FAST` and `AI_OPENAI_MODEL_SMART` (for example `gemini-2.5-flash`).
+Extracted invoices still land as `needs_review` unless the verifier independently agrees; free-model accuracy is
+unmeasured. See [`docs/STATUS.md`](docs/STATUS.md).
+
 ### 60–90 second demo
 
 1. **Invoices -> New demo invoice -> "Valid invoice"** (the official PINT-AE example). It validates in
