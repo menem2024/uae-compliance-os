@@ -2,12 +2,13 @@
 
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, cast
 
 from ai.gateway.types import HAIKU, MODEL_IDS, OPUS, SONNET, ModelId
 
-type GatewayMode = Literal["anthropic", "replay", "fake"]
+type GatewayMode = Literal["anthropic", "openai_compat", "replay", "fake"]
+GATEWAY_MODES = ("anthropic", "openai_compat", "replay", "fake")
 type CacheMode = Literal["valkey", "memory", "none"]
 # What document.extracted says when the fake gateway produced it: `review` (the default) publishes it as
 # needs_review / extraction_failed with every invoice escalated, so canned output never lands as a clean
@@ -44,6 +45,18 @@ class Settings:
     model_extraction: ModelId = SONNET
     model_critic: ModelId = SONNET
     model_escalation: ModelId = OPUS
+    # openai_compat provider (AI_GATEWAY=openai_compat, alias AI_PROVIDER): any OpenAI-compatible
+    # /chat/completions endpoint. Our abstract tiers map to two model ids: HAIKU -> fast, SONNET and OPUS ->
+    # smart. Defaults are OpenRouter free vision models (they come and go: override them). For Google
+    # Gemini use AI_OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ and
+    # AI_OPENAI_MODEL_FAST/_SMART=gemini-2.5-flash. The key is read from the environment only and is
+    # hidden from repr. Prices are micro-USD per million tokens; 0 (free tier) means cost_micro_usd 0.
+    openai_base_url: str = "https://openrouter.ai/api/v1"
+    openai_api_key: str = field(default="", repr=False)
+    openai_model_fast: str = "google/gemma-3-27b-it:free"
+    openai_model_smart: str = "meta-llama/llama-4-maverick:free"
+    openai_price_input_micro: int = 0
+    openai_price_output_micro: int = 0
     cache: CacheMode = "memory"
     valkey_url: str = "redis://localhost:6379/0"
     daily_spend_cap_micro_usd: int = 3_000_000
@@ -72,7 +85,9 @@ class Settings:
             return _choice(e, key, default, MODEL_IDS)
 
         return cls(
-            gateway=_choice(e, "AI_GATEWAY", d.gateway, ("anthropic", "replay", "fake")),
+            # AI_PROVIDER is an alias of AI_GATEWAY and wins when both are set.
+            gateway=_choice(e, "AI_PROVIDER" if e.get("AI_PROVIDER") else "AI_GATEWAY", d.gateway,
+                            GATEWAY_MODES),
             fake_scenario=e.get("AI_FAKE_SCENARIO", ""),
             fake_latency_ms=_int(e, "AI_FAKE_LATENCY_MS", d.fake_latency_ms),
             fake_results=_choice(e, "AI_FAKE_RESULTS", d.fake_results, ("review", "accept")),
@@ -81,6 +96,12 @@ class Settings:
             model_extraction=model("AI_MODEL_EXTRACTION", d.model_extraction),
             model_critic=model("AI_MODEL_CRITIC", d.model_critic),
             model_escalation=model("AI_MODEL_ESCALATION", d.model_escalation),
+            openai_base_url=e.get("AI_OPENAI_BASE_URL", "") or d.openai_base_url,
+            openai_api_key=e.get("AI_OPENAI_API_KEY", ""),
+            openai_model_fast=e.get("AI_OPENAI_MODEL_FAST", "") or d.openai_model_fast,
+            openai_model_smart=e.get("AI_OPENAI_MODEL_SMART", "") or d.openai_model_smart,
+            openai_price_input_micro=_int(e, "AI_OPENAI_PRICE_INPUT_MICRO", 0),
+            openai_price_output_micro=_int(e, "AI_OPENAI_PRICE_OUTPUT_MICRO", 0),
             cache=_choice(e, "AI_CACHE", d.cache, ("valkey", "memory", "none")),
             valkey_url=e.get("VALKEY_URL", "") or d.valkey_url,
             daily_spend_cap_micro_usd=_int(e, "AI_DAILY_SPEND_CAP_MICRO_USD", d.daily_spend_cap_micro_usd),

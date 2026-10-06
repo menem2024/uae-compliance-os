@@ -29,3 +29,18 @@ def test_fake_results_default_to_review():
     assert Settings.from_env({"AI_FAKE_RESULTS": "accept"}).fake_results == "accept"
     with pytest.raises(ValueError):
         Settings.from_env({"AI_FAKE_RESULTS": "yes"})
+
+
+def test_openai_compat_settings_and_the_provider_alias():
+    d = Settings.from_env({})
+    assert d.gateway == "fake" and d.openai_api_key == "" and d.openai_price_input_micro == 0
+    s = Settings.from_env({"AI_PROVIDER": "openai_compat", "AI_GATEWAY": "anthropic",
+                           "AI_OPENAI_BASE_URL": "https://g.example/v1/", "AI_OPENAI_API_KEY": "sekret",
+                           "AI_OPENAI_MODEL_FAST": "f", "AI_OPENAI_MODEL_SMART": "m",
+                           "AI_OPENAI_PRICE_OUTPUT_MICRO": "7"})
+    assert (s.gateway, s.openai_base_url, s.openai_model_fast, s.openai_model_smart,
+            s.openai_price_output_micro) == ("openai_compat", "https://g.example/v1/", "f", "m", 7)
+    assert s.openai_api_key == "sekret" and "sekret" not in repr(s)
+    assert Settings.from_env({"AI_PROVIDER": "", "AI_GATEWAY": "anthropic"}).gateway == "anthropic"
+    with pytest.raises(ValueError, match="AI_PROVIDER"):
+        Settings.from_env({"AI_PROVIDER": "openai"})
