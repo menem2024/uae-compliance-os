@@ -166,3 +166,15 @@ async def test_extraction_fake_score_is_strictly_between_threshold_and_one(datas
     assert not r.exit_criterion_eligible
     pr = await run_suite(suite, mode="fake", subset="pr", settings=_settings(tmp_path))
     assert pr.cases == 10 and not pr.exit_criterion_eligible
+
+
+async def test_live_key_env_follows_the_chosen_provider(tmp_path: Path):
+    gw = CostlyGateway()
+    for env in ({}, {"EVALS_LIVE_CONFIRM": "1", "ANTHROPIC_API_KEY": "k"}):  # the Anthropic key is not enough
+        with pytest.raises(LiveNotConfirmed, match="AI_OPENAI_API_KEY"):
+            await run_suite(ToySuite(), mode="live", subset="full", settings=_settings(tmp_path), env=env,
+                            provider=lambda: gw, key_env="AI_OPENAI_API_KEY")
+    ok = {"EVALS_LIVE_CONFIRM": "1", "AI_OPENAI_API_KEY": "k"}
+    r = await run_suite(ToySuite(), mode="live", subset="full", settings=_settings(tmp_path), env=ok,
+                        max_cost_usd=100.0, provider=lambda: gw, key_env="AI_OPENAI_API_KEY")
+    assert (r.mode, gw.calls) == ("live", 4)

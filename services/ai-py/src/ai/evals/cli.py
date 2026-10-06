@@ -12,7 +12,7 @@ import json
 import sys
 import tomllib
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Literal
@@ -26,12 +26,14 @@ from ai.evals.runner import (
     Report,
     run_suite,
 )
+from ai.gateway.factory import provider_gateway
 from ai.gateway.limits import MemorySpendLimiter
 from ai.settings import Settings
 
 EVALS_GROUP = "compliance.evals"
 DEFAULT_THRESHOLDS = Path("evals/thresholds.toml")
 DEFAULT_REPORTS = Path("evals/reports")
+LIVE_KEY_ENV = {"anthropic": "ANTHROPIC_API_KEY", "openai_compat": "AI_OPENAI_API_KEY"}
 _OPS = {"min": ">=", "max": "<=", "eq": "=="}
 
 
@@ -117,11 +119,21 @@ def _summary(r: Report) -> str:
             f"eligible={str(r.exit_criterion_eligible).lower()}")
 
 
+def live_provider_args(gateway: str, settings: Settings) -> dict[str, Any]:
+    """`run_suite` keyword arguments for the live provider. `anthropic` (the default) changes nothing; any
+    other provider is built through the gateway factory, with the API key it needs checked up front."""
+    if gateway == "anthropic":
+        return {}
+    chosen = replace(settings, gateway=gateway)  # type: ignore[type-var]
+    return {"provider": lambda: provider_gateway(chosen), "key_env": LIVE_KEY_ENV[gateway]}
+
+
 async def _run_all(suites: Mapping[str, Suite], args: argparse.Namespace,  # type: ignore[type-arg]
                    settings: Settings) -> list[Report]:
     limiter = MemorySpendLimiter(int(args.max_cost_usd * MICRO))  # one cap for the whole invocation
+    extra = live_provider_args(args.gateway, settings)
     return [await run_suite(s, mode=args.mode, subset=args.subset, settings=settings,
-                            max_cost_usd=args.max_cost_usd, limiter=limiter) for s in suites.values()]
+                            max_cost_usd=args.max_cost_usd, limiter=limiter, **extra) for s in suites.values()]
 
 
 def main(argv: Sequence[str] | None = None, *, suites: Mapping[str, Suite] | None = None,  # type: ignore[type-arg]
@@ -132,11 +144,22 @@ def main(argv: Sequence[str] | None = None, *, suites: Mapping[str, Suite] | Non
     r.add_argument("suite", nargs="?", help="suite name (see the compliance.evals entry points)")
     r.add_argument("--all", action="store_true", help="run every registered suite")
     r.add_argument("--mode", choices=("auto", "fake", "replay", "live"), default="auto")
+    r.add_argument("--gateway", choices=tuple(LIVE_KEY_ENV), default="anthropic",
+                   help="provider for --mode live, built through the gateway factory (default: anthropic)")
     r.add_argument("--subset", choices=("pr", "full"), default="full")
     r.add_argument("--max-cost-usd", type=float, default=DEFAULT_MAX_COST_USD)
     r.add_argument("--thresholds", type=Path, default=DEFAULT_THRESHOLDS)
     r.add_argument("--reports-dir", type=Path, default=DEFAULT_REPORTS)
+    sm = sub.add_parser("sample", help="live accuracy measurement on a stratified sample of extraction-v1")
+    sm.add_argument("--gateway", choices=tuple(LIVE_KEY_ENV), default="openai_compat")
+    sm.add_argument("--n", type=int, default=24, help="cases in the sample (default 24)")
+    sm.add_argument("--concurrency", type=int, default=2)
+    sm.add_argument("--out-dir", type=Path, default=DEFAULT_REPORTS)
     args = p.parse_args(argv)
+    if args.cmd == "sample":
+        from ai.evals.sample import main as sample_main
+
+        return sample_main(args, settings)
     if bool(args.suite) == bool(args.all):
         p.error("give exactly one of <suite> or --all")
     registry = dict(suites) if suites is not None else load_suites()
@@ -147,8 +170,13 @@ def main(argv: Sequence[str] | None = None, *, suites: Mapping[str, Suite] | Non
     else:
         p.error(f"unknown suite {args.suite!r}; registered: {', '.join(sorted(registry)) or 'none'}")
     thresholds = load_thresholds(args.thresholds)
+    settings = settings or Settings.from_env()
+    if args.gateway != "anthropic":  # never mix another model's recordings or reports into the Anthropic ones
+        settings = replace(settings, recordings_dir=str(Path(settings.recordings_dir) / args.gateway))
+        if args.reports_dir == DEFAULT_REPORTS:
+            args.reports_dir = DEFAULT_REPORTS / args.gateway
     try:
-        reports = asyncio.run(_run_all(chosen, args, settings or Settings.from_env()))
+        reports = asyncio.run(_run_all(chosen, args, settings))
     except (LiveNotConfirmed, LiveSpendCapExceeded) as exc:
         print(f"evals: {exc}", file=sys.stderr)
         return 1

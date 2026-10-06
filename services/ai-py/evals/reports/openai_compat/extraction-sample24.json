@@ -1,0 +1,898 @@
+{
+ "cases": [
+  {
+   "attempts": 1,
+   "case_id": "ar-image-000",
+   "error": "",
+   "fields_correct": 26,
+   "fields_counted": 26,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "format:image",
+    "lang:ar",
+    "layout:modern",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "ar-image-001",
+   "error": "",
+   "fields_correct": 36,
+   "fields_counted": 37,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "format:image",
+    "lang:ar",
+    "layout:modern",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": [
+    "buyer.name"
+   ]
+  },
+  {
+   "attempts": 1,
+   "case_id": "ar-image-002",
+   "error": "",
+   "fields_correct": 34,
+   "fields_counted": 34,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "format:image",
+    "lang:ar",
+    "layout:modern",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "ar-image-005",
+   "error": "",
+   "fields_correct": 25,
+   "fields_counted": 25,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "defect:missing_buyer_trn",
+    "format:image",
+    "lang:ar",
+    "layout:classic",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "ar-image-007",
+   "error": "",
+   "fields_correct": 23,
+   "fields_counted": 38,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "defect:missing_buyer_trn",
+    "format:image",
+    "lang:ar",
+    "layout:thermal",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "model_transient",
+   "wrong_fields": [
+    "issue_date",
+    "net_amount",
+    "price.net_price",
+    "seller_trn",
+    "tax_amount",
+    "taxable_amount",
+    "total_amount",
+    "totals.line_extension_amount",
+    "totals.payable_amount",
+    "totals.tax_exclusive_amount",
+    "vat_amount"
+   ]
+  },
+  {
+   "attempts": 1,
+   "case_id": "ar-image-008",
+   "error": "",
+   "fields_correct": 33,
+   "fields_counted": 33,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "defect:total_off_by_cent",
+    "format:image",
+    "lang:ar",
+    "layout:modern",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "model_transient",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 2,
+   "case_id": "ar-pdf-000",
+   "error": "",
+   "fields_correct": 58,
+   "fields_counted": 58,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "defect:line_net_off_by_cent",
+    "format:pdf",
+    "lang:ar",
+    "layout:classic",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "output_invalid",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 2,
+   "case_id": "ar-pdf-001",
+   "error": "",
+   "fields_correct": 26,
+   "fields_counted": 26,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "format:pdf",
+    "lang:ar",
+    "layout:thermal",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "ar-pdf-002",
+   "error": "",
+   "fields_correct": 61,
+   "fields_counted": 61,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "defect:missing_buyer_trn",
+    "format:pdf",
+    "lang:ar",
+    "layout:classic",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "ar-pdf-003",
+   "error": "",
+   "fields_correct": 54,
+   "fields_counted": 54,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "format:pdf",
+    "lang:ar",
+    "layout:classic",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 4,
+   "case_id": "ar-pdf-004",
+   "error": "",
+   "fields_correct": 25,
+   "fields_counted": 40,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "format:pdf",
+    "lang:ar",
+    "layout:thermal",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "model_transient",
+   "wrong_fields": [
+    "buyer.name",
+    "buyer_trn",
+    "issue_date",
+    "net_amount",
+    "price.net_price",
+    "seller_trn",
+    "taxable_amount",
+    "total_amount",
+    "totals.line_extension_amount",
+    "totals.payable_amount",
+    "totals.tax_exclusive_amount"
+   ]
+  },
+  {
+   "attempts": 4,
+   "case_id": "ar-pdf-006",
+   "error": "model_transient",
+   "fields_correct": 0,
+   "fields_counted": 25,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "defect:line_net_off_by_cent",
+    "format:pdf",
+    "lang:ar",
+    "layout:thermal",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "",
+   "wrong_fields": [
+    "buyer.name",
+    "buyer_trn",
+    "category.code",
+    "category.rate",
+    "currency",
+    "invoice_number",
+    "invoice_type_code",
+    "issue_date",
+    "item.name",
+    "net_amount",
+    "price.net_price",
+    "quantity",
+    "seller.name",
+    "seller.postal_address.country_subdivision",
+    "seller_trn",
+    "tax.code",
+    "tax.rate",
+    "tax_amount",
+    "taxable_amount",
+    "total_amount",
+    "totals.line_extension_amount",
+    "totals.payable_amount",
+    "totals.tax_exclusive_amount",
+    "unit_code",
+    "vat_amount"
+   ]
+  },
+  {
+   "attempts": 4,
+   "case_id": "en-image-000",
+   "error": "model_transient",
+   "fields_correct": 0,
+   "fields_counted": 45,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "defect:line_net_off_by_cent",
+    "format:image",
+    "lang:en",
+    "layout:modern",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "",
+   "wrong_fields": [
+    "buyer.name",
+    "buyer_trn",
+    "category.code",
+    "category.rate",
+    "currency",
+    "invoice_number",
+    "invoice_type_code",
+    "issue_date",
+    "item.name",
+    "net_amount",
+    "note",
+    "payment_due_date",
+    "price.net_price",
+    "quantity",
+    "seller.name",
+    "seller.postal_address.country_subdivision",
+    "seller_trn",
+    "tax.code",
+    "tax.rate",
+    "tax_amount",
+    "taxable_amount",
+    "total_amount",
+    "totals.line_extension_amount",
+    "totals.payable_amount",
+    "totals.tax_exclusive_amount",
+    "unit_code",
+    "vat_amount"
+   ]
+  },
+  {
+   "attempts": 4,
+   "case_id": "en-image-001",
+   "error": "model_transient",
+   "fields_correct": 0,
+   "fields_counted": 68,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "format:image",
+    "lang:en",
+    "layout:classic",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "",
+   "wrong_fields": [
+    "buyer.name",
+    "buyer_trn",
+    "category.code",
+    "category.rate",
+    "currency",
+    "invoice_number",
+    "invoice_type_code",
+    "issue_date",
+    "item.name",
+    "net_amount",
+    "payment_due_date",
+    "price.net_price",
+    "quantity",
+    "seller.name",
+    "seller.postal_address.country_subdivision",
+    "seller_trn",
+    "tax.code",
+    "tax.rate",
+    "tax_amount",
+    "taxable_amount",
+    "total_amount",
+    "totals.line_extension_amount",
+    "totals.payable_amount",
+    "totals.tax_exclusive_amount",
+    "unit_code",
+    "vat_amount"
+   ]
+  },
+  {
+   "attempts": 4,
+   "case_id": "en-image-002",
+   "error": "model_transient",
+   "fields_correct": 0,
+   "fields_counted": 26,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "format:image",
+    "lang:en",
+    "layout:thermal",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "",
+   "wrong_fields": [
+    "buyer.name",
+    "buyer_trn",
+    "category.code",
+    "category.rate",
+    "currency",
+    "invoice_number",
+    "invoice_type_code",
+    "issue_date",
+    "item.name",
+    "net_amount",
+    "note",
+    "price.net_price",
+    "quantity",
+    "seller.name",
+    "seller.postal_address.country_subdivision",
+    "seller_trn",
+    "tax.code",
+    "tax.rate",
+    "tax_amount",
+    "taxable_amount",
+    "total_amount",
+    "totals.line_extension_amount",
+    "totals.payable_amount",
+    "totals.tax_exclusive_amount",
+    "unit_code",
+    "vat_amount"
+   ]
+  },
+  {
+   "attempts": 4,
+   "case_id": "en-image-003",
+   "error": "model_transient",
+   "fields_correct": 0,
+   "fields_counted": 47,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "format:image",
+    "lang:en",
+    "layout:classic",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "",
+   "wrong_fields": [
+    "buyer.name",
+    "buyer_trn",
+    "category.code",
+    "category.rate",
+    "currency",
+    "invoice_number",
+    "invoice_type_code",
+    "issue_date",
+    "item.name",
+    "net_amount",
+    "payment_due_date",
+    "price.net_price",
+    "quantity",
+    "seller.name",
+    "seller.postal_address.country_subdivision",
+    "seller_trn",
+    "tax.code",
+    "tax.rate",
+    "tax_amount",
+    "taxable_amount",
+    "total_amount",
+    "totals.line_extension_amount",
+    "totals.payable_amount",
+    "totals.tax_exclusive_amount",
+    "unit_code",
+    "vat_amount"
+   ]
+  },
+  {
+   "attempts": 4,
+   "case_id": "en-image-007",
+   "error": "model_transient",
+   "fields_correct": 0,
+   "fields_counted": 26,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "defect:seller_trn_14_digits",
+    "format:image",
+    "lang:en",
+    "layout:thermal",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "",
+   "wrong_fields": [
+    "buyer.name",
+    "buyer_trn",
+    "category.code",
+    "category.rate",
+    "currency",
+    "invoice_number",
+    "invoice_type_code",
+    "issue_date",
+    "item.name",
+    "net_amount",
+    "note",
+    "price.net_price",
+    "quantity",
+    "seller.name",
+    "seller.postal_address.country_subdivision",
+    "seller_trn",
+    "tax.code",
+    "tax.rate",
+    "tax_amount",
+    "taxable_amount",
+    "total_amount",
+    "totals.line_extension_amount",
+    "totals.payable_amount",
+    "totals.tax_exclusive_amount",
+    "unit_code",
+    "vat_amount"
+   ]
+  },
+  {
+   "attempts": 4,
+   "case_id": "en-image-010",
+   "error": "",
+   "fields_correct": 40,
+   "fields_counted": 40,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "defect:missing_buyer_trn",
+    "format:image",
+    "lang:en",
+    "layout:classic"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "en-pdf-000",
+   "error": "timeout",
+   "fields_correct": 0,
+   "fields_counted": 25,
+   "finding_codes": [],
+   "pass": false,
+   "tags": [
+    "defect:missing_buyer_trn",
+    "format:pdf",
+    "lang:en",
+    "layout:classic",
+    "subset:pr"
+   ],
+   "verdict": "",
+   "verifier_error": "",
+   "wrong_fields": [
+    "buyer.name",
+    "category.code",
+    "category.rate",
+    "currency",
+    "invoice_number",
+    "invoice_type_code",
+    "issue_date",
+    "item.name",
+    "net_amount",
+    "payment_due_date",
+    "price.net_price",
+    "quantity",
+    "seller.name",
+    "seller.postal_address.country_subdivision",
+    "seller_trn",
+    "tax.code",
+    "tax.rate",
+    "tax_amount",
+    "taxable_amount",
+    "total_amount",
+    "totals.line_extension_amount",
+    "totals.payable_amount",
+    "totals.tax_exclusive_amount",
+    "unit_code",
+    "vat_amount"
+   ]
+  },
+  {
+   "attempts": 1,
+   "case_id": "en-pdf-001",
+   "error": "",
+   "fields_correct": 66,
+   "fields_counted": 66,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "format:pdf",
+    "lang:en",
+    "layout:classic",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "en-pdf-002",
+   "error": "",
+   "fields_correct": 25,
+   "fields_counted": 25,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "format:pdf",
+    "lang:en",
+    "layout:thermal",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "en-pdf-003",
+   "error": "",
+   "fields_correct": 25,
+   "fields_counted": 25,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "format:pdf",
+    "lang:en",
+    "layout:thermal",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "en-pdf-005",
+   "error": "",
+   "fields_correct": 47,
+   "fields_counted": 47,
+   "finding_codes": [],
+   "pass": true,
+   "tags": [
+    "defect:missing_buyer_trn",
+    "format:pdf",
+    "lang:en",
+    "layout:classic",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": []
+  },
+  {
+   "attempts": 1,
+   "case_id": "en-pdf-008",
+   "error": "",
+   "fields_correct": 40,
+   "fields_counted": 42,
+   "finding_codes": [
+    "arithmetic.line_net.confirmed_by_critic",
+    "arithmetic.line_total.confirmed_by_critic",
+    "arithmetic.taxable_amount.confirmed_by_critic"
+   ],
+   "pass": false,
+   "tags": [
+    "defect:missing_buyer_trn",
+    "format:pdf",
+    "lang:en",
+    "layout:thermal",
+    "subset:pr"
+   ],
+   "verdict": "accept",
+   "verifier_error": "",
+   "wrong_fields": [
+    "net_amount"
+   ]
+  }
+ ],
+ "cases_errored": 7,
+ "cases_planned": 24,
+ "cases_run": 24,
+ "failure_causes": {
+  "cases_with_wrong_values": 4,
+  "errors": {
+   "model_transient": 6,
+   "timeout": 1
+  },
+  "retried_cases": 10
+ },
+ "gateway": "openai_compat",
+ "models": [
+  "gemini-2.5-flash"
+ ],
+ "overall": {
+  "field_accuracy": 0.6858,
+  "fields_correct": 644,
+  "fields_counted": 939,
+  "invoice_exact_match_rate": 0.5417,
+  "invoice_exact_match_rate_excluding_errors": 0.7647
+ },
+ "per_field": {
+  "buyer.name": {
+   "accuracy": 0.625,
+   "correct": 15,
+   "counted": 24
+  },
+  "buyer_trn": {
+   "accuracy": 0.5882,
+   "correct": 10,
+   "counted": 17
+  },
+  "category.code": {
+   "accuracy": 0.7241,
+   "correct": 21,
+   "counted": 29
+  },
+  "category.rate": {
+   "accuracy": 0.7586,
+   "correct": 22,
+   "counted": 29
+  },
+  "currency": {
+   "accuracy": 0.7083,
+   "correct": 17,
+   "counted": 24
+  },
+  "invoice_number": {
+   "accuracy": 0.7083,
+   "correct": 17,
+   "counted": 24
+  },
+  "invoice_type_code": {
+   "accuracy": 0.7083,
+   "correct": 17,
+   "counted": 24
+  },
+  "issue_date": {
+   "accuracy": 0.625,
+   "correct": 15,
+   "counted": 24
+  },
+  "item.name": {
+   "accuracy": 0.7313,
+   "correct": 49,
+   "counted": 67
+  },
+  "net_amount": {
+   "accuracy": 0.6119,
+   "correct": 41,
+   "counted": 67
+  },
+  "note": {
+   "accuracy": 0.7,
+   "correct": 7,
+   "counted": 10
+  },
+  "payment_due_date": {
+   "accuracy": 0.7333,
+   "correct": 11,
+   "counted": 15
+  },
+  "price.net_price": {
+   "accuracy": 0.6418,
+   "correct": 43,
+   "counted": 67
+  },
+  "quantity": {
+   "accuracy": 0.7313,
+   "correct": 49,
+   "counted": 67
+  },
+  "seller.name": {
+   "accuracy": 0.7083,
+   "correct": 17,
+   "counted": 24
+  },
+  "seller.postal_address.country_subdivision": {
+   "accuracy": 0.7083,
+   "correct": 17,
+   "counted": 24
+  },
+  "seller_trn": {
+   "accuracy": 0.625,
+   "correct": 15,
+   "counted": 24
+  },
+  "tax.code": {
+   "accuracy": 0.7313,
+   "correct": 49,
+   "counted": 67
+  },
+  "tax.rate": {
+   "accuracy": 0.7463,
+   "correct": 50,
+   "counted": 67
+  },
+  "tax_amount": {
+   "accuracy": 0.6897,
+   "correct": 20,
+   "counted": 29
+  },
+  "taxable_amount": {
+   "accuracy": 0.6552,
+   "correct": 19,
+   "counted": 29
+  },
+  "total_amount": {
+   "accuracy": 0.625,
+   "correct": 15,
+   "counted": 24
+  },
+  "totals.line_extension_amount": {
+   "accuracy": 0.625,
+   "correct": 15,
+   "counted": 24
+  },
+  "totals.payable_amount": {
+   "accuracy": 0.625,
+   "correct": 15,
+   "counted": 24
+  },
+  "totals.tax_exclusive_amount": {
+   "accuracy": 0.625,
+   "correct": 15,
+   "counted": 24
+  },
+  "unit_code": {
+   "accuracy": 0.7313,
+   "correct": 49,
+   "counted": 67
+  },
+  "vat_amount": {
+   "accuracy": 0.6667,
+   "correct": 16,
+   "counted": 24
+  }
+ },
+ "per_tag": {
+  "format:image": {
+   "cases": 12,
+   "exact_match_rate": 0.4167,
+   "field_accuracy": 0.4876
+  },
+  "format:pdf": {
+   "cases": 12,
+   "exact_match_rate": 0.6667,
+   "field_accuracy": 0.8644
+  },
+  "lang:ar": {
+   "cases": 12,
+   "exact_match_rate": 0.6667,
+   "field_accuracy": 0.8775
+  },
+  "lang:en": {
+   "cases": 12,
+   "exact_match_rate": 0.4167,
+   "field_accuracy": 0.5041
+  }
+ },
+ "usage": {
+  "extraction": {
+   "input_tokens": 33881,
+   "llm_calls": 17,
+   "output_tokens": 20292
+  },
+  "total": {
+   "input_tokens": 37424,
+   "llm_calls": 21,
+   "output_tokens": 21394
+  },
+  "verifier": {
+   "input_tokens": 3543,
+   "llm_calls": 4,
+   "output_tokens": 1102
+  }
+ },
+ "verifier": {
+  "accept_rate": 1.0,
+  "by_kind": {
+   "clean": {
+    "accept": 8,
+    "accept_rate": 1.0,
+    "escalate": 0,
+    "revise": 0,
+    "verified": 8
+   },
+   "defect": {
+    "accept": 5,
+    "accept_rate": 1.0,
+    "escalate": 0,
+    "revise": 0,
+    "verified": 5
+   }
+  },
+  "finding_codes": {
+   "arithmetic.line_net.confirmed_by_critic": 1,
+   "arithmetic.line_total.confirmed_by_critic": 1,
+   "arithmetic.taxable_amount.confirmed_by_critic": 1
+  },
+  "review_rate": 0.0,
+  "verdicts": {
+   "accept": 13
+  },
+  "verified": 13,
+  "verifier_errors": {
+   "model_transient": 3,
+   "output_invalid": 1
+  }
+ }
+}

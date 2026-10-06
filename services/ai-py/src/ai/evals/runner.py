@@ -29,7 +29,7 @@ MICRO = 1_000_000
 
 
 class LiveNotConfirmed(Exception):
-    """`live` needs EVALS_LIVE_CONFIRM=1 and ANTHROPIC_API_KEY; nothing is built or called without them."""
+    """`live` needs EVALS_LIVE_CONFIRM=1 and the provider's API key (ANTHROPIC_API_KEY by default); nothing is built or called without them."""
 
 
 class LiveSpendCapExceeded(Exception):
@@ -64,9 +64,9 @@ def live_stack(inner: ModelGateway, recordings: Path, limiter: MemorySpendLimite
                                      concurrency)
 
 
-def _require_live(env: Mapping[str, str]) -> None:
-    if env.get("EVALS_LIVE_CONFIRM") != "1" or not env.get("ANTHROPIC_API_KEY"):
-        raise LiveNotConfirmed("live mode needs EVALS_LIVE_CONFIRM=1 and ANTHROPIC_API_KEY in the environment")
+def _require_live(env: Mapping[str, str], key_env: str = "ANTHROPIC_API_KEY") -> None:
+    if env.get("EVALS_LIVE_CONFIRM") != "1" or not env.get(key_env):
+        raise LiveNotConfirmed(f"live mode needs EVALS_LIVE_CONFIRM=1 and {key_env} in the environment")
 
 
 def _code_of(exc: BaseException) -> str:
@@ -77,7 +77,8 @@ def _code_of(exc: BaseException) -> str:
 async def run_suite(suite: Suite, *, mode: RunMode, subset: Subset, settings: Settings,  # type: ignore[type-arg]
                     max_cost_usd: float = DEFAULT_MAX_COST_USD, env: Mapping[str, str] | None = None,
                     provider: Callable[[], ModelGateway] = make_gateway,
-                    limiter: MemorySpendLimiter | None = None) -> Report:
+                    limiter: MemorySpendLimiter | None = None,
+                    key_env: str = "ANTHROPIC_API_KEY") -> Report:
     environ = os.environ if env is None else env
     root = Path(settings.recordings_dir)
     versions = prompt_versions(suite.prompt_ids)
@@ -94,7 +95,7 @@ async def run_suite(suite: Suite, *, mode: RunMode, subset: Subset, settings: Se
 
     live: ModelGateway | None = None
     if effective == "live":
-        _require_live(environ)  # before anything is built
+        _require_live(environ, key_env)  # before anything is built
         limiter = limiter or MemorySpendLimiter(int(max_cost_usd * MICRO))
         live = live_stack(provider(), root / suite.name, limiter, settings.max_concurrent_llm_calls)
     replay = ReplayGateway(root / suite.name) if effective == "replay" else None

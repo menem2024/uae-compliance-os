@@ -56,6 +56,12 @@ def _provider(settings: Settings) -> ModelGateway:
     raise ValueError(f"unknown AI_GATEWAY {settings.gateway!r}")
 
 
+def provider_gateway(settings: Settings) -> ModelGateway:
+    """The bare provider adapter of `settings.gateway`, with no spend, concurrency or cache layers (the eval
+    harness adds its own stack around it)."""
+    return _provider(settings)
+
+
 def _valkey(settings: Settings) -> Any:
     from redis.asyncio import Redis
 
