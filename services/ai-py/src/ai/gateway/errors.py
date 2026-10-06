@@ -55,3 +55,15 @@ class SpendLimiterUnavailable(TransientModelError):
     Transient on purpose (code `model_transient`): the node retries, then the message is nak'ed and
     redelivered, so ingestion resumes by itself once the store is back. No provider call was made.
     """
+
+
+class QuotaExhausted(TransientModelError):
+    """A provider's daily (or other long-window) quota is used up, so waiting seconds cannot help.
+
+    A TransientModelError (the node still retries cheaply and the message is redelivered later, so ingestion
+    resumes once the quota resets) with its own code, so eval harnesses and operators can tell "provider is
+    out of quota for hours" from "provider blinked". `retry_after_s` is the provider's own reset hint when it
+    gave one. Gateways that pace and retry (ResilientGateway) never retry it.
+    """
+
+    code = "quota_exhausted"

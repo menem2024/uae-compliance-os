@@ -41,6 +41,16 @@ def test_openai_compat_settings_and_the_provider_alias():
     assert (s.gateway, s.openai_base_url, s.openai_model_fast, s.openai_model_smart,
             s.openai_price_output_micro) == ("openai_compat", "https://g.example/v1/", "f", "m", 7)
     assert s.openai_api_key == "sekret" and "sekret" not in repr(s)
+    assert (d.openai_max_rpm, d.openai_max_attempts, d.openai_max_retry_wait_s, d.openai_timeout_s) == (
+        10, 5, 120, 240)
+    tuned = Settings.from_env({"AI_OPENAI_MAX_RPM": "4", "AI_OPENAI_MAX_ATTEMPTS": "2",
+                               "AI_OPENAI_MAX_RETRY_WAIT_S": "30", "AI_OPENAI_TIMEOUT_S": "300"})
+    assert (tuned.openai_max_rpm, tuned.openai_max_attempts, tuned.openai_max_retry_wait_s,
+            tuned.openai_timeout_s) == (4, 2, 30, 300)
+    assert Settings.from_env({"AI_OPENAI_MAX_RPM": "0"}).openai_max_rpm == 0  # pacing off
+    for bad in ({"AI_OPENAI_MAX_ATTEMPTS": "0"}, {"AI_OPENAI_TIMEOUT_S": "1"}, {"AI_OPENAI_MAX_RPM": "-1"}):
+        with pytest.raises(ValueError):
+            Settings.from_env(bad)
     assert Settings.from_env({"AI_PROVIDER": "", "AI_GATEWAY": "anthropic"}).gateway == "anthropic"
     with pytest.raises(ValueError, match="AI_PROVIDER"):
         Settings.from_env({"AI_PROVIDER": "openai"})

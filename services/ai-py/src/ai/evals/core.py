@@ -52,6 +52,7 @@ class EvalEnv:
     gateway: ModelGateway
     mode: Mode
     concurrency: int = 4
+    node_timeout_s: float = 120.0  # per node attempt; live runs against paced providers need more
 
 
 class Suite[InT, OutT, TruthT](Protocol):
@@ -119,7 +120,7 @@ async def run_node[T](env: EvalEnv, hook: CollectingHook, *, suite: str, case_id
                       kind: StepKind, fn: Callable[[NodeContext], Awaitable[T]],
                       budget: Budget | None = None) -> T:
     """Runs one node through GraphExecutor with the case's hook; raises CaseFailed unless it succeeded."""
-    node = Node(NODE_ID, agent, action, kind, fn, retry=run_policy(env))
+    node = Node(NODE_ID, agent, action, kind, fn, retry=run_policy(env), timeout_s=env.node_timeout_s)
     workflow = f"eval.{suite}@1"
     identity = RunIdentity(run_id=str(uuid.uuid5(_RUN_NS, f"{suite}:{case_id}")), firm_id=EVAL_FIRM_ID,
                            client_company_id="", workflow=workflow, subject_type="document", subject_id=case_id)

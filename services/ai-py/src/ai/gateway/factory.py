@@ -30,6 +30,7 @@ from ai.gateway.limits import (
     SpendLimiter,
     ValkeySpendLimiter,
 )
+from ai.gateway.pacing import ResilientGateway, TokenBucket
 from ai.gateway.recorded import ReplayGateway
 from ai.gateway.types import ModelGateway
 from ai.settings import Settings
@@ -44,11 +45,18 @@ def _provider(settings: Settings) -> ModelGateway:
         case "openai_compat":
             from ai.gateway.openai_compat_gw import make_gateway as make_openai_gateway
 
-            return make_openai_gateway(
+            adapter = make_openai_gateway(
                 base_url=settings.openai_base_url, api_key=settings.openai_api_key,
                 model_fast=settings.openai_model_fast, model_smart=settings.openai_model_smart,
                 price_input_micro=settings.openai_price_input_micro,
-                price_output_micro=settings.openai_price_output_micro)
+                price_output_micro=settings.openai_price_output_micro,
+                timeout_s=float(settings.openai_timeout_s))
+            # Pacing and bounded retries sit directly on the adapter, below the cache, spend cap and
+            # concurrency limit: a cache hit costs no token, and every real attempt is paced.
+            return ResilientGateway(
+                adapter, bucket=TokenBucket(settings.openai_max_rpm),
+                max_attempts=settings.openai_max_attempts,
+                max_retry_wait_s=float(settings.openai_max_retry_wait_s))
         case "replay":
             return ReplayGateway(settings.recordings_dir)
         case "fake":

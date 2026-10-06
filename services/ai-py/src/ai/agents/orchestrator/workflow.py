@@ -48,7 +48,7 @@ from ai.agents.verifier.agent import VerifierAgent
 from ai.agents.verifier.core import StageVerdict, VerdictResult, VerifierProfile, decide, final_verdict
 from ai.agents.verifier.invoice import field_confidences, invoice_findings, invoice_profile
 from ai.agents.verifier.proto import to_proto
-from ai.gateway.errors import ModelRefusal, SpendCapExceeded, TransientModelError
+from ai.gateway.errors import ModelRefusal, QuotaExhausted, SpendCapExceeded, TransientModelError
 from ai.gateway.types import Part
 from ai.gen.compliance.v1 import documents_pb2
 from ai.runtime.context import NodeContext, error_code_of
@@ -65,7 +65,7 @@ INTAKE, EXTRACT, REVISE = "intake.classify", "extraction.extract", "extraction.r
 IMPORT, VERIFY_ALL, EMIT = "import.tabular", "verify.all", "emit"
 INVOICE_KINDS = frozenset({"invoice", "credit_note"})
 TRANSIENT: tuple[type[Exception], ...] = (TransientModelError, ToolTransientError)
-TRANSIENT_CODES = frozenset({TransientModelError.code, ToolTransientError.code})
+TRANSIENT_CODES = frozenset({TransientModelError.code, QuotaExhausted.code, ToolTransientError.code})
 FETCH_CODES: frozenset[FetchCode] = frozenset({"object_missing", "sha256_mismatch", "tenant_mismatch",
                                                "unsupported_format"})
 TABULAR_CODES = frozenset({TabularRejected.ZIP_BOMB, TabularRejected.NOT_A_WORKBOOK, TabularRejected.TOO_MANY_ROWS,

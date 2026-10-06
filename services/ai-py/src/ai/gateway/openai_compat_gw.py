@@ -2,7 +2,7 @@
 OpenAI-compatible API, a local server).
 
 This is the only module in ai-py that imports httpx2 (tests/test_import_boundaries.py). Our RetryPolicy owns
-retries: the client makes exactly one attempt. Errors map to the same GatewayError taxonomy as the Anthropic
+retries: the client makes exactly one attempt (pacing and bounded retries live in ai.gateway.pacing). Errors map to the same GatewayError taxonomy as the Anthropic
 adapter and never carry request content or the API key.
 
 Our abstract tiers (HAIKU, SONNET, OPUS) map to two configurable model ids: HAIKU -> `model_fast`, SONNET and
@@ -26,6 +26,7 @@ from ai.gateway.errors import (
     ModelRefusal,
     OutputInvalid,
     PermanentModelError,
+    QuotaExhausted,
     TransientModelError,
 )
 from ai.gateway.keys import cache_key
@@ -49,6 +50,7 @@ from ai.gateway.types import (
 )
 
 _ERROR_TEXT_MAX = 200
+_TEXT_TIMEOUT_S = 120.0  # text-only calls never need more; image and PDF calls get `timeout_s`
 _FINISH_TO_STOP = {"stop": "end_turn", "length": "max_tokens", "tool_calls": "tool_use",
                    "function_call": "tool_use"}
 
@@ -132,6 +134,47 @@ def _retry_after(response: httpx2.Response) -> float | None:
         return None  # an HTTP-date: our own backoff applies
 
 
+def _details(payload: Any, kind: str) -> list[dict[str, Any]]:
+    err = _error_obj(payload)
+    items = err.get("details") if isinstance(err, dict) else None
+    return [d for d in items or [] if isinstance(d, dict) and str(d.get("@type", "")).endswith(kind)]
+
+
+def _retry_info_s(payload: Any) -> float | None:
+    """The provider's own wait hint from a google.rpc.RetryInfo detail (`"58647s"`, `"12.5s"`)."""
+    for d in _details(payload, "RetryInfo"):
+        raw = str(d.get("retryDelay", "")).removesuffix("s")
+        try:
+            return float(raw)
+        except ValueError:
+            continue
+    return None
+
+
+def _violation(payload: Any) -> dict[str, Any]:
+    for d in _details(payload, "QuotaFailure"):
+        for v in d.get("violations") or []:
+            if isinstance(v, dict):
+                return v
+    return {}
+
+
+def _safe_token(raw: Any) -> str:
+    text = str(raw or "")
+    return text if len(text) <= 80 and text.replace("-", "").replace("_", "").replace(".", "").isalnum() else ""
+
+
+def _is_daily_quota(payload: Any) -> bool:
+    """A quota that resets in hours, not seconds: Gemini's `...PerDay...` quota id, OpenRouter's
+    `free-models-per-day`. Waiting for it inside a request is pointless."""
+    quota_id = _safe_token(_violation(payload).get("quotaId")).lower()
+    if "perday" in quota_id or "per-day" in quota_id:
+        return True
+    err = _error_obj(payload)
+    text = str(err.get("message", "") if isinstance(err, dict) else err or "").lower()
+    return "per-day" in text or "per day" in text or "daily" in text
+
+
 def _json(response: httpx2.Response) -> Any:
     try:
         return response.json()
@@ -139,12 +182,39 @@ def _json(response: httpx2.Response) -> Any:
         return None
 
 
+def _error_obj(payload: Any) -> Any:
+    if isinstance(payload, list) and payload:  # Gemini answers errors as a one-element list
+        payload = payload[0]
+    return payload.get("error") if isinstance(payload, dict) else None
+
+
 def _provider_message(payload: Any, secret: str) -> str:
     """The provider's own error text, redacted, truncated and with the API key removed."""
-    err = payload.get("error") if isinstance(payload, dict) else None
+    err = _error_obj(payload)
     text = err.get("message") if isinstance(err, dict) else err if isinstance(err, str) else ""
     text = redact(str(text or ""))[:_ERROR_TEXT_MAX]
     return text.replace(secret, "[key]") if secret else text
+
+
+def _provider_status(payload: Any) -> str:
+    """The provider's symbolic error status (`RESOURCE_EXHAUSTED`, `UNAVAILABLE`), never free text."""
+    err = _error_obj(payload)
+    raw = (err.get("status") or err.get("type")) if isinstance(err, dict) else ""
+    return raw if isinstance(raw, str) and raw.replace("_", "").isalnum() and len(raw) <= 40 else ""
+
+
+def _transient_text(response: httpx2.Response, payload: Any, secret: str) -> str:
+    """`HTTP 429 RESOURCE_EXHAUSTED: <provider text>`: status line for diagnosis, no request content."""
+    head = f"HTTP {response.status_code}"
+    status = _provider_status(payload)
+    if status:
+        head = f"{head} {status}"
+    violation = _violation(payload)
+    quota_id, limit = _safe_token(violation.get("quotaId")), _safe_token(violation.get("quotaValue"))
+    if quota_id:
+        head = f"{head} [{quota_id}{f' limit {limit}' if limit else ''}]"
+    detail = _provider_message(payload, secret)
+    return f"{head}: {detail}" if detail else head
 
 
 def _billed(exc: GatewayError, usage: Usage) -> GatewayError:
@@ -163,7 +233,7 @@ def _strip_fences(text: str) -> str:
 class OpenAICompatGateway:
     def __init__(self, *, base_url: str, api_key: str, model_fast: str, model_smart: str,
                  price_input_micro: int = 0, price_output_micro: int = 0,
-                 client: httpx2.AsyncClient | None = None) -> None:
+                 timeout_s: float = 240.0, client: httpx2.AsyncClient | None = None) -> None:
         self._url = f"{base_url.rstrip('/')}/chat/completions"
         self._gemini = "generativelanguage.googleapis.com" in base_url
         self._key = api_key
@@ -171,7 +241,8 @@ class OpenAICompatGateway:
         price = Price(input=price_input_micro, output=price_output_micro, cache_read=price_input_micro,
                       cache_write=price_input_micro)
         self._pricing = {tier: price for tier in self._models}
-        self._client = client or httpx2.AsyncClient(timeout=httpx2.Timeout(120.0, connect=5.0))
+        self._timeout_s = timeout_s
+        self._client = client or httpx2.AsyncClient(timeout=httpx2.Timeout(timeout_s, connect=5.0))
 
     async def complete(self, req: ModelRequest) -> ModelResponse:
         if not self._key:
@@ -182,18 +253,30 @@ class OpenAICompatGateway:
             _pdfs_as_image_url(body)
         started = time.monotonic()
         try:
-            response = await self._client.post(self._url, json=body, headers={
+            response = await self._client.post(self._url, json=body, timeout=self._timeout_for(req), headers={
                 "Authorization": f"Bearer {self._key}", "Content-Type": "application/json"})
         except httpx2.HTTPError as exc:  # connect, read and timeout errors; `from None`: never chain request data
             raise TransientModelError(type(exc).__name__) from None
         payload = _json(response)
         if response.status_code == 429 or response.status_code >= 500:
-            raise TransientModelError(f"HTTP {response.status_code}", retry_after_s=_retry_after(response))
+            text = _transient_text(response, payload, self._key)
+            hint = _retry_after(response)
+            if hint is None:
+                hint = _retry_info_s(payload)
+            if response.status_code == 429 and _is_daily_quota(payload):
+                raise QuotaExhausted(text, retry_after_s=hint)
+            raise TransientModelError(text, retry_after_s=hint)
         if response.status_code >= 400:
             detail = _provider_message(payload, self._key)
             raise PermanentModelError(f"HTTP {response.status_code}: {detail}" if detail
                                       else f"HTTP {response.status_code}")
         return self._to_response(req, model_id, payload, response, int((time.monotonic() - started) * 1000))
+
+    def _timeout_for(self, req: ModelRequest) -> httpx2.Timeout:
+        """Image and PDF calls read slowly (a thinking model on a scan took up to ~17 s here, with a tail far
+        beyond that); text-only calls keep the short bound."""
+        binary = any(isinstance(p, DocumentPart | ImagePart) for m in req.messages for p in m.parts)
+        return httpx2.Timeout(self._timeout_s if binary else min(_TEXT_TIMEOUT_S, self._timeout_s), connect=5.0)
 
     def _to_response(self, req: ModelRequest, model_id: str, payload: Any, response: httpx2.Response,
                      latency_ms: int) -> ModelResponse:
@@ -262,7 +345,8 @@ class OpenAICompatGateway:
 
 
 def make_gateway(*, base_url: str, api_key: str, model_fast: str, model_smart: str,
-                 price_input_micro: int = 0, price_output_micro: int = 0) -> OpenAICompatGateway:
+                 price_input_micro: int = 0, price_output_micro: int = 0,
+                 timeout_s: float = 240.0) -> OpenAICompatGateway:
     return OpenAICompatGateway(base_url=base_url, api_key=api_key, model_fast=model_fast,
                                model_smart=model_smart, price_input_micro=price_input_micro,
-                               price_output_micro=price_output_micro)
+                               price_output_micro=price_output_micro, timeout_s=timeout_s)

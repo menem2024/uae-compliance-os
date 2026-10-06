@@ -50,3 +50,36 @@ def test_summary_counts_errors_as_zero_and_holds_no_values():
     assert s["per_field"]["total_amount"]["accuracy"] == 0.5
     assert "case_id" in json.dumps(s) and "# Extraction accuracy sample" in to_markdown(s)
     assert CaseFailed("x").code == "x"
+
+
+class _QuotaSuite:
+    """A suite stand-in whose model is out of daily quota from the second case on."""
+
+    def __init__(self) -> None:
+        self.ran: list[str] = []
+
+    async def run_case(self, case, env, hook):
+        self.ran.append(case.case_id)
+        raise CaseFailed("quota_exhausted")
+
+
+async def test_quota_exhaustion_is_not_retried_with_case_backoff_and_stops_the_sample():
+    from ai.evals.sample import run_case, run_sample
+
+    cases = select_sample(_cases(), 6)
+    slept: list[float] = []
+
+    async def sleep(s: float) -> None:
+        slept.append(s)
+
+    suite = _QuotaSuite()
+    res = await run_sample(suite, cases, gateway=None, settings=Settings(), concurrency=1, sleep=sleep)  # type: ignore[arg-type]
+    assert slept == [] and [r.error for r in res] == ["quota_exhausted"] and len(suite.ran) == 1
+    assert res[0].attempts == 1
+    # a plain transient error still gets the case-level backoff
+    class Flaky(_QuotaSuite):
+        async def run_case(self, case, env, hook):
+            raise CaseFailed("model_transient")
+
+    r = await run_case(Flaky(), None, cases[0], None, sleep)  # type: ignore[arg-type]
+    assert r.error == "model_transient" and r.attempts == 4 and slept == [30.0, 60.0, 120.0]

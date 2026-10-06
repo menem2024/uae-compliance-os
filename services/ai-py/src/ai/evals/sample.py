@@ -31,7 +31,7 @@ from ai.agents.verifier.invoice import invoice_profile
 from ai.evals.core import CaseFailed, DatasetStale, DocRef, EvalCase, EvalEnv, run_node
 from ai.evals.scoring import field_accuracy
 from ai.evals.suites.extraction import ExtractionSuite, source_of
-from ai.gateway.errors import TransientModelError
+from ai.gateway.errors import QuotaExhausted, TransientModelError
 from ai.gateway.factory import build_gateway
 from ai.gateway.types import ModelGateway
 from ai.runtime.context import NodeContext
@@ -40,6 +40,7 @@ from ai.runtime.types import RunTotals, StepKind
 from ai.settings import Settings
 
 DEFAULT_OUT = Path("evals/reports")
+NODE_TIMEOUT_S = 330.0  # above the adapter's 240 s read timeout plus its paced retries' first waits
 BACKOFF_S = (30.0, 60.0, 120.0)  # case-level waits after a node exhausted its own retries on a transient error
 
 
@@ -113,6 +114,7 @@ async def run_case(suite: ExtractionSuite, verifier: VerifierAgent, case: EvalCa
             res.extraction_usage = _add(res.extraction_usage, hook.outcome.totals)
         if not res.error:
             break
+        # Only a blink is worth a case-level wait: a daily quota (quota_exhausted) lasts hours.
         if res.error != TransientModelError.code or attempt == len(BACKOFF_S):
             break
         await sleep(BACKOFF_S[attempt])
@@ -258,14 +260,20 @@ def to_markdown(s: Mapping[str, Any]) -> str:
 async def run_sample(suite: ExtractionSuite, cases: Sequence[EvalCase[DocRef, Any]], gateway: ModelGateway,
                      settings: Settings, concurrency: int, sleep: Any = asyncio.sleep) -> list[CaseResult]:
     verifier = VerifierAgent([invoice_profile(critic=InvoiceCritic(model=settings.model_critic))])
-    env = EvalEnv(gateway, "live", concurrency)
+    env = EvalEnv(gateway, "live", concurrency, node_timeout_s=NODE_TIMEOUT_S)
     sem = asyncio.Semaphore(concurrency)
+    out_of_quota = asyncio.Event()  # a daily quota will not recover during this run: stop starting cases
 
-    async def one(c: EvalCase[DocRef, Any]) -> CaseResult:
+    async def one(c: EvalCase[DocRef, Any]) -> CaseResult | None:
         async with sem:
-            return await run_case(suite, verifier, c, env, sleep)
+            if out_of_quota.is_set():
+                return None
+            res = await run_case(suite, verifier, c, env, sleep)
+            if QuotaExhausted.code in (res.error, res.verifier_error):
+                out_of_quota.set()
+            return res
 
-    return list(await asyncio.gather(*(one(c) for c in cases)))
+    return [r for r in await asyncio.gather(*(one(c) for c in cases)) if r is not None]
 
 
 def main(args: Any, settings: Settings | None = None, environ: Mapping[str, str] | None = None) -> int:

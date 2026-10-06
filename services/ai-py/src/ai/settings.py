@@ -57,6 +57,15 @@ class Settings:
     openai_model_smart: str = "meta-llama/llama-4-maverick:free"
     openai_price_input_micro: int = 0
     openai_price_output_micro: int = 0
+    # Reliability of that provider (free tiers rate-limit hard): calls are paced to AI_OPENAI_MAX_RPM per
+    # minute (0 = no pacing; Gemini's free tier allows about 10 per minute and a small daily count),
+    # transient failures are retried inside the gateway up to AI_OPENAI_MAX_ATTEMPTS times, waiting at most
+    # AI_OPENAI_MAX_RETRY_WAIT_S for a provider Retry-After, and image/PDF calls may read for
+    # AI_OPENAI_TIMEOUT_S seconds (text-only calls keep 120 s).
+    openai_max_rpm: int = 10
+    openai_max_attempts: int = 5
+    openai_max_retry_wait_s: int = 120
+    openai_timeout_s: int = 240
     cache: CacheMode = "memory"
     valkey_url: str = "redis://localhost:6379/0"
     daily_spend_cap_micro_usd: int = 3_000_000
@@ -102,6 +111,10 @@ class Settings:
             openai_model_smart=e.get("AI_OPENAI_MODEL_SMART", "") or d.openai_model_smart,
             openai_price_input_micro=_int(e, "AI_OPENAI_PRICE_INPUT_MICRO", 0),
             openai_price_output_micro=_int(e, "AI_OPENAI_PRICE_OUTPUT_MICRO", 0),
+            openai_max_rpm=_int(e, "AI_OPENAI_MAX_RPM", d.openai_max_rpm),
+            openai_max_attempts=_int(e, "AI_OPENAI_MAX_ATTEMPTS", d.openai_max_attempts, minimum=1),
+            openai_max_retry_wait_s=_int(e, "AI_OPENAI_MAX_RETRY_WAIT_S", d.openai_max_retry_wait_s),
+            openai_timeout_s=_int(e, "AI_OPENAI_TIMEOUT_S", d.openai_timeout_s, minimum=10),
             cache=_choice(e, "AI_CACHE", d.cache, ("valkey", "memory", "none")),
             valkey_url=e.get("VALKEY_URL", "") or d.valkey_url,
             daily_spend_cap_micro_usd=_int(e, "AI_DAILY_SPEND_CAP_MICRO_USD", d.daily_spend_cap_micro_usd),

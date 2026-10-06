@@ -20,6 +20,7 @@ from ai.gateway.limits import (
     SpendLimitedGateway,
     ValkeySpendLimiter,
 )
+from ai.gateway.pacing import ResilientGateway
 from ai.gateway.recorded import ReplayGateway
 from ai.gateway.types import HAIKU, SONNET, Message, ModelRequest, RequestMeta, TextPart
 from ai.settings import Settings
@@ -151,7 +152,10 @@ async def test_openai_compat_builds_lazily_live_and_in_its_own_cache_namespace()
     gw = build_gateway(s)
     stack = layers(gw)
     assert [type(x) for x in stack] == [CachingGateway, ConcurrencyLimitedGateway, SpendLimitedGateway,
-                                        OpenAICompatGateway]
+                                        ResilientGateway, OpenAICompatGateway]
+    assert stack[3]._max_attempts == s.openai_max_attempts  # type: ignore[attr-defined]
+    assert stack[3]._bucket._interval == 6.0  # type: ignore[attr-defined]  default 10 requests per minute
+    assert stack[4]._timeout_s == 240.0  # type: ignore[attr-defined]
     assert stack[2]._live is True  # type: ignore[attr-defined]  fails closed like anthropic
     assert stack[0]._cache._prefix.endswith("openai_compat:")  # type: ignore[attr-defined]
     assert stack[0]._cache._prefix != cache_prefix_of("anthropic")  # type: ignore[attr-defined]

@@ -5,7 +5,13 @@ import httpx2
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from ai.gateway.errors import ModelRefusal, OutputInvalid, PermanentModelError, TransientModelError
+from ai.gateway.errors import (
+    ModelRefusal,
+    OutputInvalid,
+    PermanentModelError,
+    QuotaExhausted,
+    TransientModelError,
+)
 from ai.gateway.openai_compat_gw import OpenAICompatGateway
 from ai.gateway.types import (
     HAIKU,
@@ -215,3 +221,75 @@ def test_gemini_pdf_goes_as_image_url() -> None:
     assert body["messages"][0]["content"][0] == {
         "type": "image_url", "image_url": {"url": "data:application/pdf;base64,AAA"}}
     assert body["messages"][0]["content"][1]["type"] == "text"
+
+
+async def test_transient_message_carries_status_and_redacted_provider_code():
+    body = [{"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
+                       "message": f"Quota exceeded for metric x, limit 10, user a@b.com {KEY}"}}]
+    with pytest.raises(TransientModelError) as ei:
+        await Server(status=429, body=body).gateway().complete(req())
+    text = str(ei.value)
+    assert "HTTP 429" in text and "RESOURCE_EXHAUSTED" in text and "Quota exceeded" in text
+    assert KEY not in text and "a@b.com" not in text and "read this" not in text
+
+
+async def test_503_message_carries_status_text():
+    srv = Server(status=503, body={"error": {"code": 503, "status": "UNAVAILABLE", "message": "overloaded"}})
+    with pytest.raises(TransientModelError, match=r"HTTP 503.*UNAVAILABLE"):
+        await srv.gateway().complete(req())
+
+
+async def test_timeout_message_names_the_exception_type():
+    with pytest.raises(TransientModelError, match="ReadTimeout"):
+        await Server(exc=httpx2.ReadTimeout("slow")).gateway().complete(req())
+
+
+def gemini_429(quota_id: str, delay: str | None = "58647s") -> list:
+    details = [{"@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                "violations": [{"quotaMetric": "generate_content_free_tier_requests", "quotaId": quota_id,
+                                "quotaValue": "20"}]}]
+    if delay:
+        details.append({"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": delay})
+    return [{"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "message": "You exceeded your quota",
+                       "details": details}}]
+
+
+async def test_daily_quota_429_is_quota_exhausted_with_the_reset_hint():
+    body = gemini_429("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    with pytest.raises(QuotaExhausted) as ei:
+        await Server(status=429, body=body).gateway().complete(req())
+    assert ei.value.retry_after_s == 58647.0 and isinstance(ei.value, TransientModelError)
+    assert "PerDay" in str(ei.value) and "limit 20" in str(ei.value)
+
+
+async def test_per_minute_429_stays_a_plain_transient_with_the_provider_delay():
+    body = gemini_429("GenerateRequestsPerMinutePerProjectPerModel-FreeTier", delay="12.5s")
+    with pytest.raises(TransientModelError) as ei:
+        await Server(status=429, body=body).gateway().complete(req())
+    assert not isinstance(ei.value, QuotaExhausted) and ei.value.retry_after_s == 12.5
+
+
+async def test_retry_after_header_wins_over_the_body_hint():
+    body = gemini_429("GenerateRequestsPerMinutePerProjectPerModel-FreeTier", delay="12.5s")
+    srv = Server(status=429, body=body, headers={"Retry-After": "7"})
+    with pytest.raises(TransientModelError) as ei:
+        await srv.gateway().complete(req())
+    assert ei.value.retry_after_s == 7.0
+
+
+async def test_openrouter_free_models_per_day_429_is_quota_exhausted():
+    body = {"error": {"code": 429, "message": "Rate limit exceeded: free-models-per-day. Add credits"}}
+    with pytest.raises(QuotaExhausted):
+        await Server(status=429, body=body).gateway().complete(req())
+
+
+async def test_binary_requests_get_the_long_timeout_and_text_requests_the_short_one():
+    srv = Server(body=completion())
+    gw = srv.gateway(timeout_s=240.0)
+    await gw.complete(req())  # carries an image
+    assert srv.requests[-1].extensions["timeout"]["read"] == 240.0
+    text_only = (Message("user", (TextPart("just text"),)),)
+    await gw.complete(req(messages=text_only))
+    assert srv.requests[-1].extensions["timeout"]["read"] == 120.0
+    await srv.gateway(timeout_s=60.0).complete(req(messages=text_only))
+    assert srv.requests[-1].extensions["timeout"]["read"] == 60.0
