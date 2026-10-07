@@ -8,7 +8,7 @@ TOML = Path(__file__).resolve().parents[2] / "evals" / "thresholds.toml"
 TAGS = ("lang:ar", "lang:en", "format:pdf", "format:image")
 
 
-def test_thresholds_toml_is_exactly_the_six_values_of_spec_5_6():
+def test_thresholds_toml_is_exactly_the_six_values_of_spec_5_6_and_the_three_fix_values_of_5_7_5():
     assert load_thresholds(TOML) == [
         Threshold("extraction", "field_accuracy", ">=", 0.90),
         Threshold("extraction", "field_accuracy", ">=", 0.85, TAGS),
@@ -16,6 +16,9 @@ def test_thresholds_toml_is_exactly_the_six_values_of_spec_5_6():
         Threshold("importer", "field_accuracy", "==", 1.0),
         Threshold("verifier", "catch_rate", ">=", 0.80),
         Threshold("verifier", "false_flag_rate", "<=", 0.10),
+        Threshold("fix", "precision", ">=", 0.90),
+        Threshold("fix", "recall", ">=", 0.80),
+        Threshold("fix", "harmless", ">=", 1.0),
     ]
 
 

@@ -19,3 +19,14 @@ min = 0.80
 
 [verifier.false_flag_rate]
 max = 0.10
+
+# Fix agent (spec 5.7.5). Scored on the LLM step only; fake mode answers with the truth, so it proves the
+# harness, not the model. Live numbers are not measured until `make evals-live` has run.
+[fix.precision]
+min = 0.90
+
+[fix.recall]
+min = 0.80
+
+[fix.harmless]
+min = 1.0
