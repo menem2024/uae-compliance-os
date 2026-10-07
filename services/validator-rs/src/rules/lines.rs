@@ -17,7 +17,7 @@ use rust_decimal::Decimal;
 
 use crate::codelists::sets;
 use crate::decimal::{self, Cents};
-use crate::doc::{Doc, LineDec, tax_category_written, text};
+use crate::doc::{Doc, DocKind, LineDec, tax_category_written, text};
 use crate::pb;
 use crate::rule::{Rule, Sink};
 use crate::rules::platform::is_xsd_date;
@@ -694,7 +694,14 @@ fn ibr_065(doc: &Doc<'_>, sink: &mut Sink<'_>) {
 
 /// `ibr-sr-58`, context `cac:InvoiceLine/cac:Item/cac:ClassifiedTaxCategory`, test
 /// `exists(cbc:ID)`.
+///
+/// Upstream defect 6: unlike its neighbours the context has no `| cac:CreditNoteLine/...`
+/// alternative, so the official schematron never fires it on a credit note; the rule follows
+/// the official context and does not evaluate credit notes.
 fn ibr_sr_58(doc: &Doc<'_>, sink: &mut Sink<'_>) {
+    if doc.kind != DocKind::Invoice {
+        return;
+    }
     for (i, l, d) in each(doc) {
         if tax_written(l, d) && tax_code(l).is_none() {
             sink.fail(&[i]);
@@ -1152,6 +1159,24 @@ mod tests {
             paths(run(ibr_125_ae, "lines[#].item.description", &inv)),
             ["lines[0].item.description"]
         );
+    }
+
+    /// Upstream defect 6: the official context of `ibr-sr-58` is `cac:InvoiceLine/cac:Item/
+    /// cac:ClassifiedTaxCategory` only (every neighbouring rule says `| cac:CreditNoteLine/...`),
+    /// so Saxon never fires it on a credit note. The differential corpus found this (fuzz
+    /// document 1698); the rule follows the official XPath.
+    #[test]
+    fn ibr_sr_58_applies_to_invoices_only_like_the_official_context() {
+        let mut inv = example("standard-tax-invoice");
+        inv.lines[0].tax.as_mut().expect("line tax").code = String::new();
+        assert_eq!(
+            paths(run(ibr_sr_58, "lines[#].tax.code", &inv)),
+            ["lines[0].tax.code"]
+        );
+        inv.invoice_type_code = "381".into();
+        assert!(run(ibr_sr_58, "lines[#].tax.code", &inv).is_empty());
+        inv.invoice_type_code = "81".into();
+        assert!(run(ibr_sr_58, "lines[#].tax.code", &inv).is_empty());
     }
 
     #[test]
