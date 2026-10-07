@@ -1,12 +1,17 @@
 //! Loads the differential-test corpus from `rulesets/pint-ae-1.0.4/`: the 30 official examples
-//! as canonical JSON (`corpus/examples/<slug>.json`, committed). Mutation fixtures and the
-//! fuzz generator are added by Task 15.
+//! as canonical JSON (`corpus/examples/<slug>.json`, committed), and assembles the whole
+//! differential corpus ([`documents`]): examples, mutation fixtures and seeded fuzz documents.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::canonical_json::from_canonical_json;
+use crate::catalog::Family;
 use crate::pb;
+use crate::ruleset::RuleSet;
+
+use super::{file_stem, fuzz, mutations};
 
 /// Root of the RuleSet data directory.
 pub fn ruleset_dir() -> PathBuf {
@@ -62,6 +67,79 @@ pub fn examples() -> Vec<(String, pb::Invoice)> {
         .collect();
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out
+}
+
+/// One document of the differential corpus.
+#[derive(Debug, Clone)]
+pub struct CorpusDoc {
+    /// Path relative to the corpus directory, without `.xml`: `examples/<slug>`,
+    /// `mutations/<family>/<fixture>` or `fuzz/fuzz-<n>`.
+    pub name: String,
+    /// Where the document comes from: the fixture's note, or the fuzz edits.
+    pub note: String,
+    pub invoice: pb::Invoice,
+}
+
+impl CorpusDoc {
+    /// The file the XML of this document is written to, relative to the corpus directory.
+    pub fn xml_name(&self) -> String {
+        format!("{}.xml", self.name)
+    }
+}
+
+/// Whether `inv` has an `AE-FMT-*` or `AE-EXP-*` issue: it cannot be serialised faithfully and
+/// is never exported, so the fuzz corpus leaves it out (spec 5.3.3).
+fn is_unserialisable(rs: &RuleSet, inv: &pb::Invoice) -> bool {
+    rs.validate(inv)
+        .issues
+        .iter()
+        .any(|i| i.rule_id.starts_with("AE-FMT-") || i.rule_id.starts_with("AE-EXP-"))
+}
+
+/// The whole differential corpus, in a fixed order: the 30 examples (by slug), every mutation
+/// fixture of every family (family order, file order), then `fuzz` documents of `seed`
+/// ([`fuzz::generate`], seeds the fixed SplitMix64 stream) over the 30 examples.
+///
+/// A mutation fixture is kept even when it carries an `AE-FMT-*` or `AE-EXP-*` expectation: the
+/// family authors checked each one against the official schematron, and the CLI skips the few
+/// that cannot be serialised at all.
+pub fn documents(fuzz_count: usize, seed: u64, rs: &RuleSet) -> Result<Vec<CorpusDoc>, String> {
+    let bases = examples();
+    let mut out: Vec<CorpusDoc> = bases
+        .iter()
+        .map(|(slug, inv)| CorpusDoc {
+            name: format!("examples/{slug}"),
+            note: "official example".into(),
+            invoice: inv.clone(),
+        })
+        .collect();
+    for family in Family::ALL {
+        let mut stems = HashSet::new();
+        for m in mutations(family)? {
+            let stem = file_stem(&m.id);
+            if !stems.insert(stem.clone()) {
+                return Err(format!("{}: file name {stem} is already used", m.id));
+            }
+            out.push(CorpusDoc {
+                name: format!("mutations/{}/{stem}", family.as_str()),
+                note: format!("{} on {}: {}", m.id, m.base, m.note),
+                invoice: m.apply(&bases)?,
+            });
+        }
+    }
+    for doc in fuzz::generate(&bases, fuzz_count, seed, &|inv| !is_unserialisable(rs, inv)) {
+        out.push(CorpusDoc {
+            name: format!("fuzz/{}", doc.name),
+            note: format!("{}: {}", doc.base, doc.edits.join("; ")),
+            invoice: doc.invoice,
+        });
+    }
+    if out.iter().filter(|d| d.name.starts_with("fuzz/")).count() != fuzz_count {
+        return Err(format!(
+            "the fuzz generator did not produce {fuzz_count} documents"
+        ));
+    }
+    Ok(out)
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = ["pytest>=8", "saxonche==13.0.0", "lxml==6.1.3"]
 # ///
-"""Tests for the Task 3 conformance tooling and data files.
+"""Tests for the conformance tooling and the rule data files (Tasks 3 and 15).
 
 Run:  uv run services/validator-rs/conformance/tests/test_conformance_tools.py
 (needs `scripts/fetch-upstream.sh` to have been run once).
@@ -43,7 +43,7 @@ def read_tsv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE))
 
 
-# ---------------------------------------------------------------- coverage skeletons
+# ---------------------------------------------------------------- coverage
 
 
 def coverage_rows() -> list[dict[str, str]]:
@@ -58,8 +58,12 @@ def coverage_rows() -> list[dict[str, str]]:
     return rows
 
 
+def official_rows() -> list[dict[str, str]]:
+    return [r for r in coverage_rows() if not r["rule_id"].startswith("AE-")]
+
+
 def test_coverage_has_exactly_302_unique_official_rows():
-    rows = coverage_rows()
+    rows = official_rows()
     ids = [r["rule_id"] for r in rows]
     assert len(ids) == 302
     assert len(set(ids)) == 302
@@ -70,25 +74,31 @@ def test_coverage_has_exactly_302_unique_official_rows():
     assert set(ids) == upstream_ids
 
 
-def test_coverage_family_counts_match_the_draft():
+def test_coverage_family_counts():
     counts = {fam: len(read_tsv(RULESET / "coverage" / f"{fam}.tsv")) for fam in FAMILIES}
     assert counts == {
         "header": 69, "parties": 71, "lines": 46, "totals": 41,
-        "vat": 57, "codelists": 18, "platform": 0,
+        "vat": 57, "codelists": 18, "platform": 12,
     }
 
 
-def test_coverage_rows_are_pending_with_arabic_text():
-    for r in coverage_rows():
-        assert r["status"] == "pending"
+def test_official_rows_are_decided_with_arabic_text():
+    # Task 15: no row is still `pending`; official rows take the upstream English text.
+    for r in official_rows():
+        assert r["status"] in {"implemented", "structural", "upstream_noop"}, r["rule_id"]
         assert r["severity"] == "error"
-        assert r["message_en"] == ""  # official rows take the upstream text
+        assert r["message_en"] == ""
         assert r["message_ar"].strip() != ""
 
 
-def test_mutation_files_exist_and_are_empty():
+def test_every_family_has_mutation_fixtures_with_an_expect_list():
     for fam in FAMILIES:
-        assert (RULESET / "mutations" / f"{fam}.jsonl").read_text() == ""
+        lines = (RULESET / "mutations" / f"{fam}.jsonl").read_text().splitlines()
+        assert lines, fam
+        for line in lines:
+            m = json.loads(line)
+            assert set(m) == {"id", "base", "set", "remove", "expect", "note"}
+            assert m["expect"] and m["note"].strip()
 
 
 def test_allowlist_has_only_the_two_preapproved_rows():

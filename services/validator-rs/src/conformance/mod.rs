@@ -2,13 +2,19 @@
 //!
 //! * [`ubl_import`]: official UBL XML to canonical `pb::Invoice`;
 //! * [`patch`]: applies a mutation fixture's `set` / `remove` paths;
-//! * [`corpus`]: the 30 official examples as committed canonical JSON (Task 5); the fuzz
-//!   generator arrives with Task 15;
+//! * [`corpus`]: the 30 official examples as committed canonical JSON (Task 5) and the whole
+//!   differential corpus (examples, mutation fixtures, fuzz documents);
+//! * [`fuzz`]: the seeded random mutations of the corpus;
+//! * [`snapshot`]: the golden snapshot `snapshot/r1.jsonl`;
+//! * [`coverage_md`]: the generated `COVERAGE.md`;
 //! * [`Mutation`]: one failing fixture of `mutations/<family>.jsonl` (spec 5.2.8), shared by the
 //!   generic family harness (`tests/family_fixtures.rs`) and `conformance mutations`.
 
 pub mod corpus;
+pub mod coverage_md;
+pub mod fuzz;
 pub mod patch;
+pub mod snapshot;
 pub mod ubl_import;
 
 pub use corpus::examples;
@@ -38,6 +44,19 @@ pub struct Mutation {
     pub remove: Vec<String>,
     pub expect: Vec<String>,
     pub note: String,
+}
+
+/// A fixture id as a file stem: `AE-FMT-001#1` becomes `AE-FMT-001_1`.
+pub fn file_stem(id: &str) -> String {
+    id.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 /// `rulesets/pint-ae-1.0.4/mutations/<family>.jsonl`.

@@ -61,3 +61,38 @@ for `credit_note`, upstream defect 2). Reference results on the 30 official exam
 asserts, 29/30 XSD-valid (`Volume-discount-credit-note.xml`, upstream defect 3).
 
 Tests: `uv run services/validator-rs/conformance/tests/test_conformance_tools.py` (after fetching).
+
+## Differential conformance, coverage and snapshot (Task 15)
+
+Run from `services/validator-rs` (SaxonC is the oracle only; it is installed by `uv run`, never
+linked into the crate):
+
+    cargo run --release --bin conformance -- corpus --out /tmp/p2-corpus --fuzz 2000 --seed 20260929
+    uv run conformance/run_schematron.py /tmp/p2-corpus --out /tmp/p2-corpus/saxon.json
+    uv run conformance/xsd_check.py      /tmp/p2-corpus --out /tmp/p2-corpus/xsd.json
+    uv run conformance/compare.py --rust /tmp/p2-corpus/rust.json --saxon /tmp/p2-corpus/saxon.json \
+        --xsd /tmp/p2-corpus/xsd.json --allow conformance/allowlist.tsv
+
+The corpus is the 30 official examples, every mutation fixture of every family and 2,000 seeded
+random mutations (1 to 4 edits each: clear a field, swap a code for another listed or an invalid
+one, move an amount by +-0.01 or +-1, drop or duplicate a line, swap a VAT category, change the
+type code between 380, 480, 381 and 81) over random examples (`src/conformance/fuzz.rs`, seed
+`20260929`). A fuzz document with an `AE-FMT-*` or `AE-EXP-*` issue is never kept. `manifest.tsv`
+in the output directory says where each document comes from. The CI job `conformance`
+(`.github/workflows/rust.yml`) runs exactly these commands plus the checks below.
+
+    cargo run --bin conformance -- coverage-md [--check]   # COVERAGE.md, generated from the TSVs
+    cargo run --bin conformance -- snapshot [--write]      # snapshot/r1.jsonl, frozen
+
+`cargo test` also runs `tests/completeness.rs` (every one of the 302 official asserts is
+`implemented`, `structural` with a named existing test, or `upstream_noop`; every `implemented`
+row has a registered rule, a passing case and a failing fixture) and `tests/snapshot.rs` (live
+results equal the frozen `snapshot/r1.jsonl`).
+
+Upstream defects found by the differential corpus, besides the ones of the contract:
+
+6. `ibr-sr-58` has the context `cac:InvoiceLine/cac:Item/cac:ClassifiedTaxCategory` with no
+   `| cac:CreditNoteLine/...` alternative (every neighbouring rule has one), so the official
+   schematron never fires it on a credit note. The Rust rule follows the official context and
+   skips credit notes (fuzz document 1698 found it). Applying it to credit notes as well, like
+   `ibr-co-14` and `ibr-124`, would need a third allow-list row; that is the reviewer's call.
