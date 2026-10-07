@@ -57,3 +57,80 @@ jobs:
       - name: cargo test
         working-directory: services/validator-rs
         run: cargo test
+
+  # Differential conformance (spec 5.3.3, E2): the platform's validator and exporter against the
+  # official PINT AE 1.0.4 schematron (SaxonC-HE via saxonche) and the UBL 2.1 XSD. SaxonC is an
+  # oracle only: it lives in the `uv run` scripts' inline metadata, never in the Rust crate.
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/validator-rs -> target
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/validator-rs/conformance/*.py
+
+      # Same pinned-sha256 fetch as the test job: fails on any hash mismatch.
+      - name: fetch and verify upstream artefacts (SHA256SUMS)
+        run: scripts/fetch-upstream.sh
+
+      - name: allow-list has exactly the 2 pre-approved rows
+        working-directory: services/validator-rs
+        run: |
+          rows=$(grep -cv '^rule_id' conformance/allowlist.tsv)
+          test "$rows" = 2 || { echo "allowlist.tsv has $rows rows, expected exactly 2 (ibr-co-14, ibr-124)"; exit 1; }
+
+      - name: build the conformance CLI (release)
+        working-directory: services/validator-rs
+        run: cargo build --release --bin conformance
+
+      - name: COVERAGE.md is up to date
+        working-directory: services/validator-rs
+        run: ./target/release/conformance coverage-md --check
+
+      - name: golden snapshot r1 matches the live results
+        working-directory: services/validator-rs
+        run: ./target/release/conformance snapshot
+
+      - name: conformance runners self-test
+        run: uv run services/validator-rs/conformance/tests/test_conformance_tools.py
+
+      - name: generate the corpus (30 examples, every mutation fixture, 2,000 fuzz documents)
+        working-directory: services/validator-rs
+        run: ./target/release/conformance corpus --out "$RUNNER_TEMP/corpus" --fuzz 2000 --seed 20260929
+
+      - name: official schematron on the corpus
+        working-directory: services/validator-rs
+        run: uv run conformance/run_schematron.py "$RUNNER_TEMP/corpus" --out "$RUNNER_TEMP/corpus/saxon.json"
+
+      - name: XSD validation of the corpus
+        working-directory: services/validator-rs
+        run: uv run conformance/xsd_check.py "$RUNNER_TEMP/corpus" --out "$RUNNER_TEMP/corpus/xsd.json"
+
+      - name: compare (equivalence, E2 schema, E2 schematron)
+        working-directory: services/validator-rs
+        run: |
+          uv run conformance/compare.py \
+            --rust "$RUNNER_TEMP/corpus/rust.json" \
+            --saxon "$RUNNER_TEMP/corpus/saxon.json" \
+            --xsd "$RUNNER_TEMP/corpus/xsd.json" \
+            --allow conformance/allowlist.tsv
+
+      - name: keep the corpus results when the job fails
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: conformance-corpus
+          path: |
+            ${{ runner.temp }}/corpus/rust.json
+            ${{ runner.temp }}/corpus/saxon.json
+            ${{ runner.temp }}/corpus/xsd.json
+            ${{ runner.temp }}/corpus/manifest.tsv
+          retention-days: 7
