@@ -389,6 +389,7 @@ func (h *trackCHandlers) invoiceDetail(w http.ResponseWriter, r *http.Request) {
 		inv   sqlc.TrackCGetInvoiceRow
 		run   *runJSON
 		fixes *fixTaskJSON
+		open  any // the open invoice.field_fix proposal, if any (trackc.OpenInvoiceProposal)
 	)
 	if !h.inFirm(w, r, "invoice detail", func(q *sqlc.Queries, _ uuid.UUID) error {
 		var err error
@@ -416,7 +417,8 @@ func (h *trackCHandlers) invoiceDetail(w http.ResponseWriter, r *http.Request) {
 		case !errors.Is(err, pgx.ErrNoRows):
 			return err
 		}
-		return nil
+		open, err = trackc.OpenInvoiceProposal(ctx, q, id)
+		return err
 	}) {
 		return
 	}
@@ -432,7 +434,7 @@ func (h *trackCHandlers) invoiceDetail(w http.ResponseWriter, r *http.Request) {
 	trackc.WriteJSON(w, http.StatusOK, map[string]any{
 		"id": inv.ID, "status": inv.Status, "payload_version": inv.PayloadVersion, "payload": json.RawMessage(inv.Payload),
 		"ruleset_version": ruleset, "approval": approval, "latest_run": run, "latest_fix_task": fixes,
-		"open_proposal": nil, // filled in by Task 19 once Track B's proposals exist
+		"open_proposal": open,
 		"created_at":    ts(inv.CreatedAt), "updated_at": ts(inv.UpdatedAt),
 	})
 }

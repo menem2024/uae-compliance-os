@@ -11,6 +11,8 @@ import (
 
 	"github.com/menem2024/uae-platform/services/api-go/internal/auth"
 	"github.com/menem2024/uae-platform/services/api-go/internal/db"
+	"github.com/menem2024/uae-platform/services/api-go/internal/fixapply"
+	"github.com/menem2024/uae-platform/services/api-go/internal/proposals"
 )
 
 type recLimiter struct {
@@ -90,11 +92,26 @@ func TestFirmMiddleware(t *testing.T) {
 	}
 }
 
-func TestWireStubsAreNoOps(t *testing.T) {
+func TestWireProposalsRegistersEveryKindAndMountsTheRoutes(t *testing.T) {
 	m := &Module{}
 	wireProposals(m)
+	if len(m.Mounts) != 1 || m.Proposals == nil {
+		t.Fatalf("module = %+v", m)
+	}
+	for _, kind := range []string{proposals.KindDocumentAttribution, fixapply.KindFieldFix} {
+		if _, ok := m.Proposals.Get(kind); !ok {
+			t.Errorf("no Applier registered for %s", kind)
+		}
+	}
+	if _, ok := m.Proposals.Get("invoice.other"); ok {
+		t.Error("an unknown kind has an Applier")
+	}
+}
+
+func TestWireFixesIsANoOpUntilTask20(t *testing.T) {
+	m := &Module{}
 	wireFixes(m)
-	if len(m.Mounts) != 0 || m.Fixes != nil {
-		t.Errorf("stubs changed the module: %+v", m)
+	if m.Fixes != nil {
+		t.Errorf("wireFixes changed the module: %+v", m)
 	}
 }
