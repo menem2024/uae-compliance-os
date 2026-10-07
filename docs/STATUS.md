@@ -52,6 +52,8 @@ official examples and on tens of thousands of mutated documents (per rule family
 
 ## IN PROGRESS
 
+- Phase 2 merged 2026-10-06 and verified (Rust 229, ai-py 548, every Go package incl. DB integration run one package at a time): proposals decide flow and fix-task requests (api-go, tasks 19 and 20) and the ai-py Fix agent with its eval suite on fake/replay only (tasks 21 and 22, no live-model numbers). Not built yet: the web `/review` queue (task 23), the performance gate (task 16), the rest of task 15, tasks 24 and 25. `go test ./...` with the integration tag must run with `-p 1` because packages share one database.
+
 - Phase 2 task 15 (conformance suite, completeness test, `COVERAGE.md`): fixes for `ibr-016`, exact cents in
   every sum, per-document Schematron errors are in; the completeness test, fuzz corpus and CI job are not.
 - Phase 1 sign-off (task 31): needs the chaos run and a live-model evaluation (see BLOCKED).
