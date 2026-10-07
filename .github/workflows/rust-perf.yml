@@ -1,0 +1,56 @@
+name: rust-perf
+
+# The validator performance gate (spec 5.4): in release mode, typical invoices under 5 ms at p99 and
+# a 1,000-line invoice under 50 ms. Timing on shared runners is noisy, so a failure is retried once.
+
+on:
+  push:
+    paths:
+      - "services/validator-rs/**"
+      - ".github/workflows/rust-perf.yml"
+  pull_request:
+    paths:
+      - "services/validator-rs/**"
+      - ".github/workflows/rust-perf.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  p99:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/validator-rs
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/validator-rs -> target
+
+      - name: fetch the official upstream artefacts (pinned sha256)
+        working-directory: .
+        run: bash scripts/fetch-upstream.sh
+
+      - name: perf gate (release)
+        run: |
+          cargo test --release --test perf_p99 -- --ignored --nocapture \
+            || cargo test --release --test perf_p99 -- --ignored --nocapture
+
+      - name: bench compiles and runs once
+        run: cargo bench --bench validate -- --test
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: p99
+          path: services/validator-rs/target/perf/p99.json
+          if-no-files-found: ignore

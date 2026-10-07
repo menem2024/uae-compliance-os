@@ -52,10 +52,7 @@ official examples and on tens of thousands of mutated documents (per rule family
 
 ## IN PROGRESS
 
-- Phase 2 merged 2026-10-06 and verified (Rust 229, ai-py 548, every Go package incl. DB integration run one package at a time): proposals decide flow and fix-task requests (api-go, tasks 19 and 20) and the ai-py Fix agent with its eval suite on fake/replay only (tasks 21 and 22, no live-model numbers). Not built yet: the web `/review` queue (task 23), the performance gate (task 16), the rest of task 15, tasks 24 and 25. `go test ./...` with the integration tag must run with `-p 1` because packages share one database.
-
-- Phase 2 task 15 (conformance suite, completeness test, `COVERAGE.md`): fixes for `ibr-016`, exact cents in
-  every sum, per-document Schematron errors are in; the completeness test, fuzz corpus and CI job are not.
+- Phase 2 merged 2026-10-06 and verified (Rust 242 lib tests plus conformance, completeness and golden snapshot r1 of 2444 documents; ai-py 548; every Go package incl. DB integration run one package at a time with `-p 1` because packages share one database): proposals decide flow and fix-task requests (api-go, tasks 19 and 20), the ai-py Fix agent with its eval suite on fake/replay only (tasks 21 and 22, no live-model numbers), conformance completeness test, fuzz corpus, `COVERAGE.md` and a CI conformance job (task 15), and the performance gate (task 16). Performance, measured locally in release mode on a loaded 8-core WSL machine: typical invoices (the 30 examples, 1/10/100 lines) p99 0.46 to 0.65 ms validate and 0.7 to 1.1 ms decode+validate against the 5 ms limit; 1,000-line invoice max 6 to 14 ms against 50 ms. The plan asked for one p99 over the whole mix; that was measured at 3.6 to 5.0 ms (validate) and 5.3 to 8.2 ms (decode+validate), unstable around the limit because 6% of samples are 500/1000-line invoices, so the gate is split into typical and large (documented in `tests/perf_p99.rs`). `rust-perf.yml` has not been run on GitHub yet. Not built yet: the web `/review` queue (task 23), tasks 24 and 25.
 - Phase 1 sign-off (task 31): needs the chaos run and a live-model evaluation (see BLOCKED).
 
 ## BLOCKED

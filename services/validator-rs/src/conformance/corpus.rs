@@ -69,6 +69,75 @@ pub fn examples() -> Vec<(String, pb::Invoice)> {
     out
 }
 
+/// A zero-issue synthetic invoice of `lines` lines (at least 1), for the performance gate. It starts
+/// from the official `standard-tax-invoice` example, drops the document and line allowances and
+/// charges, and gives each line a seeded quantity and price in one standard-rated (5%) category,
+/// with every total recomputed exactly (`Decimal`, half away from zero, 2 decimals like the rules).
+///
+/// # Panics
+/// When the example fixture is missing or malformed (a broken checkout).
+pub fn synthetic(lines: usize, seed: u64) -> pb::Invoice {
+    use rust_decimal::Decimal;
+    use rust_decimal::RoundingStrategy::MidpointAwayFromZero;
+    use serde_json::{Value, json};
+
+    let lines = lines.max(1);
+    let path = examples_dir().join("standard-tax-invoice.json");
+    let text =
+        fs::read_to_string(&path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    let mut doc: Value =
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let two = |d: Decimal| d.round_dp_with_strategy(2, MidpointAwayFromZero);
+    let rate = Decimal::new(5, 2);
+    let base = doc["lines"][0].clone();
+    let mut out_lines = Vec::with_capacity(lines);
+    let mut total = Decimal::ZERO;
+    for i in 0..lines as u64 {
+        let qty = 1 + ((i + seed) % 7);
+        let price = Decimal::from(10) + Decimal::new(((i * 3 + seed) % 13) as i64 * 25, 2);
+        let net = two(Decimal::from(qty) * price);
+        let vat = two(net * rate);
+        let mut l = base.clone();
+        let obj = l.as_object_mut().expect("line object");
+        obj.remove("allowances_charges");
+        obj.insert("id".into(), json!((i + 1).to_string()));
+        obj.insert("order_line_reference".into(), json!((i + 1).to_string()));
+        obj.insert("quantity".into(), json!(qty.to_string()));
+        obj.insert("net_amount".into(), json!(net.to_string()));
+        obj.insert(
+            "price".into(),
+            json!({
+                "net_price": price.to_string(),
+                "gross_price": price.to_string(),
+                "discount": "0",
+                "base_quantity": "1",
+                "base_quantity_unit_code": "H87",
+            }),
+        );
+        obj.insert("amount_aed".into(), json!((net + vat).to_string()));
+        obj.insert("vat_amount_aed".into(), json!(vat.to_string()));
+        total += net;
+        out_lines.push(l);
+    }
+    let tax = two(total * rate);
+    let obj = doc.as_object_mut().expect("invoice object");
+    obj.remove("allowances_charges");
+    obj.insert("lines".into(), Value::Array(out_lines));
+    obj.insert(
+        "totals".into(),
+        json!({
+            "line_extension_amount": total.to_string(),
+            "tax_exclusive_amount": total.to_string(),
+            "payable_amount": (total + tax).to_string(),
+        }),
+    );
+    obj.insert("total_amount".into(), json!((total + tax).to_string()));
+    obj.insert("vat_amount".into(), json!(tax.to_string()));
+    doc["tax_breakdown"][0]["taxable_amount"] = json!(total.to_string());
+    doc["tax_breakdown"][0]["tax_amount"] = json!(tax.to_string());
+    from_canonical_json(&doc.to_string()).unwrap_or_else(|e| panic!("synthetic invoice: {e}"))
+}
+
 /// One document of the differential corpus.
 #[derive(Debug, Clone)]
 pub struct CorpusDoc {
@@ -145,6 +214,27 @@ pub fn documents(fuzz_count: usize, seed: u64, rs: &RuleSet) -> Result<Vec<Corpu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use prost::Message;
+
+    #[test]
+    fn synthetic_invoices_have_no_issues_at_every_size() {
+        let rs = crate::ruleset::default_ruleset();
+        for n in [1, 10, 100, 500, 1000] {
+            let inv = synthetic(n, 20260929);
+            assert_eq!(inv.lines.len(), n);
+            let run = rs.validate(&inv);
+            assert!(
+                run.issues.is_empty(),
+                "{n} lines: {:?}",
+                run.issues.iter().map(|i| &i.rule_id).collect::<Vec<_>>()
+            );
+        }
+        assert_eq!(
+            synthetic(10, 7).encode_to_vec(),
+            synthetic(10, 7).encode_to_vec()
+        );
+    }
+
     use crate::canonical_json::to_canonical_json_pretty;
     use crate::conformance::ubl_import::from_xml;
 
