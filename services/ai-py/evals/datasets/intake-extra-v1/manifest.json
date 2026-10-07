@@ -1,0 +1,226 @@
+{
+ "dataset": "intake-extra-v1",
+ "version": 1,
+ "cases": [
+  {
+   "case_id": "letter-ar-pdf-000",
+   "tags": [
+    "lang:ar",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-pdf-000.pdf",
+   "media_type": "application/pdf",
+   "sha256": "767e8f29defe28df309a2d23123d422c7a55d2320f883377fb5da3d8c006c917"
+  },
+  {
+   "case_id": "letter-ar-image-001",
+   "tags": [
+    "lang:ar",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-image-001.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "506bf34065f755d0bf435ea70a4533c0d5e98039825f30eee4028939eb9ca132"
+  },
+  {
+   "case_id": "letter-ar-pdf-002",
+   "tags": [
+    "lang:ar",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-pdf-002.pdf",
+   "media_type": "application/pdf",
+   "sha256": "767e8f29defe28df309a2d23123d422c7a55d2320f883377fb5da3d8c006c917"
+  },
+  {
+   "case_id": "letter-ar-image-003",
+   "tags": [
+    "lang:ar",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-image-003.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "fafe815dfdcaed185add8b85bb91f45cfb2145eb35134fce5377eec798248695"
+  },
+  {
+   "case_id": "letter-ar-pdf-004",
+   "tags": [
+    "lang:ar",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-pdf-004.pdf",
+   "media_type": "application/pdf",
+   "sha256": "d005eba4b8bdca78cff87e648f353926d47cecd22a4635bb6cef2b43cc160709"
+  },
+  {
+   "case_id": "letter-ar-image-005",
+   "tags": [
+    "lang:ar",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-image-005.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "69fcc0639f35b3702c71ff4fa688604a83933d6021aaeb583fad9d34c9c2d7dc"
+  },
+  {
+   "case_id": "letter-ar-pdf-006",
+   "tags": [
+    "lang:ar",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-pdf-006.pdf",
+   "media_type": "application/pdf",
+   "sha256": "51cb5fd4fe933967d9abdfaa571ef2ce8c1b18a804f02d12c1acff3b8f7c9b19"
+  },
+  {
+   "case_id": "letter-ar-image-007",
+   "tags": [
+    "lang:ar",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-image-007.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "165a0b4369f518b21e6b5c577c2f3986ff6648374fae13b56361d0ac9bc3b2c4"
+  },
+  {
+   "case_id": "letter-ar-pdf-008",
+   "tags": [
+    "lang:ar",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-pdf-008.pdf",
+   "media_type": "application/pdf",
+   "sha256": "d005eba4b8bdca78cff87e648f353926d47cecd22a4635bb6cef2b43cc160709"
+  },
+  {
+   "case_id": "letter-ar-image-009",
+   "tags": [
+    "lang:ar",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-ar-image-009.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "41b0f6732c66d3841d2a34ae3fa698fa62a3a980067001cb6f735c3ff3a2d811"
+  },
+  {
+   "case_id": "letter-en-pdf-000",
+   "tags": [
+    "lang:en",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-pdf-000.pdf",
+   "media_type": "application/pdf",
+   "sha256": "5a7aaa6109b03b520e81107246a9beea136fd3122d24316238d0ceda59ba6a2c"
+  },
+  {
+   "case_id": "letter-en-image-001",
+   "tags": [
+    "lang:en",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-image-001.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "0296e7f1a7a6651cb67b1efe7f29d95956923aaa484a2f5587563c69259939c8"
+  },
+  {
+   "case_id": "letter-en-pdf-002",
+   "tags": [
+    "lang:en",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-pdf-002.pdf",
+   "media_type": "application/pdf",
+   "sha256": "1c9ae49d66c3cb346af949e9ad41e28fe69e8515fa1ed54eeedbc87d14920934"
+  },
+  {
+   "case_id": "letter-en-image-003",
+   "tags": [
+    "lang:en",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-image-003.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "7c9f2e1dfa1a8bc909396af0097eed61dcdf3df7d173c1db478240ad395d0179"
+  },
+  {
+   "case_id": "letter-en-pdf-004",
+   "tags": [
+    "lang:en",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-pdf-004.pdf",
+   "media_type": "application/pdf",
+   "sha256": "baebd20dc278c67a04e92ba1847d035a88973e819a825453cc9943a772076a19"
+  },
+  {
+   "case_id": "letter-en-image-005",
+   "tags": [
+    "lang:en",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-image-005.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "2d99d7dee9c63bbaff6d898dd91c6576995da7822596fad51ca07f98ea9507d1"
+  },
+  {
+   "case_id": "letter-en-pdf-006",
+   "tags": [
+    "lang:en",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-pdf-006.pdf",
+   "media_type": "application/pdf",
+   "sha256": "1c9ae49d66c3cb346af949e9ad41e28fe69e8515fa1ed54eeedbc87d14920934"
+  },
+  {
+   "case_id": "letter-en-image-007",
+   "tags": [
+    "lang:en",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-image-007.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "7c3599c0c009c73c98272e30eb2dc48102eedacbebfc653a5208bfe58882fec8"
+  },
+  {
+   "case_id": "letter-en-pdf-008",
+   "tags": [
+    "lang:en",
+    "format:pdf",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-pdf-008.pdf",
+   "media_type": "application/pdf",
+   "sha256": "5a7aaa6109b03b520e81107246a9beea136fd3122d24316238d0ceda59ba6a2c"
+  },
+  {
+   "case_id": "letter-en-image-009",
+   "tags": [
+    "lang:en",
+    "format:image",
+    "kind:contract"
+   ],
+   "file": "files/letter-en-image-009.jpg",
+   "media_type": "image/jpeg",
+   "sha256": "3acb9f5ff4cfa2ad6d7779eccf107add0a692061fe09f910806afc3572fd1fab"
+  }
+ ]
+}

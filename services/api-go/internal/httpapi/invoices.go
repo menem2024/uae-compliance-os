@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	compliancev1 "github.com/menem2024/uae-platform/services/api-go/gen/compliance/v1"
 	"github.com/menem2024/uae-platform/services/api-go/internal/auth"
@@ -66,37 +66,29 @@ type FirmView struct {
 	BrandColor *string
 }
 
-type invoiceRequest struct {
-	InvoiceNumber string `json:"invoice_number"`
-	IssueDate     string `json:"issue_date"`
-	SellerTRN     string `json:"seller_trn"`
-	BuyerTRN      string `json:"buyer_trn"`
-	Currency      string `json:"currency"`
-	TotalAmount   string `json:"total_amount"`
-	VATAmount     string `json:"vat_amount"`
-}
-
 type handlers struct {
 	store   Store
 	pub     Publisher
 	limiter Limiter
 }
 
-func decodeInvoice(r *http.Request, w http.ResponseWriter) (invoiceRequest, error) {
-	var in invoiceRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&in); err != nil {
-		return in, fmt.Errorf("decode body: %w", err)
+// decodeInvoice reads a canonical invoice (proto field names, spec §5.6.6). Unknown fields, trailing
+// data and bodies over MaxBodyBytes are rejected. The Phase 0 seven-key body is a valid invoice, and
+// total_amount and vat_amount must still be decimals.
+func decodeInvoice(r *http.Request, w http.ResponseWriter) (*compliancev1.Invoice, error) {
+	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
 	}
-	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		return in, errors.New("trailing data after JSON object")
+	in := &compliancev1.Invoice{}
+	if err := (protojson.UnmarshalOptions{}).Unmarshal(raw, in); err != nil {
+		return nil, fmt.Errorf("decode body: %w", err)
 	}
-	if _, err := decimal.NewFromString(in.TotalAmount); err != nil {
-		return in, fmt.Errorf("total_amount: %w", err)
+	if _, err := decimal.NewFromString(in.GetTotalAmount()); err != nil {
+		return nil, fmt.Errorf("total_amount: %w", err)
 	}
-	if _, err := decimal.NewFromString(in.VATAmount); err != nil {
-		return in, fmt.Errorf("vat_amount: %w", err)
+	if _, err := decimal.NewFromString(in.GetVatAmount()); err != nil {
+		return nil, fmt.Errorf("vat_amount: %w", err)
 	}
 	return in, nil
 }
@@ -150,7 +142,7 @@ func (h *handlers) createInvoice(w http.ResponseWriter, r *http.Request) {
 	if !h.checkRateLimit(w, r, firmID) {
 		return
 	}
-	payload, err := json.Marshal(in)
+	payload, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(in)
 	if err != nil {
 		slog.ErrorContext(ctx, "marshal payload", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -165,15 +157,7 @@ func (h *handlers) createInvoice(w http.ResponseWriter, r *http.Request) {
 	ev := &compliancev1.InvoiceSubmitted{
 		InvoiceId: id.String(),
 		FirmId:    firmID.String(),
-		Invoice: &compliancev1.Invoice{
-			InvoiceNumber: in.InvoiceNumber,
-			IssueDate:     in.IssueDate,
-			SellerTrn:     in.SellerTRN,
-			BuyerTrn:      in.BuyerTRN,
-			Currency:      in.Currency,
-			TotalAmount:   in.TotalAmount,
-			VatAmount:     in.VATAmount,
-		},
+		Invoice:   in,
 	}
 	if err := h.pub.PublishSubmitted(ctx, ev); err != nil {
 		// The row stays "uploaded"; acceptable for Phase 0 (no outbox yet).

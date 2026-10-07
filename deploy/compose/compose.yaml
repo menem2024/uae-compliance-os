@@ -2,7 +2,8 @@
 # then `bash scripts/compose-check.sh`.
 #
 # Host ports: web 3000, Zitadel 8085, Grafana 3001, Tempo API 3200, OTLP 4317/4318,
-# MinIO console 9001. api-go (8080) is internal only.
+# MinIO S3 API 9000 (browsers PUT/GET presigned URLs straight to it) and console 9001.
+# api-go (8080) is internal only.
 #
 # One Zitadel hostname, http://zitadel.localhost:8085, for browsers and containers alike:
 # browsers resolve *.localhost to loopback (port 8085 is published), containers resolve it
@@ -78,6 +79,9 @@ services:
       MINIO_ROOT_PASSWORD: minio_dev_pw
       MINIO_CONSOLE_PORT_NUMBER: "9001"
     ports:
+      # 9000 is the S3 API only (presigned browser uploads/downloads, STORAGE_PUBLIC_ENDPOINT);
+      # 9001 is the console. The admin API shares the S3 port but needs admin credentials.
+      - "9000:9000"
       - "9001:9001"
     volumes:
       - miniodata:/bitnami/minio/data
@@ -234,6 +238,29 @@ services:
     image: ai-py:dev
     environment:
       NATS_URL: nats://nats:4222
+      # Documents come from MinIO (same credentials and bucket api-go uses); the response
+      # cache lives in Valkey. AI_GATEWAY stays unset (= fake), so a fresh dev stack never
+      # calls a real model, and the Langfuse variables stay unset (tracing ships disabled).
+      S3_ENDPOINT: minio:9000
+      S3_ACCESS_KEY: minio
+      S3_SECRET_KEY: minio_dev_pw
+      S3_USE_SSL: "false"
+      S3_BUCKET: documents
+      S3_REGION: us-east-1
+      AI_CACHE: valkey
+      VALKEY_URL: redis://valkey:6379/0
+      # Model provider passthrough: all unset/empty = the fake gateway (today's behaviour). Set them in
+      # the shell or deploy/compose/.env, e.g. AI_PROVIDER=openai_compat plus AI_OPENAI_BASE_URL and
+      # AI_OPENAI_API_KEY (never commit the key). Empty values fall back to the service defaults.
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_OPENAI_BASE_URL: ${AI_OPENAI_BASE_URL:-}
+      AI_OPENAI_API_KEY: ${AI_OPENAI_API_KEY:-}
+      AI_OPENAI_MODEL_FAST: ${AI_OPENAI_MODEL_FAST:-}
+      AI_OPENAI_MODEL_SMART: ${AI_OPENAI_MODEL_SMART:-}
+      AI_OPENAI_MAX_RPM: ${AI_OPENAI_MAX_RPM:-}
+      AI_OPENAI_MAX_ATTEMPTS: ${AI_OPENAI_MAX_ATTEMPTS:-}
+      AI_OPENAI_MAX_RETRY_WAIT_S: ${AI_OPENAI_MAX_RETRY_WAIT_S:-}
+      AI_OPENAI_TIMEOUT_S: ${AI_OPENAI_TIMEOUT_S:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
       OTEL_SERVICE_NAME: ai-py
     healthcheck:
@@ -245,6 +272,10 @@ services:
         - "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=3).status == 200 else 1)"
     depends_on:
       nats:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      valkey:
         condition: service_healthy
     mem_limit: 256m
     restart: unless-stopped
@@ -263,6 +294,10 @@ services:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minio
       MINIO_SECRET_KEY: minio_dev_pw
+      # Presigned upload/download URLs are signed for the host the browser uses, so this is
+      # the published MinIO S3 port on the host, not the in-network minio:9000.
+      STORAGE_PUBLIC_ENDPOINT: localhost:9000
+      STORAGE_REGION: auto
       ZITADEL_ISSUER: http://zitadel.localhost:8085
       ZITADEL_JWKS_URL: http://zitadel.localhost:8085/oauth/v2/keys
       ZITADEL_AUDIENCE: *zitadel_project_id

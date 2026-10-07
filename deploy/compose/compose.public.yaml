@@ -1,0 +1,51 @@
+# Public-demo override: run the stack behind two public https hostnames (for example Cloudflare
+# quick tunnels) so people on other machines can sign in. Secret-free; everything comes from the shell.
+#
+#   export PUBLIC_WEB_HOST=<host serving localhost:3000>        # no scheme
+#   export PUBLIC_ZITADEL_HOST=<host serving localhost:8085>    # no scheme
+#   export SEED_USER_PASSWORD=<new random password>
+#   export PUBLIC_OUT_DIR=<empty dir outside the repo>          # host copy of the generated OIDC secret
+#   docker compose -p compliance-pub --env-file /dev/null \
+#     -f compose.yaml -f compose.public.yaml up -d --build
+#
+# A separate project name keeps the local stack's volumes untouched. The ai-py provider variables
+# are pinned empty (fake gateway), so no model key can reach this project. The hostnames are baked
+# in at first start (Zitadel's instance domain, OIDC redirect URIs), so a changed hostname needs
+# a fresh project (`down -v`). MinIO stays local: document uploads via presigned URLs do not work
+# for remote browsers; the sample-invoice flow does not use them.
+services:
+  zitadel:
+    environment:
+      ZITADEL_EXTERNALDOMAIN: ${PUBLIC_ZITADEL_HOST:?}
+      ZITADEL_EXTERNALPORT: "443"
+      ZITADEL_EXTERNALSECURE: "true"
+
+  zitadel-bootstrap:
+    environment:
+      ZITADEL_URL: https://${PUBLIC_ZITADEL_HOST:?}
+      # Reach Zitadel through its public hostname (TLS terminates at the tunnel), no connect-to.
+      ZITADEL_CONNECT_TO: ""
+      WEB_URL: https://${PUBLIC_WEB_HOST:?}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:?}
+      HOST_ENV_FILE: /out/.env.generated
+    volumes: !override
+      - zitadel-machinekey:/machinekey:ro
+      - bootstrap-env:/generated
+      - ${PUBLIC_OUT_DIR:?}:/out
+
+  ai-py:
+    environment:
+      AI_PROVIDER: ""
+      AI_OPENAI_BASE_URL: ""
+      AI_OPENAI_API_KEY: ""
+      AI_OPENAI_MODEL_FAST: ""
+      AI_OPENAI_MODEL_SMART: ""
+
+  api-go:
+    environment:
+      ZITADEL_ISSUER: https://${PUBLIC_ZITADEL_HOST:?}
+      ZITADEL_JWKS_URL: https://${PUBLIC_ZITADEL_HOST:?}/oauth/v2/keys
+
+  web:
+    environment:
+      AUTH_URL: https://${PUBLIC_WEB_HOST:?}

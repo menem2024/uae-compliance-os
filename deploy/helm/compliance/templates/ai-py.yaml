@@ -1,3 +1,13 @@
+{{- /* Render-time guard (values.yaml global.environment): the fake model gateway answers every
+document with canned output, so it is for local clusters only. AI_GATEWAY unset means fake. */ -}}
+{{- $environment := dig "environment" "local" (.Values.global | default dict) | toString -}}
+{{- if not (has $environment (list "local" "staging" "production")) }}
+{{- fail (printf "global.environment (%s) must be one of local, staging, production" $environment) }}
+{{- end }}
+{{- $gateway := .Values.aiPy.env.AI_GATEWAY | default "fake" | toString -}}
+{{- if and (ne $environment "local") (eq $gateway "fake") }}
+{{- fail (printf "aiPy.env.AI_GATEWAY is %q (unset means fake) while global.environment is %q: the fake gateway answers every document with canned output; set aiPy.env.AI_GATEWAY=anthropic" $gateway $environment) }}
+{{- end }}
 {{- $name := "ai-py" -}}
 {{- $ctx := dict "root" $ "name" $name "component" "worker" -}}
 # ai-py is a NATS worker; the Service only exposes its health endpoint.
@@ -32,12 +42,40 @@ spec:
     metadata:
       labels:
         {{- include "compliance.labels" $ctx | nindent 8 }}
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       terminationGracePeriodSeconds: 20
       securityContext:
         {{- include "compliance.podSecurityContext" (dict "uid" 65532) | nindent 8 }}
+      # The consumers touch MinIO and Valkey at start-up: wait until both
+      # accept TCP connections (the counterpart of compose's depends_on healthy).
+      initContainers:
+        - name: wait-for-minio-valkey
+          {{- include "compliance.serviceImage" $ctx | nindent 10 }}
+          command:
+            - /app/.venv/bin/python
+            - -c
+            - |
+              import socket, time
+              for host, port in (("minio", 9000), ("valkey", 6379)):
+                  while True:
+                      try:
+                          socket.create_connection((host, port), timeout=3).close()
+                          break
+                      except OSError:
+                          time.sleep(2)
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            {{- include "compliance.containerSecurityContext" (dict "readOnlyRootFilesystem" true) | nindent 12 }}
       containers:
         - name: {{ $name }}
           {{- include "compliance.serviceImage" $ctx | nindent 10 }}
@@ -50,6 +88,16 @@ spec:
             - name: {{ $k }}
               value: {{ $v | quote }}
             {{- end }}
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ACCESS_KEY
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_SECRET_KEY
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           readinessProbe:

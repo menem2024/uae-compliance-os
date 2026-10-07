@@ -43,7 +43,7 @@ function Item({ icon, children, onSelect }: { icon: ReactNode; children: ReactNo
 /** Ctrl+K command palette (prototype Main board), built on cmdk via the shadcn command primitives. */
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useTranslations("Palette");
-  const tNav = useTranslations("Shell.nav");
+  const tAll = useTranslations();
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const { switchLocale } = useSwitchLocale();
@@ -86,7 +86,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                         icon={<Icon className="size-4" strokeWidth={1.8} aria-hidden />}
                         onSelect={run(() => router.push(n.href!))}
                       >
-                        {tNav(n.key)}
+                        {tAll(n.labelKey)}
                       </Item>
                     );
                   })}

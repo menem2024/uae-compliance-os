@@ -10,6 +10,9 @@ service ValidatorService {
 
 message ValidateRequest {
   Invoice invoice = 1;
+  // RuleSet to run, e.g. "pint-ae@1.0.4+r1". Empty means the validator's default RuleSet.
+  // An unknown version is INVALID_ARGUMENT.
+  string ruleset_version = 2;
 }
 
 message ValidateResponse {
@@ -23,13 +26,73 @@ enum Severity {
 }
 
 message ValidationIssue {
+  // Official schematron assert id (e.g. "ibr-132-ae") or platform rule id (e.g. "AE-FMT-001").
   string rule_id = 1;
   Severity severity = 2;
+  // Field path in the canonical-invoice grammar (contract rule 12), without an "invoice." prefix.
   string path = 3;
+  // English message.
   string message = 4;
+  // Primary PINT-AE business term, e.g. "IBT-031". May be empty.
+  string business_term = 5;
+  // Named values used by the messages, e.g. {"expected": "1050.00"}. Never free text.
+  map<string, string> message_args = 6;
+  // True when the Fix agent may propose a change for this issue.
+  bool fixable = 7;
+  // Arabic message.
+  string message_ar = 8;
+  // The one value for `path` that resolves this issue, when the rule can compute it. Empty = none.
+  string suggested_value = 9;
 }
 
 message ValidationRun {
   string ruleset_version = 1;
   repeated ValidationIssue issues = 2;
+  // Wall time of the RuleSet evaluation, in microseconds.
+  int64 duration_us = 3;
+  // Number of rules evaluated.
+  int32 rules_evaluated = 4;
+}
+
+// Fix agent payloads (agent "fix", proposal kind "invoice.field_fix"). They travel as
+// google.protobuf.Any in AgentTaskRequested.input, Proposal.detail and AgentTaskCompleted.output
+// (agents.proto, owned by Track B).
+
+message FixTaskInput {
+  string invoice_id = 1;
+  int32 payload_version = 2;
+  string validation_run_id = 3;
+  string ruleset_version = 4;
+  Invoice invoice = 5;
+  // Error issues with fixable = true only.
+  repeated ValidationIssue issues = 6;
+  // "auto" or "on_demand".
+  string mode = 7;
+}
+
+message FixChangeNote {
+  string path = 1;
+  repeated string rule_ids = 2;
+  // "deterministic" or "llm".
+  string source = 3;
+  // Short reason shown to the reviewer.
+  string rationale = 4;
+}
+
+message FixProposalDetail {
+  string validation_run_id = 1;
+  int32 payload_version = 2;
+  string ruleset_version = 3;
+  repeated FixChangeNote notes = 4;
+  // Error counts before and after the changes, predicted by re-validating the patched invoice.
+  int32 errors_before = 5;
+  int32 errors_after = 6;
+  repeated string resolved_rule_ids = 7;
+}
+
+message FixTaskResult {
+  // "proposed", "no_fix" or "not_improving".
+  string outcome = 1;
+  string proposal_id = 2;
+  int32 changes = 3;
 }

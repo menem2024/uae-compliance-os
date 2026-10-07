@@ -1,0 +1,214 @@
+syntax = "proto3";
+
+package compliance.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+// Agent runtime events. Contract: .ship/tasks/contracts/agent-runtime.md (owner Track B).
+// Costs are integer micro-USD (1 USD = 1000000). confidence values are probabilities, not money.
+
+enum AgentRunStatus {
+  AGENT_RUN_STATUS_UNSPECIFIED = 0;
+  AGENT_RUN_STATUS_RUNNING = 1;
+  AGENT_RUN_STATUS_SUCCEEDED = 2;
+  AGENT_RUN_STATUS_FAILED = 3;
+  AGENT_RUN_STATUS_BUDGET_EXCEEDED = 4;
+  AGENT_RUN_STATUS_CANCELLED = 5;
+}
+
+enum AgentStepStatus {
+  AGENT_STEP_STATUS_UNSPECIFIED = 0;
+  AGENT_STEP_STATUS_STARTED = 1;
+  AGENT_STEP_STATUS_SUCCEEDED = 2;
+  AGENT_STEP_STATUS_FAILED = 3;
+  AGENT_STEP_STATUS_RETRYING = 4;
+  AGENT_STEP_STATUS_SKIPPED = 5;
+}
+
+enum StepKind {
+  STEP_KIND_UNSPECIFIED = 0;
+  STEP_KIND_DETERMINISTIC = 1;
+  STEP_KIND_LLM = 2;
+  STEP_KIND_TOOL = 3;
+  STEP_KIND_ROUTER = 4;
+}
+
+enum Verdict {
+  VERDICT_UNSPECIFIED = 0;
+  VERDICT_ACCEPT = 1;
+  VERDICT_REVISE = 2;
+  VERDICT_ESCALATE = 3;
+}
+
+message ModelUsage {
+  string model = 1;
+  string prompt_id = 2;
+  int32 prompt_version = 3;
+  int64 input_tokens = 4;
+  int64 output_tokens = 5;
+  int64 cache_read_input_tokens = 6;
+  int64 cache_creation_input_tokens = 7;
+  int64 cost_micro_usd = 8;
+  bool response_cache_hit = 9;
+  int32 llm_calls = 10;
+}
+
+message RunBudget {
+  int32 max_steps = 1;
+  int32 max_llm_calls = 2;
+  int64 max_input_tokens = 3;
+  int64 max_output_tokens = 4;
+  int64 max_cost_micro_usd = 5;
+  int32 deadline_seconds = 6;
+}
+
+message RunTotals {
+  int32 steps = 1;
+  int32 llm_calls = 2;
+  int32 response_cache_hits = 3;
+  int64 input_tokens = 4;
+  int64 output_tokens = 5;
+  int64 cost_micro_usd = 6;
+}
+
+message GraphNode {
+  string node_id = 1;
+  string agent = 2;
+  string action = 3;
+  StepKind kind = 4;
+  repeated string depends_on = 5;
+}
+
+// Subject agent.run.started.
+message AgentRunStarted {
+  string run_id = 1;
+  string firm_id = 2;
+  string client_company_id = 3;
+  string workflow = 4;
+  string subject_type = 5;
+  string subject_id = 6;
+  RunBudget budget = 7;
+  google.protobuf.Timestamp started_at = 8;
+  string trace_id = 9;
+  int32 delivery_attempt = 10;
+  repeated GraphNode plan = 11;
+}
+
+// Subject agent.run.step. For one step_id, the event with the highest seq wins.
+message AgentStepEvent {
+  string run_id = 1;
+  string firm_id = 2;
+  string step_id = 3;
+  int64 seq = 4;
+  string node_id = 5;
+  repeated string depends_on = 6;
+  string agent = 7;
+  string action = 8;
+  StepKind kind = 9;
+  AgentStepStatus status = 10;
+  int32 attempt = 11;
+  google.protobuf.Timestamp at = 12;
+  int64 duration_ms = 13;
+  ModelUsage usage = 14;
+  string message_key = 15;
+  map<string, string> message_args = 16;
+  string error_code = 17;
+  string subject_type = 18;
+  string subject_id = 19;
+  string client_company_id = 20;
+}
+
+// Subject agent.run.finished.
+message AgentRunFinished {
+  string run_id = 1;
+  string firm_id = 2;
+  AgentRunStatus status = 3;
+  RunTotals totals = 4;
+  google.protobuf.Timestamp finished_at = 5;
+  string error_code = 6;
+  string subject_type = 7;
+  string subject_id = 8;
+}
+
+message VerifierFinding {
+  string path = 1;
+  string code = 2;
+  string severity = 3;
+  string observed = 4;
+  string expected = 5;
+  string evidence_ref = 6;
+  string source = 7;
+}
+
+message VerifierVerdict {
+  Verdict verdict = 1;
+  double confidence = 2;
+  repeated VerifierFinding findings = 3;
+  string critic_model = 4;
+  int32 revisions = 5;
+}
+
+message FieldChange {
+  string path = 1;
+  string old_value = 2;
+  string new_value = 3;
+}
+
+message Evidence {
+  string kind = 1;
+  string ref = 2;
+  string excerpt = 3;
+}
+
+message Proposal {
+  string proposal_id = 1;
+  string firm_id = 2;
+  string client_company_id = 3;
+  string run_id = 4;
+  string agent = 5;
+  string kind = 6;
+  string target_type = 7;
+  string target_id = 8;
+  string summary_key = 9;
+  map<string, string> summary_args = 10;
+  string rationale = 11;
+  double confidence = 12;
+  repeated FieldChange changes = 13;
+  google.protobuf.Any detail = 14;
+  repeated Evidence evidence = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp expires_at = 17;
+}
+
+// Subject agent.proposal.created.
+message ProposalCreated {
+  Proposal proposal = 1;
+}
+
+// Subject agent.task.requested. Any track's api-go code may publish it; ai-py dispatches by `agent`.
+message AgentTaskRequested {
+  string task_id = 1;
+  string firm_id = 2;
+  string client_company_id = 3;
+  string agent = 4;
+  string subject_type = 5;
+  string subject_id = 6;
+  google.protobuf.Any input = 7;
+  string requested_by = 8;
+  RunBudget budget = 9;
+}
+
+// Subject agent.task.completed.<agent> (0.2). One per AgentTaskRequested that reached a handler.
+message AgentTaskCompleted {
+  string task_id = 1;
+  string firm_id = 2;
+  string client_company_id = 3;
+  string agent = 4;
+  string run_id = 5;
+  AgentRunStatus status = 6;
+  google.protobuf.Any output = 7;
+  string error_code = 8;
+  string subject_type = 9;
+  string subject_id = 10;
+}

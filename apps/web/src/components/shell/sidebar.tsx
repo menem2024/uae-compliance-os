@@ -29,6 +29,7 @@ function NavLink({ item, label, active }: { item: NavItem & { href: string }; la
     >
       <Icon className="size-[18px] shrink-0" strokeWidth={1.8} aria-hidden />
       <span className="grow">{label}</span>
+      {item.live && item.href !== null && <span className="size-1.5 rounded-pill bg-ok animate-pulse" aria-hidden />}
       {item.badge !== undefined && (
         <span className="num rounded-pill bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-ink">
           {formatInt(item.badge)}
@@ -61,6 +62,7 @@ function SoonItem({ item, label, soon }: { item: NavItem; label: string; soon: s
 export function Sidebar({ firm, mandateDays }: { firm: ShellFirm; mandateDays: number }) {
   const t = useTranslations("Shell");
   const tHome = useTranslations("Home");
+  const tAll = useTranslations();
   const pathname = usePathname();
   const initial = Array.from(firm.name.trim())[0]?.toUpperCase() ?? "·";
 
@@ -90,12 +92,12 @@ export function Sidebar({ firm, mandateDays }: { firm: ShellFirm; mandateDays: n
       <nav aria-label={t("mainNav")} className="flex flex-col gap-1">
         {NAV.map((item) =>
           item.href === null ? (
-            <SoonItem key={item.key} item={item} label={t(`nav.${item.key}`)} soon={t("soon")} />
+            <SoonItem key={item.key} item={item} label={tAll(item.labelKey)} soon={t("soon")} />
           ) : (
             <NavLink
               key={item.key}
               item={{ ...item, href: item.href }}
-              label={t(`nav.${item.key}`)}
+              label={tAll(item.labelKey)}
               active={isActive(item.href, pathname)}
             />
           ),

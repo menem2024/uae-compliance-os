@@ -10,7 +10,7 @@ import (
 )
 
 const firmByOrg = `-- name: FirmByOrg :one
-SELECT id, zitadel_org_id, name, brand_color, created_at FROM firms WHERE zitadel_org_id = $1
+SELECT id, zitadel_org_id, name, brand_color, created_at, updated_at FROM firms WHERE zitadel_org_id = $1
 `
 
 func (q *Queries) FirmByOrg(ctx context.Context, zitadelOrgID string) (Firm, error) {
@@ -22,6 +22,7 @@ func (q *Queries) FirmByOrg(ctx context.Context, zitadelOrgID string) (Firm, err
 		&i.Name,
 		&i.BrandColor,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

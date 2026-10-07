@@ -1,0 +1,229 @@
+{
+  "invoice_number": "AE-001-E-Commerce-TEST",
+  "issue_date": "2025-02-11",
+  "seller_trn": "112345678900003",
+  "buyer_trn": "112345679000003",
+  "currency": "AED",
+  "total_amount": "105",
+  "vat_amount": "5",
+  "uuid": "0401431a-3b05-442e-95bd-2d12c2cb2296",
+  "issue_time": "11:35:10+04:00",
+  "invoice_type_code": "380",
+  "transaction_type_code": "00000001",
+  "payment_due_date": "2025-02-11",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "seller": {
+    "name": "Supplier Legal Name",
+    "trading_name": "Supplier Trade Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "112345678900003",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "line2": "Additional Street Name",
+      "line3": "Additional Address line",
+      "city": "Abu Dhabi",
+      "post_code": "Postal Zone",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Contact Email address"
+    }
+  },
+  "buyer": {
+    "name": "Buyer Legal Name",
+    "trading_name": "Buyer Trade Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "112345679000003",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Street Name",
+      "line2": "Additional Street Name",
+      "line3": "Additional Address Line",
+      "city": "Abu Dhabi",
+      "post_code": "Postal Zone",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "Contact Number",
+      "email": "Contact Email address"
+    }
+  },
+  "payee": {
+    "name": "Payee Party Name",
+    "identifier": {
+      "id": "132345679670003",
+      "scheme_id": "0066"
+    },
+    "legal_registration": {
+      "id": "112345679350001"
+    }
+  },
+  "delivery": {
+    "party_name": "Delivery Party Name",
+    "location": {
+      "id": "112345679000003",
+      "scheme_id": "0066"
+    },
+    "actual_delivery_date": "2025-02-11",
+    "address": {
+      "line1": "Street Name",
+      "line2": "Additional Street Name",
+      "line3": "Address line 3",
+      "city": "Abu Dhabi",
+      "post_code": "Postal Zone",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    }
+  },
+  "payment_instructions": [
+    {
+      "means_code": "55",
+      "means_text": "Debit Card",
+      "card": {
+        "primary_account_number": "XXXXXXXXXXXX1234",
+        "holder_name": "Card Holder Name",
+        "network_id": "VISA"
+      }
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "Instant Payment"
+    }
+  ],
+  "allowances_charges": [
+    {
+      "amount": "5",
+      "base_amount": "100",
+      "percentage": "5",
+      "reason": "Discount",
+      "reason_code": "95",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    },
+    {
+      "is_charge": true,
+      "amount": "2.5",
+      "base_amount": "100",
+      "percentage": "2.5",
+      "reason": "Technical Modification",
+      "reason_code": "AAC",
+      "tax_category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "102.5",
+    "allowance_total_amount": "5",
+    "charge_total_amount": "2.5",
+    "tax_exclusive_amount": "100",
+    "paid_amount": "0",
+    "rounding_amount": "0",
+    "payable_amount": "105"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "100",
+      "tax_amount": "5",
+      "category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "supporting_documents": [
+    {
+      "reference": "DR-INV-001",
+      "external_uri": "https://www.site.ae/invoices.pdf"
+    },
+    {
+      "reference": "DR-INV-02",
+      "attachment": {
+        "mime_code": "application/pdf",
+        "filename": "Sample_invoice.pdf"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "note": "Please check the invoice",
+      "quantity": "1",
+      "unit_code": "H87",
+      "net_amount": "102.5",
+      "allowances_charges": [
+        {
+          "amount": "2.5",
+          "base_amount": "100",
+          "percentage": "2.5",
+          "reason": "Discount",
+          "reason_code": "95"
+        },
+        {
+          "is_charge": true,
+          "amount": "5",
+          "base_amount": "100",
+          "percentage": "5",
+          "reason": "Technical Modification",
+          "reason_code": "AAC"
+        }
+      ],
+      "price": {
+        "net_price": "100",
+        "discount": "1",
+        "gross_price": "101",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "107.625",
+      "vat_amount_aed": "5.125",
+      "item": {
+        "name": "Item Name",
+        "description": "Item Description",
+        "item_type": "G",
+        "classifications": [
+          {
+            "code": "11223355",
+            "scheme_id": "HS",
+            "scheme_version": "1.0"
+          }
+        ]
+      }
+    }
+  ]
+}

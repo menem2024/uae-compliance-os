@@ -76,7 +76,20 @@
     "pipelineBody": "Every invoice moves through these stages until it is ready to export.",
     "countdownDate": "Go-live",
     "countdownScope": "Scope",
-    "countdownScopeValue": "SMEs"
+    "countdownScopeValue": "SMEs",
+    "overviewTitle": "Overview",
+    "overviewBody": "What your firm has in the system right now.",
+    "clients": "Client companies",
+    "invoices": "Invoices",
+    "capped": "Counts cover the latest {count} records only.",
+    "loadError": "Could not load your overview.",
+    "retry": "Try again",
+    "recentTitle": "Recent invoices",
+    "recentBody": "The five newest. Open one to review it.",
+    "recentEmpty": "No invoices yet. Create a demo invoice to see the review flow.",
+    "recentEmptyCta": "Create a demo invoice",
+    "viewAll": "All invoices",
+    "issueDate": "Issued {date}"
   },
   "DemoPage": {
     "subtitle": "Submit a demo invoice and follow the validation result live",
@@ -120,7 +133,10 @@
     "extracted": "Extracted",
     "validated": "Validated",
     "has_issues": "Has issues",
-    "ready": "Ready to export"
+    "ready": "Ready to export",
+    "classified": "Classified",
+    "fixed": "Fixed",
+    "needs_review": "Needs review"
   },
   "Auth": {
     "welcome": "Welcome back",
@@ -151,5 +167,478 @@
   },
   "Rules": {
     "AE-TRN-001": "Seller TRN must be exactly 15 digits"
+  },
+  "P1Nav": {
+    "documents": "Documents",
+    "agents": "Agent activity",
+    "live": "Live"
+  },
+  "P1Clients": {
+    "title": "Client companies",
+    "subtitle": "The businesses your firm keeps books for",
+    "search": "Search by name or TRN",
+    "statusFilter": "Status",
+    "status": { "active": "Active", "archived": "Archived", "all": "All" },
+    "create": "New client company",
+    "createTitle": "New client company",
+    "editTitle": "Edit client company",
+    "formHint": "The TRN is the 15-digit UAE tax registration number. It is optional.",
+    "fields": {
+      "name": "Name",
+      "nameAr": "Name in Arabic",
+      "trn": "TRN",
+      "emirate": "Emirate",
+      "emirateNone": "Not set"
+    },
+    "emirates": {
+      "AUH": "Abu Dhabi", "DXB": "Dubai", "SHJ": "Sharjah", "UAQ": "Umm Al Quwain",
+      "FUJ": "Fujairah", "AJM": "Ajman", "RAK": "Ras Al Khaimah"
+    },
+    "columns": { "name": "Name", "trn": "TRN", "emirate": "Emirate", "documents": "Documents", "needsReview": "Needs review" },
+    "edit": "Edit",
+    "archive": "Archive",
+    "restore": "Restore",
+    "archived": "{name} archived",
+    "restored": "{name} restored",
+    "saved": "{name} saved",
+    "save": "Save",
+    "cancel": "Cancel",
+    "empty": "No client companies yet. Add the first one.",
+    "emptySearch": "No client company matches this search.",
+    "loadMore": "Load more",
+    "errors": {
+      "generic": "Something went wrong. Try again.",
+      "load": "Could not load client companies.",
+      "invalid_name": "Enter a name (up to 200 characters).",
+      "invalid_name_ar": "The Arabic name is too long (up to 200 characters).",
+      "invalid_trn": "A TRN has exactly 15 digits.",
+      "invalid_emirate": "Choose an emirate from the list.",
+      "trn_taken": "Another client company of your firm already has this TRN."
+    }
+  },
+  "P1Settings": {
+    "title": "Settings",
+    "subtitle": "Your firm's name and accent colour",
+    "fields": { "name": "Firm name", "brandColor": "Accent colour", "brandColorPicker": "Pick a colour" },
+    "brandHint": "Six-digit hex, for example #C8A45D. We adjust it so text stays readable in both themes.",
+    "useDefault": "Use default",
+    "save": "Save changes",
+    "saved": "Settings saved",
+    "preview": "Preview",
+    "mode": { "light": "Light theme", "dark": "Dark theme" },
+    "sampleLink": "Invoice INV-2026-00042",
+    "sampleButton": "Approve",
+    "errors": {
+      "generic": "Could not save. Try again.",
+      "load": "Could not load the firm settings.",
+      "invalid_brand_color": "Use a six-digit hex colour such as #C8A45D."
+    }
+  },
+  "P1Landing": {
+    "hero": {
+      "badge": "Built for the UAE e-invoicing mandate",
+      "title": "Your firm's clients, mandate-ready before the deadline",
+      "subtitle": "An in-house agent orchestra reads, extracts and verifies invoices automatically, so your team reviews decisions instead of retyping documents."
+    },
+    "orchestra": {
+      "title": "An agent orchestra, not a single bot",
+      "subtitle": "Every document moves through a traceable pipeline. Each step is logged, budgeted and reviewable.",
+      "intake": "Intake — reads the upload and classifies the document",
+      "extraction": "Extraction — pulls invoice fields with confidence scores",
+      "verifier": "Verifier — runs checks and escalates what looks wrong",
+      "orchestrator": "Orchestrator — plans the run and keeps every step accountable"
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "steps": [
+        { "title": "Upload", "body": "Drop a PDF, image, CSV or XLSX. We dedupe by content hash automatically." },
+        { "title": "Extract", "body": "Intake and Extraction agents turn the document into structured invoice data." },
+        { "title": "Verify", "body": "The Verifier runs checks and flags anything that needs a human look." },
+        { "title": "Review", "body": "Your team approves or adjusts proposals; nothing ships to a client unreviewed." }
+      ]
+    },
+    "trust": {
+      "title": "Built with compliance in mind",
+      "points": [
+        "Every Firm's data is isolated at the database level",
+        "Agents never write business state directly",
+        "A full audit trail for every decision",
+        "No invoice is sent to a client without human review"
+      ]
+    },
+    "cta": {
+      "title": "Get your clients ready",
+      "body": "Open a workspace for your firm and start validating invoices ahead of the mandate.",
+      "button": "Sign in"
+    }
+  },
+  "P1Documents": {
+    "title": "Documents",
+    "subtitle": "Upload invoices and watch them move through the agents",
+    "client": {
+      "label": "Client company",
+      "placeholder": "Choose a client company",
+      "none": "Add a client company first to upload documents.",
+      "add": "Add client company",
+      "loadError": "Could not load client companies."
+    },
+    "dropzone": {
+      "title": "Drop files here, or browse",
+      "hint": "PDF, PNG, JPEG, WebP, CSV or XLSX. Up to 20 MB each, 100 files at a time.",
+      "browse": "Choose files",
+      "needClient": "Choose a client company first."
+    },
+    "queue": {
+      "title": "This upload",
+      "clear": "Clear finished"
+    },
+    "state": {
+      "hashing": "Reading file",
+      "requesting": "Preparing upload",
+      "uploading": "Uploading",
+      "completing": "Verifying",
+      "processing": "Agents are working",
+      "extracted": "Extracted",
+      "needs_review": "Needs review",
+      "not_invoice": "Not an invoice",
+      "failed": "Failed",
+      "rejected": "Rejected",
+      "duplicate": "Already uploaded"
+    },
+    "status": {
+      "pending_upload": "Waiting for file",
+      "uploaded": "Queued",
+      "processing": "Agents are working",
+      "extracted": "Extracted",
+      "needs_review": "Needs review",
+      "not_invoice": "Not an invoice",
+      "failed": "Failed",
+      "rejected": "Rejected"
+    },
+    "columns": {
+      "file": "File",
+      "status": "Status",
+      "invoices": "Invoices",
+      "size": "Size",
+      "uploaded": "Uploaded"
+    },
+    "sort": {
+      "asc": "Sorted ascending",
+      "desc": "Sorted descending",
+      "none": "Not sorted"
+    },
+    "empty": "No documents yet. Drop the first file above.",
+    "loadMore": "Load more",
+    "errors": {
+      "load": "Could not load documents.",
+      "generic": "Upload failed. Try again.",
+      "invalid_content_type": "This file type is not supported.",
+      "invalid_size": "The file is empty or larger than 20 MB.",
+      "invalid_filename": "The file name is not valid.",
+      "invalid_sha256": "The file could not be read.",
+      "content_type_mismatch": "The content does not match the file type.",
+      "object_missing": "The file did not arrive.",
+      "size_mismatch": "The uploaded size did not match.",
+      "client_company_archived": "This client company is archived.",
+      "client_company_not_found": "Client company not found.",
+      "storage_unavailable": "Storage is busy. Try again.",
+      "upload_failed": "Upload failed. Try again.",
+      "http_429": "Too many uploads. Wait a minute and try again.",
+      "sha256_mismatch": "The uploaded content did not match."
+    }
+  },
+  "P1Agents": {
+    "title": "Agent activity",
+    "subtitle": "Watch the agents work on your documents, live",
+    "connection": {
+      "connecting": "Connecting",
+      "live": "Live",
+      "offline": "Reconnecting"
+    },
+    "catchingUp": "Catching up with the latest activity",
+    "header": {
+      "title": "The orchestra",
+      "runs": "Runs today",
+      "running": "Running now",
+      "documents": "Documents",
+      "llmCalls": "Model calls",
+      "cacheHits": "Cache hits",
+      "cost": "Cost today",
+      "loadError": "Could not load today's summary."
+    },
+    "roster": {
+      "title": "Agents",
+      "calls": "Calls today",
+      "avg": "Avg time",
+      "active": "Active",
+      "phase2": "Phase 2",
+      "phase3": "Phase 3",
+      "names": {
+        "intake": "Intake",
+        "extraction": "Extraction",
+        "verifier": "Verifier",
+        "orchestrator": "Orchestrator",
+        "fix": "Fix",
+        "legal": "Legal",
+        "regulation_watcher": "Regulation watcher"
+      },
+      "roles": {
+        "intake": "Classifies each upload",
+        "extraction": "Reads invoice fields",
+        "verifier": "Checks and second-guesses",
+        "orchestrator": "Plans and routes the run",
+        "fix": "Suggests corrections",
+        "legal": "Answers legal questions",
+        "regulation_watcher": "Tracks rule changes"
+      }
+    },
+    "feed": {
+      "title": "Live feed",
+      "empty": "Waiting for agent activity. Upload a document to see it here.",
+      "count": "{count} recent events",
+      "fallback": "Agent update",
+      "step": "{agent} {action}: {status}",
+      "intake": {
+        "classified": "Intake classified the file as {kind} ({language}), {count} invoice(s)"
+      },
+      "gateway": {
+        "cache_hit": "Reused a cached model answer for {prompt}"
+      },
+      "proposal": {
+        "created": "Proposed a {kind} for review"
+      },
+      "verifier": {
+        "check": {
+          "flagged": "{family} checks flagged {count, plural, one {# issue} other {# issues}}",
+          "passed": "{family} checks passed"
+        },
+        "critic": {
+          "agreed": "Second reviewer agreed ({paths} fields reviewed)",
+          "disagreed": "Second reviewer disagreed on {count} field(s)"
+        },
+        "verdict": {
+          "escalate": "Verdict: needs a human (confidence {confidence})",
+          "escalating": "Escalating to a stronger model (confidence {confidence})",
+          "revise": "Asking extraction to revise {count} field(s)"
+        }
+      }
+    },
+    "status": {
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "budget_exceeded": "Over budget",
+      "cancelled": "Cancelled",
+      "abandoned": "Abandoned",
+      "pending": "Waiting",
+      "started": "Started",
+      "retrying": "Retrying",
+      "skipped": "Skipped"
+    },
+    "runs": {
+      "title": "Runs",
+      "empty": "No runs yet.",
+      "open": "Open run",
+      "columns": {
+        "workflow": "Workflow",
+        "subject": "Subject",
+        "status": "Status",
+        "steps": "Steps",
+        "cost": "Cost",
+        "started": "Started"
+      },
+      "subject": {
+        "document": "Document"
+      }
+    },
+    "drawer": {
+      "title": "Run details",
+      "description": "Plan, steps and proposals of one run",
+      "close": "Close",
+      "loading": "Loading run",
+      "error": "Could not load this run.",
+      "plan": "Plan",
+      "dagError": "This plan could not be drawn.",
+      "steps": "Steps",
+      "noSteps": "No steps recorded yet.",
+      "totals": {
+        "llmCalls": "Model calls",
+        "tokens": "Tokens in / out",
+        "cost": "Cost",
+        "duration": "Time"
+      },
+      "error_code": "Error"
+    },
+    "proposals": {
+      "title": "Proposals",
+      "empty": "No proposals yet.",
+      "columns": {
+        "agent": "Agent",
+        "kind": "Kind",
+        "summary": "Summary",
+        "confidence": "Confidence",
+        "state": "State"
+      },
+      "state": {
+        "proposed": "Proposed",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "superseded": "Superseded",
+        "expired": "Expired"
+      }
+    }
+  },
+  "P2Invoices": {
+    "title": "Invoices",
+    "subtitle": "Review each invoice, fix what the validator flags, approve it and export PINT-AE XML",
+    "list": {
+      "title": "Your invoices",
+      "columns": {
+        "invoice": "Invoice",
+        "seller": "Seller",
+        "buyer": "Buyer",
+        "total": "Total",
+        "status": "Status",
+        "issues": "Issues",
+        "issueDate": "Issue date"
+      },
+      "errorsCount": "{count, plural, one {# error} other {# errors}}",
+      "warningsCount": "{count, plural, one {# warning} other {# warnings}}",
+      "noIssues": "None",
+      "empty": "No invoices yet. Create a demo invoice above to see the review flow.",
+      "loadError": "Could not load the invoices.",
+      "retry": "Try again",
+      "loadMore": "Load more",
+      "unnamed": "Untitled"
+    },
+    "samples": {
+      "title": "New demo invoice",
+      "hint": "Each sample is a real canonical invoice. It goes to the live backend exactly as it is, and the validator decides what is wrong with it.",
+      "create": "Create and review",
+      "creating": "Creating",
+      "createError": "Could not create the invoice.",
+      "expected": {
+        "validated": "Expected: validated",
+        "has_issues": "Expected: has issues"
+      },
+      "valid": {
+        "title": "Valid invoice",
+        "description": "The official PINT-AE example. It should pass validation, then be approved and exported."
+      },
+      "totalsMismatch": {
+        "title": "Totals do not add up",
+        "description": "The amount due differs from the invoice total. The validator suggests the right value."
+      },
+      "badTrn": {
+        "title": "Invalid seller TRN",
+        "description": "The seller tax registration number has 14 digits instead of 15."
+      },
+      "missingFields": {
+        "title": "Missing required fields",
+        "description": "No issue date, no buyer name and no buyer address."
+      }
+    },
+    "review": {
+      "back": "All invoices",
+      "title": "Invoice review",
+      "loading": "Loading the invoice",
+      "notFound": "This invoice was not found. It may belong to another firm.",
+      "loadError": "Could not load the invoice.",
+      "retry": "Try again",
+      "pending": "The invoice is being processed. This page updates by itself.",
+      "timeout": "Processing is taking longer than expected. Refresh to check again.",
+      "refresh": "Refresh",
+      "live": "Live",
+      "status": "Status",
+      "ruleset": "Ruleset",
+      "seller": "Seller",
+      "buyer": "Buyer",
+      "total": "Total",
+      "version": "Version {version}",
+      "stats": {
+        "errors": "Errors",
+        "warnings": "Warnings",
+        "rules": "Rules evaluated",
+        "duration": "Duration"
+      },
+      "traceId": "Trace ID",
+      "invoiceId": "Invoice ID",
+      "copy": "Copy",
+      "copied": "Copied",
+      "noRun": "Not validated yet",
+      "next": {
+        "has_issues": "Fix every error below, then re-validate. Warnings do not block approval.",
+        "validated": "No errors. Approve the invoice to make it ready for export.",
+        "ready": "Approved and ready. Export the PINT-AE XML.",
+        "needs_review": "This invoice needs a human look before it can be validated.",
+        "fixed": "Your change is saved. Re-validation is running."
+      },
+      "approvedBy": "Approved by {who}"
+    },
+    "actions": {
+      "title": "Next step",
+      "revalidate": "Re-validate",
+      "revalidating": "Validating",
+      "approve": "Approve",
+      "approving": "Approving",
+      "export": "Export PINT-AE XML",
+      "exporting": "Exporting",
+      "download": "Download again",
+      "exported": "Exported {filename}",
+      "exportMeta": "{size} bytes, SHA-256 {sha}"
+    },
+    "issues": {
+      "title": "Issues",
+      "none": "No issues. The validator found nothing to fix.",
+      "severity": {
+        "error": "Error",
+        "warning": "Warning"
+      },
+      "path": "Field",
+      "term": "Business term",
+      "suggested": "Suggested value",
+      "apply": "Apply suggestion",
+      "applying": "Applying",
+      "correct": "Correct",
+      "correctLabel": "New value for {path}",
+      "save": "Save",
+      "saving": "Saving",
+      "cancel": "Cancel",
+      "current": "Current value",
+      "empty": "empty",
+      "noField": "This issue is about the whole document, so there is no single field to edit."
+    },
+    "audit": {
+      "title": "Audit trail",
+      "empty": "Nothing recorded yet.",
+      "loadError": "Could not load the audit trail.",
+      "by": "by {who}",
+      "system": "System",
+      "reason": "Reason",
+      "trace": "Trace",
+      "actions": {
+        "validation_requested": "Validation requested",
+        "fields_changed": "Fields changed",
+        "approved": "Approved",
+        "approval_revoked": "Approval revoked",
+        "exported": "Exported",
+        "fix_requested": "Fix requested"
+      }
+    },
+    "errors": {
+      "generic": "Something went wrong. Try again.",
+      "stale_payload": "Someone changed this invoice while you were editing. It was reloaded, so check it and try again.",
+      "old_value_mismatch": "The field no longer holds the value you saw. It was reloaded, so try again.",
+      "bad_path": "That field cannot be edited here.",
+      "not_validated": "Only a validated invoice can be approved. Re-validate it first.",
+      "not_ready": "Only an approved invoice can be exported. Approve it first.",
+      "revalidation_required": "The invoice changed since it was approved. Re-validate and approve it again.",
+      "validator_unavailable": "The validator is not reachable right now. Try again in a moment.",
+      "exporter_unavailable": "The exporter is not reachable right now. Try again in a moment.",
+      "not_found": "Not found. It may belong to another firm.",
+      "rate_limited": "Too many requests. Wait a moment and try again.",
+      "unauthenticated": "Your session expired. Sign in again.",
+      "upstream_unavailable": "The backend is not reachable right now. Try again in a moment."
+    }
   }
 }

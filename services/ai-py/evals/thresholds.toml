@@ -1,0 +1,32 @@
+# Eval thresholds (spec section 5.6). They apply in every mode. `min` is >=, `max` is <=, `eq` is ==.
+# A per_tag table applies its rule to each listed tag's value instead of the suite total.
+
+[extraction.field_accuracy]
+min = 0.90
+
+[extraction.field_accuracy.per_tag]
+min = 0.85
+tags = ["lang:ar", "lang:en", "format:pdf", "format:image"]
+
+[intake.kind_accuracy]
+min = 0.95
+
+[importer.field_accuracy]
+eq = 1.0
+
+[verifier.catch_rate]
+min = 0.80
+
+[verifier.false_flag_rate]
+max = 0.10
+
+# Fix agent (spec 5.7.5). Scored on the LLM step only; fake mode answers with the truth, so it proves the
+# harness, not the model. Live numbers are not measured until `make evals-live` has run.
+[fix.precision]
+min = 0.90
+
+[fix.recall]
+min = 0.80
+
+[fix.harmless]
+min = 1.0

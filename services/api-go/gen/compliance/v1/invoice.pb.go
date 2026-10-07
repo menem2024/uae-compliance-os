@@ -21,18 +21,53 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Invoice is the canonical invoice. Money is a decimal string, never a float.
+// Invoice is the canonical invoice or credit note, modelled on PINT AE Billing 1.0.4
+// (urn:peppol:pint:billing-1@ae-1). Money, quantities, rates and percentages are
+// decimal strings, never floats. An empty string means "absent". Code values are
+// strings checked against the RuleSet's versioned code lists.
+// Fields 1-7 are the Phase 0 wire contract and never change.
 type Invoice struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	InvoiceNumber string                 `protobuf:"bytes,1,opt,name=invoice_number,json=invoiceNumber,proto3" json:"invoice_number,omitempty"`
-	IssueDate     string                 `protobuf:"bytes,2,opt,name=issue_date,json=issueDate,proto3" json:"issue_date,omitempty"` // YYYY-MM-DD
-	SellerTrn     string                 `protobuf:"bytes,3,opt,name=seller_trn,json=sellerTrn,proto3" json:"seller_trn,omitempty"`
-	BuyerTrn      string                 `protobuf:"bytes,4,opt,name=buyer_trn,json=buyerTrn,proto3" json:"buyer_trn,omitempty"`
-	Currency      string                 `protobuf:"bytes,5,opt,name=currency,proto3" json:"currency,omitempty"`                          // ISO 4217
-	TotalAmount   string                 `protobuf:"bytes,6,opt,name=total_amount,json=totalAmount,proto3" json:"total_amount,omitempty"` // decimal string, e.g. "1050.00"
-	VatAmount     string                 `protobuf:"bytes,7,opt,name=vat_amount,json=vatAmount,proto3" json:"vat_amount,omitempty"`       // decimal string
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Phase 0 fields (unchanged).
+	InvoiceNumber string `protobuf:"bytes,1,opt,name=invoice_number,json=invoiceNumber,proto3" json:"invoice_number,omitempty"` // IBT-001 Invoice number
+	IssueDate     string `protobuf:"bytes,2,opt,name=issue_date,json=issueDate,proto3" json:"issue_date,omitempty"`             // IBT-002 Invoice issue date, YYYY-MM-DD
+	SellerTrn     string `protobuf:"bytes,3,opt,name=seller_trn,json=sellerTrn,proto3" json:"seller_trn,omitempty"`             // IBT-031 Seller VAT identifier (TRN)
+	BuyerTrn      string `protobuf:"bytes,4,opt,name=buyer_trn,json=buyerTrn,proto3" json:"buyer_trn,omitempty"`                // IBT-048 Buyer VAT identifier (TRN)
+	Currency      string `protobuf:"bytes,5,opt,name=currency,proto3" json:"currency,omitempty"`                                // IBT-005 Invoice currency code, ISO 4217
+	TotalAmount   string `protobuf:"bytes,6,opt,name=total_amount,json=totalAmount,proto3" json:"total_amount,omitempty"`       // IBT-112 Invoice total amount with tax, decimal string
+	VatAmount     string `protobuf:"bytes,7,opt,name=vat_amount,json=vatAmount,proto3" json:"vat_amount,omitempty"`             // IBT-110 Invoice total tax amount, decimal string
+	// v2 header.
+	Uuid                 string                       `protobuf:"bytes,8,opt,name=uuid,proto3" json:"uuid,omitempty"`                                                                  // BTAE-07 Unique identifier number
+	IssueTime            string                       `protobuf:"bytes,9,opt,name=issue_time,json=issueTime,proto3" json:"issue_time,omitempty"`                                       // IBT-168 Invoice issue time
+	InvoiceTypeCode      string                       `protobuf:"bytes,10,opt,name=invoice_type_code,json=invoiceTypeCode,proto3" json:"invoice_type_code,omitempty"`                  // IBT-003 (UNCL1001 subset: 380, 480, 381, 81)
+	TransactionTypeCode  string                       `protobuf:"bytes,11,opt,name=transaction_type_code,json=transactionTypeCode,proto3" json:"transaction_type_code,omitempty"`      // BTAE-02, 8 characters of 0/1, e.g. "00000000"
+	TaxCurrency          string                       `protobuf:"bytes,12,opt,name=tax_currency,json=taxCurrency,proto3" json:"tax_currency,omitempty"`                                // IBT-006 Tax accounting currency (AED when present)
+	ExchangeRate         string                       `protobuf:"bytes,13,opt,name=exchange_rate,json=exchangeRate,proto3" json:"exchange_rate,omitempty"`                             // BTAE-04 Currency exchange rate (<= 6 decimals)
+	TaxPointDate         string                       `protobuf:"bytes,14,opt,name=tax_point_date,json=taxPointDate,proto3" json:"tax_point_date,omitempty"`                           // IBT-007 VAT point date
+	PaymentDueDate       string                       `protobuf:"bytes,15,opt,name=payment_due_date,json=paymentDueDate,proto3" json:"payment_due_date,omitempty"`                     // IBT-009 Payment due date
+	Note                 string                       `protobuf:"bytes,16,opt,name=note,proto3" json:"note,omitempty"`                                                                 // IBT-022 Invoice note
+	CreditNoteReasonCode string                       `protobuf:"bytes,17,opt,name=credit_note_reason_code,json=creditNoteReasonCode,proto3" json:"credit_note_reason_code,omitempty"` // BTAE-03 (credit notes only; CreditReason code list)
+	Process              *ProcessControl              `protobuf:"bytes,18,opt,name=process,proto3" json:"process,omitempty"`                                                           // IBG-02
+	References           *DocumentReferences          `protobuf:"bytes,19,opt,name=references,proto3" json:"references,omitempty"`                                                     // IBT-010..IBT-019, BTAE-05, BTAE-21
+	PrecedingInvoices    []*PrecedingInvoiceReference `protobuf:"bytes,20,rep,name=preceding_invoices,json=precedingInvoices,proto3" json:"preceding_invoices,omitempty"`              // IBG-03
+	Seller               *Party                       `protobuf:"bytes,21,opt,name=seller,proto3" json:"seller,omitempty"`                                                             // IBG-04
+	Buyer                *Party                       `protobuf:"bytes,22,opt,name=buyer,proto3" json:"buyer,omitempty"`                                                               // IBG-07
+	PrincipalId          string                       `protobuf:"bytes,23,opt,name=principal_id,json=principalId,proto3" json:"principal_id,omitempty"`                                // BTAE-14 Principal ID (disclosed agent billing)
+	BeneficiaryId        string                       `protobuf:"bytes,24,opt,name=beneficiary_id,json=beneficiaryId,proto3" json:"beneficiary_id,omitempty"`                          // BTAE-01 Beneficiary ID (free trade zone)
+	Payee                *Payee                       `protobuf:"bytes,25,opt,name=payee,proto3" json:"payee,omitempty"`                                                               // IBG-10
+	TaxRepresentative    *TaxRepresentative           `protobuf:"bytes,26,opt,name=tax_representative,json=taxRepresentative,proto3" json:"tax_representative,omitempty"`              // IBG-11 and IBG-12
+	Delivery             *Delivery                    `protobuf:"bytes,27,opt,name=delivery,proto3" json:"delivery,omitempty"`                                                         // IBG-13 and IBG-15
+	InvoicingPeriod      *Period                      `protobuf:"bytes,28,opt,name=invoicing_period,json=invoicingPeriod,proto3" json:"invoicing_period,omitempty"`                    // IBG-14
+	BillingFrequency     string                       `protobuf:"bytes,29,opt,name=billing_frequency,json=billingFrequency,proto3" json:"billing_frequency,omitempty"`                 // BTAE-06 Frequency of billing (FreqBilling code list)
+	PaymentInstructions  []*PaymentInstructions       `protobuf:"bytes,30,rep,name=payment_instructions,json=paymentInstructions,proto3" json:"payment_instructions,omitempty"`        // IBG-16
+	PaymentTerms         []*PaymentTerms              `protobuf:"bytes,31,rep,name=payment_terms,json=paymentTerms,proto3" json:"payment_terms,omitempty"`                             // IBG-33
+	AllowancesCharges    []*AllowanceCharge           `protobuf:"bytes,32,rep,name=allowances_charges,json=allowancesCharges,proto3" json:"allowances_charges,omitempty"`              // IBG-20 (is_charge=false) and IBG-21 (is_charge=true)
+	Totals               *DocumentTotals              `protobuf:"bytes,33,opt,name=totals,proto3" json:"totals,omitempty"`                                                             // IBG-22 and IBG-37, except IBT-110 (field 7) and IBT-112 (field 6)
+	TaxBreakdown         []*TaxSubtotal               `protobuf:"bytes,34,rep,name=tax_breakdown,json=taxBreakdown,proto3" json:"tax_breakdown,omitempty"`                             // IBG-23
+	SupportingDocuments  []*SupportingDocument        `protobuf:"bytes,35,rep,name=supporting_documents,json=supportingDocuments,proto3" json:"supporting_documents,omitempty"`        // IBG-24
+	Lines                []*InvoiceLine               `protobuf:"bytes,36,rep,name=lines,proto3" json:"lines,omitempty"`                                                               // IBG-25
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Invoice) Reset() {
@@ -114,11 +149,2411 @@ func (x *Invoice) GetVatAmount() string {
 	return ""
 }
 
+func (x *Invoice) GetUuid() string {
+	if x != nil {
+		return x.Uuid
+	}
+	return ""
+}
+
+func (x *Invoice) GetIssueTime() string {
+	if x != nil {
+		return x.IssueTime
+	}
+	return ""
+}
+
+func (x *Invoice) GetInvoiceTypeCode() string {
+	if x != nil {
+		return x.InvoiceTypeCode
+	}
+	return ""
+}
+
+func (x *Invoice) GetTransactionTypeCode() string {
+	if x != nil {
+		return x.TransactionTypeCode
+	}
+	return ""
+}
+
+func (x *Invoice) GetTaxCurrency() string {
+	if x != nil {
+		return x.TaxCurrency
+	}
+	return ""
+}
+
+func (x *Invoice) GetExchangeRate() string {
+	if x != nil {
+		return x.ExchangeRate
+	}
+	return ""
+}
+
+func (x *Invoice) GetTaxPointDate() string {
+	if x != nil {
+		return x.TaxPointDate
+	}
+	return ""
+}
+
+func (x *Invoice) GetPaymentDueDate() string {
+	if x != nil {
+		return x.PaymentDueDate
+	}
+	return ""
+}
+
+func (x *Invoice) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+func (x *Invoice) GetCreditNoteReasonCode() string {
+	if x != nil {
+		return x.CreditNoteReasonCode
+	}
+	return ""
+}
+
+func (x *Invoice) GetProcess() *ProcessControl {
+	if x != nil {
+		return x.Process
+	}
+	return nil
+}
+
+func (x *Invoice) GetReferences() *DocumentReferences {
+	if x != nil {
+		return x.References
+	}
+	return nil
+}
+
+func (x *Invoice) GetPrecedingInvoices() []*PrecedingInvoiceReference {
+	if x != nil {
+		return x.PrecedingInvoices
+	}
+	return nil
+}
+
+func (x *Invoice) GetSeller() *Party {
+	if x != nil {
+		return x.Seller
+	}
+	return nil
+}
+
+func (x *Invoice) GetBuyer() *Party {
+	if x != nil {
+		return x.Buyer
+	}
+	return nil
+}
+
+func (x *Invoice) GetPrincipalId() string {
+	if x != nil {
+		return x.PrincipalId
+	}
+	return ""
+}
+
+func (x *Invoice) GetBeneficiaryId() string {
+	if x != nil {
+		return x.BeneficiaryId
+	}
+	return ""
+}
+
+func (x *Invoice) GetPayee() *Payee {
+	if x != nil {
+		return x.Payee
+	}
+	return nil
+}
+
+func (x *Invoice) GetTaxRepresentative() *TaxRepresentative {
+	if x != nil {
+		return x.TaxRepresentative
+	}
+	return nil
+}
+
+func (x *Invoice) GetDelivery() *Delivery {
+	if x != nil {
+		return x.Delivery
+	}
+	return nil
+}
+
+func (x *Invoice) GetInvoicingPeriod() *Period {
+	if x != nil {
+		return x.InvoicingPeriod
+	}
+	return nil
+}
+
+func (x *Invoice) GetBillingFrequency() string {
+	if x != nil {
+		return x.BillingFrequency
+	}
+	return ""
+}
+
+func (x *Invoice) GetPaymentInstructions() []*PaymentInstructions {
+	if x != nil {
+		return x.PaymentInstructions
+	}
+	return nil
+}
+
+func (x *Invoice) GetPaymentTerms() []*PaymentTerms {
+	if x != nil {
+		return x.PaymentTerms
+	}
+	return nil
+}
+
+func (x *Invoice) GetAllowancesCharges() []*AllowanceCharge {
+	if x != nil {
+		return x.AllowancesCharges
+	}
+	return nil
+}
+
+func (x *Invoice) GetTotals() *DocumentTotals {
+	if x != nil {
+		return x.Totals
+	}
+	return nil
+}
+
+func (x *Invoice) GetTaxBreakdown() []*TaxSubtotal {
+	if x != nil {
+		return x.TaxBreakdown
+	}
+	return nil
+}
+
+func (x *Invoice) GetSupportingDocuments() []*SupportingDocument {
+	if x != nil {
+		return x.SupportingDocuments
+	}
+	return nil
+}
+
+func (x *Invoice) GetLines() []*InvoiceLine {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
+// ProcessControl is IBG-02. The exporter fills the defaults when empty.
+type ProcessControl struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	BusinessProcessType     string                 `protobuf:"bytes,1,opt,name=business_process_type,json=businessProcessType,proto3" json:"business_process_type,omitempty"`           // IBT-023, default "urn:peppol:bis:billing"
+	SpecificationIdentifier string                 `protobuf:"bytes,2,opt,name=specification_identifier,json=specificationIdentifier,proto3" json:"specification_identifier,omitempty"` // IBT-024, default "urn:peppol:pint:billing-1@ae-1"
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *ProcessControl) Reset() {
+	*x = ProcessControl{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessControl) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessControl) ProtoMessage() {}
+
+func (x *ProcessControl) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessControl.ProtoReflect.Descriptor instead.
+func (*ProcessControl) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ProcessControl) GetBusinessProcessType() string {
+	if x != nil {
+		return x.BusinessProcessType
+	}
+	return ""
+}
+
+func (x *ProcessControl) GetSpecificationIdentifier() string {
+	if x != nil {
+		return x.SpecificationIdentifier
+	}
+	return ""
+}
+
+// Identifier is an identifier with an optional scheme (the "-1" sub-term).
+type Identifier struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	SchemeId      string                 `protobuf:"bytes,2,opt,name=scheme_id,json=schemeId,proto3" json:"scheme_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Identifier) Reset() {
+	*x = Identifier{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Identifier) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Identifier) ProtoMessage() {}
+
+func (x *Identifier) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Identifier.ProtoReflect.Descriptor instead.
+func (*Identifier) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Identifier) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Identifier) GetSchemeId() string {
+	if x != nil {
+		return x.SchemeId
+	}
+	return ""
+}
+
+type DocumentReferences struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	BuyerReference           string                 `protobuf:"bytes,1,opt,name=buyer_reference,json=buyerReference,proto3" json:"buyer_reference,omitempty"`                                  // IBT-010
+	ProjectReference         string                 `protobuf:"bytes,2,opt,name=project_reference,json=projectReference,proto3" json:"project_reference,omitempty"`                            // IBT-011
+	ContractReference        string                 `protobuf:"bytes,3,opt,name=contract_reference,json=contractReference,proto3" json:"contract_reference,omitempty"`                         // IBT-012
+	ContractValue            string                 `protobuf:"bytes,4,opt,name=contract_value,json=contractValue,proto3" json:"contract_value,omitempty"`                                     // BTAE-05 Contract value, decimal string
+	PurchaseOrderReference   string                 `protobuf:"bytes,5,opt,name=purchase_order_reference,json=purchaseOrderReference,proto3" json:"purchase_order_reference,omitempty"`        // IBT-013
+	SalesOrderReference      string                 `protobuf:"bytes,6,opt,name=sales_order_reference,json=salesOrderReference,proto3" json:"sales_order_reference,omitempty"`                 // IBT-014
+	ReceivingAdviceReference string                 `protobuf:"bytes,7,opt,name=receiving_advice_reference,json=receivingAdviceReference,proto3" json:"receiving_advice_reference,omitempty"`  // IBT-015
+	DespatchAdviceReference  string                 `protobuf:"bytes,8,opt,name=despatch_advice_reference,json=despatchAdviceReference,proto3" json:"despatch_advice_reference,omitempty"`     // IBT-016
+	TenderOrLotReference     string                 `protobuf:"bytes,9,opt,name=tender_or_lot_reference,json=tenderOrLotReference,proto3" json:"tender_or_lot_reference,omitempty"`            // IBT-017
+	InvoicedObject           *Identifier            `protobuf:"bytes,10,opt,name=invoiced_object,json=invoicedObject,proto3" json:"invoiced_object,omitempty"`                                 // IBT-018 and IBT-018-1
+	BuyerAccountingReference string                 `protobuf:"bytes,11,opt,name=buyer_accounting_reference,json=buyerAccountingReference,proto3" json:"buyer_accounting_reference,omitempty"` // IBT-019
+	CustomsReference         string                 `protobuf:"bytes,12,opt,name=customs_reference,json=customsReference,proto3" json:"customs_reference,omitempty"`                           // BTAE-21 Customs reference number
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *DocumentReferences) Reset() {
+	*x = DocumentReferences{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DocumentReferences) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DocumentReferences) ProtoMessage() {}
+
+func (x *DocumentReferences) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DocumentReferences.ProtoReflect.Descriptor instead.
+func (*DocumentReferences) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DocumentReferences) GetBuyerReference() string {
+	if x != nil {
+		return x.BuyerReference
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetProjectReference() string {
+	if x != nil {
+		return x.ProjectReference
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetContractReference() string {
+	if x != nil {
+		return x.ContractReference
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetContractValue() string {
+	if x != nil {
+		return x.ContractValue
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetPurchaseOrderReference() string {
+	if x != nil {
+		return x.PurchaseOrderReference
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetSalesOrderReference() string {
+	if x != nil {
+		return x.SalesOrderReference
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetReceivingAdviceReference() string {
+	if x != nil {
+		return x.ReceivingAdviceReference
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetDespatchAdviceReference() string {
+	if x != nil {
+		return x.DespatchAdviceReference
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetTenderOrLotReference() string {
+	if x != nil {
+		return x.TenderOrLotReference
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetInvoicedObject() *Identifier {
+	if x != nil {
+		return x.InvoicedObject
+	}
+	return nil
+}
+
+func (x *DocumentReferences) GetBuyerAccountingReference() string {
+	if x != nil {
+		return x.BuyerAccountingReference
+	}
+	return ""
+}
+
+func (x *DocumentReferences) GetCustomsReference() string {
+	if x != nil {
+		return x.CustomsReference
+	}
+	return ""
+}
+
+type PrecedingInvoiceReference struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                // IBT-025
+	IssueDate     string                 `protobuf:"bytes,2,opt,name=issue_date,json=issueDate,proto3" json:"issue_date,omitempty"` // IBT-026
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PrecedingInvoiceReference) Reset() {
+	*x = PrecedingInvoiceReference{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrecedingInvoiceReference) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrecedingInvoiceReference) ProtoMessage() {}
+
+func (x *PrecedingInvoiceReference) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrecedingInvoiceReference.ProtoReflect.Descriptor instead.
+func (*PrecedingInvoiceReference) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *PrecedingInvoiceReference) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PrecedingInvoiceReference) GetIssueDate() string {
+	if x != nil {
+		return x.IssueDate
+	}
+	return ""
+}
+
+// Party is a seller (IBG-04) or a buyer (IBG-07). The VAT identifiers IBT-031 and
+// IBT-048 are Invoice.seller_trn and Invoice.buyer_trn.
+type Party struct {
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	Name                       string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                                                                                 // IBT-027 / IBT-044 (legal registration name)
+	TradingName                string                 `protobuf:"bytes,2,opt,name=trading_name,json=tradingName,proto3" json:"trading_name,omitempty"`                                                // IBT-028 / IBT-045
+	Identifiers                []*Identifier          `protobuf:"bytes,3,rep,name=identifiers,proto3" json:"identifiers,omitempty"`                                                                   // IBT-029 (0..n) / IBT-046 (0..1)
+	LegalRegistration          *LegalRegistration     `protobuf:"bytes,4,opt,name=legal_registration,json=legalRegistration,proto3" json:"legal_registration,omitempty"`                              // IBT-030 / IBT-047 and their BTAE qualifiers
+	TaxRegistrationIdentifier  string                 `protobuf:"bytes,5,opt,name=tax_registration_identifier,json=taxRegistrationIdentifier,proto3" json:"tax_registration_identifier,omitempty"`    // IBT-032 Seller TIN (seller only, 10 digits)
+	AdditionalLegalInformation string                 `protobuf:"bytes,6,opt,name=additional_legal_information,json=additionalLegalInformation,proto3" json:"additional_legal_information,omitempty"` // IBT-033 (seller only)
+	ElectronicAddress          *Identifier            `protobuf:"bytes,7,opt,name=electronic_address,json=electronicAddress,proto3" json:"electronic_address,omitempty"`                              // IBT-034 / IBT-049 and their scheme, e.g. "0235"
+	PostalAddress              *PostalAddress         `protobuf:"bytes,8,opt,name=postal_address,json=postalAddress,proto3" json:"postal_address,omitempty"`                                          // IBG-05 / IBG-08
+	Contact                    *Contact               `protobuf:"bytes,9,opt,name=contact,proto3" json:"contact,omitempty"`                                                                           // IBG-06 / IBG-09
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
+}
+
+func (x *Party) Reset() {
+	*x = Party{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Party) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Party) ProtoMessage() {}
+
+func (x *Party) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Party.ProtoReflect.Descriptor instead.
+func (*Party) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Party) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Party) GetTradingName() string {
+	if x != nil {
+		return x.TradingName
+	}
+	return ""
+}
+
+func (x *Party) GetIdentifiers() []*Identifier {
+	if x != nil {
+		return x.Identifiers
+	}
+	return nil
+}
+
+func (x *Party) GetLegalRegistration() *LegalRegistration {
+	if x != nil {
+		return x.LegalRegistration
+	}
+	return nil
+}
+
+func (x *Party) GetTaxRegistrationIdentifier() string {
+	if x != nil {
+		return x.TaxRegistrationIdentifier
+	}
+	return ""
+}
+
+func (x *Party) GetAdditionalLegalInformation() string {
+	if x != nil {
+		return x.AdditionalLegalInformation
+	}
+	return ""
+}
+
+func (x *Party) GetElectronicAddress() *Identifier {
+	if x != nil {
+		return x.ElectronicAddress
+	}
+	return nil
+}
+
+func (x *Party) GetPostalAddress() *PostalAddress {
+	if x != nil {
+		return x.PostalAddress
+	}
+	return nil
+}
+
+func (x *Party) GetContact() *Contact {
+	if x != nil {
+		return x.Contact
+	}
+	return nil
+}
+
+type LegalRegistration struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                                                         // IBT-030 / IBT-047
+	SchemeId               string                 `protobuf:"bytes,2,opt,name=scheme_id,json=schemeId,proto3" json:"scheme_id,omitempty"`                                             // IBT-030-1 / IBT-047-1
+	Type                   string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`                                                                     // BTAE-15 / BTAE-16: "TL" | "EID" | "PAS" | "CD"
+	AuthorityName          string                 `protobuf:"bytes,4,opt,name=authority_name,json=authorityName,proto3" json:"authority_name,omitempty"`                              // BTAE-12 / BTAE-11 (when type = TL)
+	PassportIssuingCountry string                 `protobuf:"bytes,5,opt,name=passport_issuing_country,json=passportIssuingCountry,proto3" json:"passport_issuing_country,omitempty"` // BTAE-18 / BTAE-19, ISO 3166-1 (when type = PAS)
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *LegalRegistration) Reset() {
+	*x = LegalRegistration{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LegalRegistration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LegalRegistration) ProtoMessage() {}
+
+func (x *LegalRegistration) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LegalRegistration.ProtoReflect.Descriptor instead.
+func (*LegalRegistration) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *LegalRegistration) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *LegalRegistration) GetSchemeId() string {
+	if x != nil {
+		return x.SchemeId
+	}
+	return ""
+}
+
+func (x *LegalRegistration) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *LegalRegistration) GetAuthorityName() string {
+	if x != nil {
+		return x.AuthorityName
+	}
+	return ""
+}
+
+func (x *LegalRegistration) GetPassportIssuingCountry() string {
+	if x != nil {
+		return x.PassportIssuingCountry
+	}
+	return ""
+}
+
+type PostalAddress struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Line1              string                 `protobuf:"bytes,1,opt,name=line1,proto3" json:"line1,omitempty"`                                                     // IBT-035 / 050 / 064 / 075
+	Line2              string                 `protobuf:"bytes,2,opt,name=line2,proto3" json:"line2,omitempty"`                                                     // IBT-036 / 051 / 065 / 076
+	Line3              string                 `protobuf:"bytes,3,opt,name=line3,proto3" json:"line3,omitempty"`                                                     // IBT-162 / 163 / 164 / 165
+	City               string                 `protobuf:"bytes,4,opt,name=city,proto3" json:"city,omitempty"`                                                       // IBT-037 / 052 / 066 / 077
+	PostCode           string                 `protobuf:"bytes,5,opt,name=post_code,json=postCode,proto3" json:"post_code,omitempty"`                               // IBT-038 / 053 / 067 / 078
+	CountrySubdivision string                 `protobuf:"bytes,6,opt,name=country_subdivision,json=countrySubdivision,proto3" json:"country_subdivision,omitempty"` // IBT-039 / 054 / 068 / 079 (AUH, DXB, SHJ, UAQ, FUJ, AJM, RAK when AE)
+	CountryCode        string                 `protobuf:"bytes,7,opt,name=country_code,json=countryCode,proto3" json:"country_code,omitempty"`                      // IBT-040 / 055 / 069 / 080, ISO 3166-1 alpha-2
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *PostalAddress) Reset() {
+	*x = PostalAddress{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PostalAddress) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PostalAddress) ProtoMessage() {}
+
+func (x *PostalAddress) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PostalAddress.ProtoReflect.Descriptor instead.
+func (*PostalAddress) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *PostalAddress) GetLine1() string {
+	if x != nil {
+		return x.Line1
+	}
+	return ""
+}
+
+func (x *PostalAddress) GetLine2() string {
+	if x != nil {
+		return x.Line2
+	}
+	return ""
+}
+
+func (x *PostalAddress) GetLine3() string {
+	if x != nil {
+		return x.Line3
+	}
+	return ""
+}
+
+func (x *PostalAddress) GetCity() string {
+	if x != nil {
+		return x.City
+	}
+	return ""
+}
+
+func (x *PostalAddress) GetPostCode() string {
+	if x != nil {
+		return x.PostCode
+	}
+	return ""
+}
+
+func (x *PostalAddress) GetCountrySubdivision() string {
+	if x != nil {
+		return x.CountrySubdivision
+	}
+	return ""
+}
+
+func (x *PostalAddress) GetCountryCode() string {
+	if x != nil {
+		return x.CountryCode
+	}
+	return ""
+}
+
+type Contact struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`           // IBT-041 / IBT-056
+	Telephone     string                 `protobuf:"bytes,2,opt,name=telephone,proto3" json:"telephone,omitempty"` // IBT-042 / IBT-057
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`         // IBT-043 / IBT-058
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Contact) Reset() {
+	*x = Contact{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Contact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Contact) ProtoMessage() {}
+
+func (x *Contact) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Contact.ProtoReflect.Descriptor instead.
+func (*Contact) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Contact) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Contact) GetTelephone() string {
+	if x != nil {
+		return x.Telephone
+	}
+	return ""
+}
+
+func (x *Contact) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+type Payee struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                                                    // IBT-059
+	Identifier        *Identifier            `protobuf:"bytes,2,opt,name=identifier,proto3" json:"identifier,omitempty"`                                        // IBT-060 and IBT-060-1
+	LegalRegistration *Identifier            `protobuf:"bytes,3,opt,name=legal_registration,json=legalRegistration,proto3" json:"legal_registration,omitempty"` // IBT-061 and IBT-061-1
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *Payee) Reset() {
+	*x = Payee{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Payee) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Payee) ProtoMessage() {}
+
+func (x *Payee) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Payee.ProtoReflect.Descriptor instead.
+func (*Payee) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Payee) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Payee) GetIdentifier() *Identifier {
+	if x != nil {
+		return x.Identifier
+	}
+	return nil
+}
+
+func (x *Payee) GetLegalRegistration() *Identifier {
+	if x != nil {
+		return x.LegalRegistration
+	}
+	return nil
+}
+
+type TaxRepresentative struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                                        // IBT-062
+	VatIdentifier string                 `protobuf:"bytes,2,opt,name=vat_identifier,json=vatIdentifier,proto3" json:"vat_identifier,omitempty"` // IBT-063
+	PostalAddress *PostalAddress         `protobuf:"bytes,3,opt,name=postal_address,json=postalAddress,proto3" json:"postal_address,omitempty"` // IBG-12
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaxRepresentative) Reset() {
+	*x = TaxRepresentative{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaxRepresentative) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaxRepresentative) ProtoMessage() {}
+
+func (x *TaxRepresentative) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaxRepresentative.ProtoReflect.Descriptor instead.
+func (*TaxRepresentative) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *TaxRepresentative) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TaxRepresentative) GetVatIdentifier() string {
+	if x != nil {
+		return x.VatIdentifier
+	}
+	return ""
+}
+
+func (x *TaxRepresentative) GetPostalAddress() *PostalAddress {
+	if x != nil {
+		return x.PostalAddress
+	}
+	return nil
+}
+
+type Delivery struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	PartyName          string                 `protobuf:"bytes,1,opt,name=party_name,json=partyName,proto3" json:"party_name,omitempty"`                              // IBT-070
+	Incoterms          string                 `protobuf:"bytes,2,opt,name=incoterms,proto3" json:"incoterms,omitempty"`                                               // BTAE-22
+	Location           *Identifier            `protobuf:"bytes,3,opt,name=location,proto3" json:"location,omitempty"`                                                 // IBT-071 and IBT-071-1
+	ActualDeliveryDate string                 `protobuf:"bytes,4,opt,name=actual_delivery_date,json=actualDeliveryDate,proto3" json:"actual_delivery_date,omitempty"` // IBT-072
+	Address            *PostalAddress         `protobuf:"bytes,5,opt,name=address,proto3" json:"address,omitempty"`                                                   // IBG-15
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *Delivery) Reset() {
+	*x = Delivery{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Delivery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Delivery) ProtoMessage() {}
+
+func (x *Delivery) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Delivery.ProtoReflect.Descriptor instead.
+func (*Delivery) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *Delivery) GetPartyName() string {
+	if x != nil {
+		return x.PartyName
+	}
+	return ""
+}
+
+func (x *Delivery) GetIncoterms() string {
+	if x != nil {
+		return x.Incoterms
+	}
+	return ""
+}
+
+func (x *Delivery) GetLocation() *Identifier {
+	if x != nil {
+		return x.Location
+	}
+	return nil
+}
+
+func (x *Delivery) GetActualDeliveryDate() string {
+	if x != nil {
+		return x.ActualDeliveryDate
+	}
+	return ""
+}
+
+func (x *Delivery) GetAddress() *PostalAddress {
+	if x != nil {
+		return x.Address
+	}
+	return nil
+}
+
+type Period struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StartDate     string                 `protobuf:"bytes,1,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"` // IBT-073 / IBT-134
+	EndDate       string                 `protobuf:"bytes,2,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`       // IBT-074 / IBT-135
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Period) Reset() {
+	*x = Period{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Period) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Period) ProtoMessage() {}
+
+func (x *Period) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Period.ProtoReflect.Descriptor instead.
+func (*Period) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *Period) GetStartDate() string {
+	if x != nil {
+		return x.StartDate
+	}
+	return ""
+}
+
+func (x *Period) GetEndDate() string {
+	if x != nil {
+		return x.EndDate
+	}
+	return ""
+}
+
+type PaymentInstructions struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Id                    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                                                    // IBT-178
+	MeansCode             string                 `protobuf:"bytes,2,opt,name=means_code,json=meansCode,proto3" json:"means_code,omitempty"`                                     // IBT-081 (UNCL4461 subset)
+	MeansText             string                 `protobuf:"bytes,3,opt,name=means_text,json=meansText,proto3" json:"means_text,omitempty"`                                     // IBT-082
+	RemittanceInformation []*Identifier          `protobuf:"bytes,4,rep,name=remittance_information,json=remittanceInformation,proto3" json:"remittance_information,omitempty"` // IBT-083 and IBT-083-1
+	CreditTransfer        *CreditTransfer        `protobuf:"bytes,5,opt,name=credit_transfer,json=creditTransfer,proto3" json:"credit_transfer,omitempty"`                      // IBG-17
+	Card                  *PaymentCard           `protobuf:"bytes,6,opt,name=card,proto3" json:"card,omitempty"`                                                                // IBG-18
+	DirectDebit           *DirectDebit           `protobuf:"bytes,7,opt,name=direct_debit,json=directDebit,proto3" json:"direct_debit,omitempty"`                               // IBG-19
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *PaymentInstructions) Reset() {
+	*x = PaymentInstructions{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentInstructions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentInstructions) ProtoMessage() {}
+
+func (x *PaymentInstructions) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentInstructions.ProtoReflect.Descriptor instead.
+func (*PaymentInstructions) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PaymentInstructions) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PaymentInstructions) GetMeansCode() string {
+	if x != nil {
+		return x.MeansCode
+	}
+	return ""
+}
+
+func (x *PaymentInstructions) GetMeansText() string {
+	if x != nil {
+		return x.MeansText
+	}
+	return ""
+}
+
+func (x *PaymentInstructions) GetRemittanceInformation() []*Identifier {
+	if x != nil {
+		return x.RemittanceInformation
+	}
+	return nil
+}
+
+func (x *PaymentInstructions) GetCreditTransfer() *CreditTransfer {
+	if x != nil {
+		return x.CreditTransfer
+	}
+	return nil
+}
+
+func (x *PaymentInstructions) GetCard() *PaymentCard {
+	if x != nil {
+		return x.Card
+	}
+	return nil
+}
+
+func (x *PaymentInstructions) GetDirectDebit() *DirectDebit {
+	if x != nil {
+		return x.DirectDebit
+	}
+	return nil
+}
+
+type CreditTransfer struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Account            *Identifier            `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`                                                 // IBT-084 and IBT-084-1 (e.g. IBAN)
+	AccountName        string                 `protobuf:"bytes,2,opt,name=account_name,json=accountName,proto3" json:"account_name,omitempty"`                      // IBT-085
+	ServiceProviderId  string                 `protobuf:"bytes,3,opt,name=service_provider_id,json=serviceProviderId,proto3" json:"service_provider_id,omitempty"`  // IBT-086
+	InstitutionAddress *PostalAddress         `protobuf:"bytes,4,opt,name=institution_address,json=institutionAddress,proto3" json:"institution_address,omitempty"` // IBG-34 (IBT-169..IBT-175)
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *CreditTransfer) Reset() {
+	*x = CreditTransfer{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreditTransfer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreditTransfer) ProtoMessage() {}
+
+func (x *CreditTransfer) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreditTransfer.ProtoReflect.Descriptor instead.
+func (*CreditTransfer) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CreditTransfer) GetAccount() *Identifier {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
+func (x *CreditTransfer) GetAccountName() string {
+	if x != nil {
+		return x.AccountName
+	}
+	return ""
+}
+
+func (x *CreditTransfer) GetServiceProviderId() string {
+	if x != nil {
+		return x.ServiceProviderId
+	}
+	return ""
+}
+
+func (x *CreditTransfer) GetInstitutionAddress() *PostalAddress {
+	if x != nil {
+		return x.InstitutionAddress
+	}
+	return nil
+}
+
+// PaymentCard is IBG-18. Only a masked PAN is ever stored or transmitted.
+type PaymentCard struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	PrimaryAccountNumber string                 `protobuf:"bytes,1,opt,name=primary_account_number,json=primaryAccountNumber,proto3" json:"primary_account_number,omitempty"` // IBT-087, masked (last 4 to 6 digits only)
+	HolderName           string                 `protobuf:"bytes,2,opt,name=holder_name,json=holderName,proto3" json:"holder_name,omitempty"`                                 // IBT-088
+	NetworkId            string                 `protobuf:"bytes,3,opt,name=network_id,json=networkId,proto3" json:"network_id,omitempty"`                                    // UBL cac:CardAccount/cbc:NetworkID (required by UBL), no IBT
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *PaymentCard) Reset() {
+	*x = PaymentCard{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentCard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentCard) ProtoMessage() {}
+
+func (x *PaymentCard) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentCard.ProtoReflect.Descriptor instead.
+func (*PaymentCard) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *PaymentCard) GetPrimaryAccountNumber() string {
+	if x != nil {
+		return x.PrimaryAccountNumber
+	}
+	return ""
+}
+
+func (x *PaymentCard) GetHolderName() string {
+	if x != nil {
+		return x.HolderName
+	}
+	return ""
+}
+
+func (x *PaymentCard) GetNetworkId() string {
+	if x != nil {
+		return x.NetworkId
+	}
+	return ""
+}
+
+type DirectDebit struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	MandateReference   string                 `protobuf:"bytes,1,opt,name=mandate_reference,json=mandateReference,proto3" json:"mandate_reference,omitempty"`       // IBT-089
+	CreditorIdentifier string                 `protobuf:"bytes,2,opt,name=creditor_identifier,json=creditorIdentifier,proto3" json:"creditor_identifier,omitempty"` // IBT-090
+	DebitedAccount     string                 `protobuf:"bytes,3,opt,name=debited_account,json=debitedAccount,proto3" json:"debited_account,omitempty"`             // IBT-091
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *DirectDebit) Reset() {
+	*x = DirectDebit{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DirectDebit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DirectDebit) ProtoMessage() {}
+
+func (x *DirectDebit) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DirectDebit.ProtoReflect.Descriptor instead.
+func (*DirectDebit) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *DirectDebit) GetMandateReference() string {
+	if x != nil {
+		return x.MandateReference
+	}
+	return ""
+}
+
+func (x *DirectDebit) GetCreditorIdentifier() string {
+	if x != nil {
+		return x.CreditorIdentifier
+	}
+	return ""
+}
+
+func (x *DirectDebit) GetDebitedAccount() string {
+	if x != nil {
+		return x.DebitedAccount
+	}
+	return ""
+}
+
+type PaymentTerms struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	InstructionsId     string                 `protobuf:"bytes,1,opt,name=instructions_id,json=instructionsId,proto3" json:"instructions_id,omitempty"`               // IBT-187
+	Note               string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`                                                         // IBT-020
+	Amount             string                 `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`                                                     // IBT-176
+	InstallmentDueDate string                 `protobuf:"bytes,4,opt,name=installment_due_date,json=installmentDueDate,proto3" json:"installment_due_date,omitempty"` // IBT-177
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *PaymentTerms) Reset() {
+	*x = PaymentTerms{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentTerms) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentTerms) ProtoMessage() {}
+
+func (x *PaymentTerms) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentTerms.ProtoReflect.Descriptor instead.
+func (*PaymentTerms) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *PaymentTerms) GetInstructionsId() string {
+	if x != nil {
+		return x.InstructionsId
+	}
+	return ""
+}
+
+func (x *PaymentTerms) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+func (x *PaymentTerms) GetAmount() string {
+	if x != nil {
+		return x.Amount
+	}
+	return ""
+}
+
+func (x *PaymentTerms) GetInstallmentDueDate() string {
+	if x != nil {
+		return x.InstallmentDueDate
+	}
+	return ""
+}
+
+// TaxCategory is shared by lines (IBG-30), document allowances and charges, and the
+// tax breakdown.
+type TaxCategory struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Code                string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`                                                            // IBT-151 / IBT-095 / IBT-102 / IBT-118: S, E, O, AE, Z, N
+	Rate                string                 `protobuf:"bytes,2,opt,name=rate,proto3" json:"rate,omitempty"`                                                            // IBT-152 / IBT-096 / IBT-103 / IBT-119, percent; empty = absent
+	TaxScheme           string                 `protobuf:"bytes,3,opt,name=tax_scheme,json=taxScheme,proto3" json:"tax_scheme,omitempty"`                                 // IBT-167 / IBT-095-1 / IBT-102-1 / IBT-118-1; empty = "VAT"
+	ExemptionReasonCode string                 `protobuf:"bytes,4,opt,name=exemption_reason_code,json=exemptionReasonCode,proto3" json:"exemption_reason_code,omitempty"` // IBT-186 / IBT-196 / IBT-198 / IBT-121
+	ExemptionReasonText string                 `protobuf:"bytes,5,opt,name=exemption_reason_text,json=exemptionReasonText,proto3" json:"exemption_reason_text,omitempty"` // IBT-185 / IBT-197 / IBT-199 / IBT-120
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *TaxCategory) Reset() {
+	*x = TaxCategory{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaxCategory) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaxCategory) ProtoMessage() {}
+
+func (x *TaxCategory) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaxCategory.ProtoReflect.Descriptor instead.
+func (*TaxCategory) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *TaxCategory) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *TaxCategory) GetRate() string {
+	if x != nil {
+		return x.Rate
+	}
+	return ""
+}
+
+func (x *TaxCategory) GetTaxScheme() string {
+	if x != nil {
+		return x.TaxScheme
+	}
+	return ""
+}
+
+func (x *TaxCategory) GetExemptionReasonCode() string {
+	if x != nil {
+		return x.ExemptionReasonCode
+	}
+	return ""
+}
+
+func (x *TaxCategory) GetExemptionReasonText() string {
+	if x != nil {
+		return x.ExemptionReasonText
+	}
+	return ""
+}
+
+// AllowanceCharge is a document-level (IBG-20/21) or line-level (IBG-27/28)
+// allowance or charge.
+type AllowanceCharge struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IsCharge      bool                   `protobuf:"varint,1,opt,name=is_charge,json=isCharge,proto3" json:"is_charge,omitempty"`         // false = allowance, true = charge (UBL ChargeIndicator)
+	Amount        string                 `protobuf:"bytes,2,opt,name=amount,proto3" json:"amount,omitempty"`                              // IBT-092 / IBT-099 / IBT-136 / IBT-141
+	BaseAmount    string                 `protobuf:"bytes,3,opt,name=base_amount,json=baseAmount,proto3" json:"base_amount,omitempty"`    // IBT-093 / IBT-100 / IBT-137 / IBT-142
+	Percentage    string                 `protobuf:"bytes,4,opt,name=percentage,proto3" json:"percentage,omitempty"`                      // IBT-094 / IBT-101 / IBT-138 / IBT-143
+	Reason        string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`                              // IBT-097 / IBT-104 / IBT-139 / IBT-144
+	ReasonCode    string                 `protobuf:"bytes,6,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`    // IBT-098 (UNCL5189) / IBT-105 (UNCL7161) / IBT-140 / IBT-145
+	TaxCategory   *TaxCategory           `protobuf:"bytes,7,opt,name=tax_category,json=taxCategory,proto3" json:"tax_category,omitempty"` // document level only: IBT-095..096, IBT-196..197 / IBT-102..103, IBT-198..199
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AllowanceCharge) Reset() {
+	*x = AllowanceCharge{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AllowanceCharge) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AllowanceCharge) ProtoMessage() {}
+
+func (x *AllowanceCharge) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AllowanceCharge.ProtoReflect.Descriptor instead.
+func (*AllowanceCharge) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *AllowanceCharge) GetIsCharge() bool {
+	if x != nil {
+		return x.IsCharge
+	}
+	return false
+}
+
+func (x *AllowanceCharge) GetAmount() string {
+	if x != nil {
+		return x.Amount
+	}
+	return ""
+}
+
+func (x *AllowanceCharge) GetBaseAmount() string {
+	if x != nil {
+		return x.BaseAmount
+	}
+	return ""
+}
+
+func (x *AllowanceCharge) GetPercentage() string {
+	if x != nil {
+		return x.Percentage
+	}
+	return ""
+}
+
+func (x *AllowanceCharge) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *AllowanceCharge) GetReasonCode() string {
+	if x != nil {
+		return x.ReasonCode
+	}
+	return ""
+}
+
+func (x *AllowanceCharge) GetTaxCategory() *TaxCategory {
+	if x != nil {
+		return x.TaxCategory
+	}
+	return nil
+}
+
+// DocumentTotals is IBG-22 and IBG-37. IBT-110 = Invoice.vat_amount and
+// IBT-112 = Invoice.total_amount.
+type DocumentTotals struct {
+	state                       protoimpl.MessageState `protogen:"open.v1"`
+	LineExtensionAmount         string                 `protobuf:"bytes,1,opt,name=line_extension_amount,json=lineExtensionAmount,proto3" json:"line_extension_amount,omitempty"`                           // IBT-106 Sum of invoice line net amount
+	AllowanceTotalAmount        string                 `protobuf:"bytes,2,opt,name=allowance_total_amount,json=allowanceTotalAmount,proto3" json:"allowance_total_amount,omitempty"`                        // IBT-107
+	ChargeTotalAmount           string                 `protobuf:"bytes,3,opt,name=charge_total_amount,json=chargeTotalAmount,proto3" json:"charge_total_amount,omitempty"`                                 // IBT-108
+	TaxExclusiveAmount          string                 `protobuf:"bytes,4,opt,name=tax_exclusive_amount,json=taxExclusiveAmount,proto3" json:"tax_exclusive_amount,omitempty"`                              // IBT-109
+	PaidAmount                  string                 `protobuf:"bytes,5,opt,name=paid_amount,json=paidAmount,proto3" json:"paid_amount,omitempty"`                                                        // IBT-113
+	RoundingAmount              string                 `protobuf:"bytes,6,opt,name=rounding_amount,json=roundingAmount,proto3" json:"rounding_amount,omitempty"`                                            // IBT-114
+	PayableAmount               string                 `protobuf:"bytes,7,opt,name=payable_amount,json=payableAmount,proto3" json:"payable_amount,omitempty"`                                               // IBT-115
+	TaxInclusivePricing         bool                   `protobuf:"varint,8,opt,name=tax_inclusive_pricing,json=taxInclusivePricing,proto3" json:"tax_inclusive_pricing,omitempty"`                          // IBT-200 (UBL TaxTotal/TaxIncludedIndicator)
+	TaxAmountAccountingCurrency string                 `protobuf:"bytes,9,opt,name=tax_amount_accounting_currency,json=taxAmountAccountingCurrency,proto3" json:"tax_amount_accounting_currency,omitempty"` // IBT-111 (in IBT-006, i.e. AED)
+	TotalWithTaxAed             string                 `protobuf:"bytes,10,opt,name=total_with_tax_aed,json=totalWithTaxAed,proto3" json:"total_with_tax_aed,omitempty"`                                    // BTAE-20 Invoice total amount with VAT in AED
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *DocumentTotals) Reset() {
+	*x = DocumentTotals{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DocumentTotals) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DocumentTotals) ProtoMessage() {}
+
+func (x *DocumentTotals) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DocumentTotals.ProtoReflect.Descriptor instead.
+func (*DocumentTotals) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DocumentTotals) GetLineExtensionAmount() string {
+	if x != nil {
+		return x.LineExtensionAmount
+	}
+	return ""
+}
+
+func (x *DocumentTotals) GetAllowanceTotalAmount() string {
+	if x != nil {
+		return x.AllowanceTotalAmount
+	}
+	return ""
+}
+
+func (x *DocumentTotals) GetChargeTotalAmount() string {
+	if x != nil {
+		return x.ChargeTotalAmount
+	}
+	return ""
+}
+
+func (x *DocumentTotals) GetTaxExclusiveAmount() string {
+	if x != nil {
+		return x.TaxExclusiveAmount
+	}
+	return ""
+}
+
+func (x *DocumentTotals) GetPaidAmount() string {
+	if x != nil {
+		return x.PaidAmount
+	}
+	return ""
+}
+
+func (x *DocumentTotals) GetRoundingAmount() string {
+	if x != nil {
+		return x.RoundingAmount
+	}
+	return ""
+}
+
+func (x *DocumentTotals) GetPayableAmount() string {
+	if x != nil {
+		return x.PayableAmount
+	}
+	return ""
+}
+
+func (x *DocumentTotals) GetTaxInclusivePricing() bool {
+	if x != nil {
+		return x.TaxInclusivePricing
+	}
+	return false
+}
+
+func (x *DocumentTotals) GetTaxAmountAccountingCurrency() string {
+	if x != nil {
+		return x.TaxAmountAccountingCurrency
+	}
+	return ""
+}
+
+func (x *DocumentTotals) GetTotalWithTaxAed() string {
+	if x != nil {
+		return x.TotalWithTaxAed
+	}
+	return ""
+}
+
+type TaxSubtotal struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaxableAmount string                 `protobuf:"bytes,1,opt,name=taxable_amount,json=taxableAmount,proto3" json:"taxable_amount,omitempty"` // IBT-116
+	TaxAmount     string                 `protobuf:"bytes,2,opt,name=tax_amount,json=taxAmount,proto3" json:"tax_amount,omitempty"`             // IBT-117
+	Category      *TaxCategory           `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`                                // IBT-118, IBT-119, IBT-118-1 (+ IBT-121 / IBT-120)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaxSubtotal) Reset() {
+	*x = TaxSubtotal{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaxSubtotal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaxSubtotal) ProtoMessage() {}
+
+func (x *TaxSubtotal) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaxSubtotal.ProtoReflect.Descriptor instead.
+func (*TaxSubtotal) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *TaxSubtotal) GetTaxableAmount() string {
+	if x != nil {
+		return x.TaxableAmount
+	}
+	return ""
+}
+
+func (x *TaxSubtotal) GetTaxAmount() string {
+	if x != nil {
+		return x.TaxAmount
+	}
+	return ""
+}
+
+func (x *TaxSubtotal) GetCategory() *TaxCategory {
+	if x != nil {
+		return x.Category
+	}
+	return nil
+}
+
+type SupportingDocument struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reference     string                 `protobuf:"bytes,1,opt,name=reference,proto3" json:"reference,omitempty"`                        // IBT-122
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`                    // IBT-123
+	ExternalUri   string                 `protobuf:"bytes,3,opt,name=external_uri,json=externalUri,proto3" json:"external_uri,omitempty"` // IBT-124
+	Attachment    *Attachment            `protobuf:"bytes,4,opt,name=attachment,proto3" json:"attachment,omitempty"`                      // IBT-125
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SupportingDocument) Reset() {
+	*x = SupportingDocument{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SupportingDocument) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SupportingDocument) ProtoMessage() {}
+
+func (x *SupportingDocument) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SupportingDocument.ProtoReflect.Descriptor instead.
+func (*SupportingDocument) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *SupportingDocument) GetReference() string {
+	if x != nil {
+		return x.Reference
+	}
+	return ""
+}
+
+func (x *SupportingDocument) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *SupportingDocument) GetExternalUri() string {
+	if x != nil {
+		return x.ExternalUri
+	}
+	return ""
+}
+
+func (x *SupportingDocument) GetAttachment() *Attachment {
+	if x != nil {
+		return x.Attachment
+	}
+	return nil
+}
+
+// Attachment points into the platform's object storage. The v2 exporter does not
+// embed it (see spec non-goals).
+type Attachment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ObjectKey     string                 `protobuf:"bytes,1,opt,name=object_key,json=objectKey,proto3" json:"object_key,omitempty"` // internal object-storage key (not a business term)
+	MimeCode      string                 `protobuf:"bytes,2,opt,name=mime_code,json=mimeCode,proto3" json:"mime_code,omitempty"`    // IBT-125-1
+	Filename      string                 `protobuf:"bytes,3,opt,name=filename,proto3" json:"filename,omitempty"`                    // IBT-125-2
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Attachment) Reset() {
+	*x = Attachment{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Attachment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Attachment) ProtoMessage() {}
+
+func (x *Attachment) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Attachment.ProtoReflect.Descriptor instead.
+func (*Attachment) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *Attachment) GetObjectKey() string {
+	if x != nil {
+		return x.ObjectKey
+	}
+	return ""
+}
+
+func (x *Attachment) GetMimeCode() string {
+	if x != nil {
+		return x.MimeCode
+	}
+	return ""
+}
+
+func (x *Attachment) GetFilename() string {
+	if x != nil {
+		return x.Filename
+	}
+	return ""
+}
+
+type InvoiceLine struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Id                      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                                                            // IBT-126
+	Note                    string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`                                                                        // IBT-127
+	ObjectIdentifier        *Identifier            `protobuf:"bytes,3,opt,name=object_identifier,json=objectIdentifier,proto3" json:"object_identifier,omitempty"`                        // IBT-128 and IBT-128-1
+	Quantity                string                 `protobuf:"bytes,4,opt,name=quantity,proto3" json:"quantity,omitempty"`                                                                // IBT-129
+	UnitCode                string                 `protobuf:"bytes,5,opt,name=unit_code,json=unitCode,proto3" json:"unit_code,omitempty"`                                                // IBT-130 (UN/ECE Rec 20)
+	NetAmount               string                 `protobuf:"bytes,6,opt,name=net_amount,json=netAmount,proto3" json:"net_amount,omitempty"`                                             // IBT-131 Invoice line net amount
+	OrderReference          string                 `protobuf:"bytes,7,opt,name=order_reference,json=orderReference,proto3" json:"order_reference,omitempty"`                              // IBT-183
+	OrderLineReference      string                 `protobuf:"bytes,8,opt,name=order_line_reference,json=orderLineReference,proto3" json:"order_line_reference,omitempty"`                // IBT-132
+	DespatchAdviceReference string                 `protobuf:"bytes,9,opt,name=despatch_advice_reference,json=despatchAdviceReference,proto3" json:"despatch_advice_reference,omitempty"` // IBT-184
+	AccountingReference     string                 `protobuf:"bytes,10,opt,name=accounting_reference,json=accountingReference,proto3" json:"accounting_reference,omitempty"`              // IBT-133
+	BatchNumber             string                 `protobuf:"bytes,11,opt,name=batch_number,json=batchNumber,proto3" json:"batch_number,omitempty"`                                      // BTAE-24
+	Period                  *Period                `protobuf:"bytes,12,opt,name=period,proto3" json:"period,omitempty"`                                                                   // IBG-26
+	AllowancesCharges       []*AllowanceCharge     `protobuf:"bytes,13,rep,name=allowances_charges,json=allowancesCharges,proto3" json:"allowances_charges,omitempty"`                    // IBG-27 / IBG-28 (tax_category unused)
+	Price                   *Price                 `protobuf:"bytes,14,opt,name=price,proto3" json:"price,omitempty"`                                                                     // IBG-29
+	Tax                     *TaxCategory           `protobuf:"bytes,15,opt,name=tax,proto3" json:"tax,omitempty"`                                                                         // IBG-30: IBT-151, IBT-152, IBT-185, IBT-186, IBT-167
+	AmountAed               string                 `protobuf:"bytes,16,opt,name=amount_aed,json=amountAed,proto3" json:"amount_aed,omitempty"`                                            // BTAE-10 Invoice line amount in AED
+	VatAmountAed            string                 `protobuf:"bytes,17,opt,name=vat_amount_aed,json=vatAmountAed,proto3" json:"vat_amount_aed,omitempty"`                                 // BTAE-08 VAT line amount in AED
+	Item                    *Item                  `protobuf:"bytes,18,opt,name=item,proto3" json:"item,omitempty"`                                                                       // IBG-31
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *InvoiceLine) Reset() {
+	*x = InvoiceLine{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvoiceLine) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvoiceLine) ProtoMessage() {}
+
+func (x *InvoiceLine) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvoiceLine.ProtoReflect.Descriptor instead.
+func (*InvoiceLine) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *InvoiceLine) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetObjectIdentifier() *Identifier {
+	if x != nil {
+		return x.ObjectIdentifier
+	}
+	return nil
+}
+
+func (x *InvoiceLine) GetQuantity() string {
+	if x != nil {
+		return x.Quantity
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetUnitCode() string {
+	if x != nil {
+		return x.UnitCode
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetNetAmount() string {
+	if x != nil {
+		return x.NetAmount
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetOrderReference() string {
+	if x != nil {
+		return x.OrderReference
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetOrderLineReference() string {
+	if x != nil {
+		return x.OrderLineReference
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetDespatchAdviceReference() string {
+	if x != nil {
+		return x.DespatchAdviceReference
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetAccountingReference() string {
+	if x != nil {
+		return x.AccountingReference
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetBatchNumber() string {
+	if x != nil {
+		return x.BatchNumber
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetPeriod() *Period {
+	if x != nil {
+		return x.Period
+	}
+	return nil
+}
+
+func (x *InvoiceLine) GetAllowancesCharges() []*AllowanceCharge {
+	if x != nil {
+		return x.AllowancesCharges
+	}
+	return nil
+}
+
+func (x *InvoiceLine) GetPrice() *Price {
+	if x != nil {
+		return x.Price
+	}
+	return nil
+}
+
+func (x *InvoiceLine) GetTax() *TaxCategory {
+	if x != nil {
+		return x.Tax
+	}
+	return nil
+}
+
+func (x *InvoiceLine) GetAmountAed() string {
+	if x != nil {
+		return x.AmountAed
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetVatAmountAed() string {
+	if x != nil {
+		return x.VatAmountAed
+	}
+	return ""
+}
+
+func (x *InvoiceLine) GetItem() *Item {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+type Price struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	NetPrice             string                 `protobuf:"bytes,1,opt,name=net_price,json=netPrice,proto3" json:"net_price,omitempty"`                                         // IBT-146
+	Discount             string                 `protobuf:"bytes,2,opt,name=discount,proto3" json:"discount,omitempty"`                                                         // IBT-147
+	GrossPrice           string                 `protobuf:"bytes,3,opt,name=gross_price,json=grossPrice,proto3" json:"gross_price,omitempty"`                                   // IBT-148
+	BaseQuantity         string                 `protobuf:"bytes,4,opt,name=base_quantity,json=baseQuantity,proto3" json:"base_quantity,omitempty"`                             // IBT-149
+	BaseQuantityUnitCode string                 `protobuf:"bytes,5,opt,name=base_quantity_unit_code,json=baseQuantityUnitCode,proto3" json:"base_quantity_unit_code,omitempty"` // IBT-150
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *Price) Reset() {
+	*x = Price{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Price) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Price) ProtoMessage() {}
+
+func (x *Price) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Price.ProtoReflect.Descriptor instead.
+func (*Price) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *Price) GetNetPrice() string {
+	if x != nil {
+		return x.NetPrice
+	}
+	return ""
+}
+
+func (x *Price) GetDiscount() string {
+	if x != nil {
+		return x.Discount
+	}
+	return ""
+}
+
+func (x *Price) GetGrossPrice() string {
+	if x != nil {
+		return x.GrossPrice
+	}
+	return ""
+}
+
+func (x *Price) GetBaseQuantity() string {
+	if x != nil {
+		return x.BaseQuantity
+	}
+	return ""
+}
+
+func (x *Price) GetBaseQuantityUnitCode() string {
+	if x != nil {
+		return x.BaseQuantityUnitCode
+	}
+	return ""
+}
+
+type Item struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Name                   string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                                                                     // IBT-153
+	Description            string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`                                                       // IBT-154
+	ItemType               string                 `protobuf:"bytes,3,opt,name=item_type,json=itemType,proto3" json:"item_type,omitempty"`                                             // BTAE-13: G | S | B
+	GoodsServiceType       string                 `protobuf:"bytes,4,opt,name=goods_service_type,json=goodsServiceType,proto3" json:"goods_service_type,omitempty"`                   // BTAE-09 (GoodsType code list, for reverse charge)
+	SellerItemId           string                 `protobuf:"bytes,5,opt,name=seller_item_id,json=sellerItemId,proto3" json:"seller_item_id,omitempty"`                               // IBT-155
+	BuyerItemId            string                 `protobuf:"bytes,6,opt,name=buyer_item_id,json=buyerItemId,proto3" json:"buyer_item_id,omitempty"`                                  // IBT-156
+	StandardId             *Identifier            `protobuf:"bytes,7,opt,name=standard_id,json=standardId,proto3" json:"standard_id,omitempty"`                                       // IBT-157 and IBT-157-1
+	Classifications        []*Classification      `protobuf:"bytes,8,rep,name=classifications,proto3" json:"classifications,omitempty"`                                               // IBT-158, -1 (HS), -2
+	ServiceAccountingCodes []*Classification      `protobuf:"bytes,9,rep,name=service_accounting_codes,json=serviceAccountingCodes,proto3" json:"service_accounting_codes,omitempty"` // BTAE-17, -1 (SAC), -2
+	OriginCountry          string                 `protobuf:"bytes,10,opt,name=origin_country,json=originCountry,proto3" json:"origin_country,omitempty"`                             // IBT-159
+	Attributes             []*ItemAttribute       `protobuf:"bytes,11,rep,name=attributes,proto3" json:"attributes,omitempty"`                                                        // IBG-32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *Item) Reset() {
+	*x = Item{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Item) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Item) ProtoMessage() {}
+
+func (x *Item) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Item.ProtoReflect.Descriptor instead.
+func (*Item) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *Item) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Item) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *Item) GetItemType() string {
+	if x != nil {
+		return x.ItemType
+	}
+	return ""
+}
+
+func (x *Item) GetGoodsServiceType() string {
+	if x != nil {
+		return x.GoodsServiceType
+	}
+	return ""
+}
+
+func (x *Item) GetSellerItemId() string {
+	if x != nil {
+		return x.SellerItemId
+	}
+	return ""
+}
+
+func (x *Item) GetBuyerItemId() string {
+	if x != nil {
+		return x.BuyerItemId
+	}
+	return ""
+}
+
+func (x *Item) GetStandardId() *Identifier {
+	if x != nil {
+		return x.StandardId
+	}
+	return nil
+}
+
+func (x *Item) GetClassifications() []*Classification {
+	if x != nil {
+		return x.Classifications
+	}
+	return nil
+}
+
+func (x *Item) GetServiceAccountingCodes() []*Classification {
+	if x != nil {
+		return x.ServiceAccountingCodes
+	}
+	return nil
+}
+
+func (x *Item) GetOriginCountry() string {
+	if x != nil {
+		return x.OriginCountry
+	}
+	return ""
+}
+
+func (x *Item) GetAttributes() []*ItemAttribute {
+	if x != nil {
+		return x.Attributes
+	}
+	return nil
+}
+
+type Classification struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	SchemeId      string                 `protobuf:"bytes,2,opt,name=scheme_id,json=schemeId,proto3" json:"scheme_id,omitempty"`
+	SchemeVersion string                 `protobuf:"bytes,3,opt,name=scheme_version,json=schemeVersion,proto3" json:"scheme_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Classification) Reset() {
+	*x = Classification{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Classification) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Classification) ProtoMessage() {}
+
+func (x *Classification) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Classification.ProtoReflect.Descriptor instead.
+func (*Classification) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *Classification) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *Classification) GetSchemeId() string {
+	if x != nil {
+		return x.SchemeId
+	}
+	return ""
+}
+
+func (x *Classification) GetSchemeVersion() string {
+	if x != nil {
+		return x.SchemeVersion
+	}
+	return ""
+}
+
+type ItemAttribute struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`   // IBT-160
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"` // IBT-161
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ItemAttribute) Reset() {
+	*x = ItemAttribute{}
+	mi := &file_compliance_v1_invoice_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemAttribute) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemAttribute) ProtoMessage() {}
+
+func (x *ItemAttribute) ProtoReflect() protoreflect.Message {
+	mi := &file_compliance_v1_invoice_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemAttribute.ProtoReflect.Descriptor instead.
+func (*ItemAttribute) Descriptor() ([]byte, []int) {
+	return file_compliance_v1_invoice_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ItemAttribute) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ItemAttribute) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
 var File_compliance_v1_invoice_proto protoreflect.FileDescriptor
 
 const file_compliance_v1_invoice_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcompliance/v1/invoice.proto\x12\rcompliance.v1\"\xe9\x01\n" +
+	"\x1bcompliance/v1/invoice.proto\x12\rcompliance.v1\"\xe1\r\n" +
 	"\aInvoice\x12%\n" +
 	"\x0einvoice_number\x18\x01 \x01(\tR\rinvoiceNumber\x12\x1d\n" +
 	"\n" +
@@ -129,7 +2564,246 @@ const file_compliance_v1_invoice_proto_rawDesc = "" +
 	"\bcurrency\x18\x05 \x01(\tR\bcurrency\x12!\n" +
 	"\ftotal_amount\x18\x06 \x01(\tR\vtotalAmount\x12\x1d\n" +
 	"\n" +
-	"vat_amount\x18\a \x01(\tR\tvatAmountB\xc8\x01\n" +
+	"vat_amount\x18\a \x01(\tR\tvatAmount\x12\x12\n" +
+	"\x04uuid\x18\b \x01(\tR\x04uuid\x12\x1d\n" +
+	"\n" +
+	"issue_time\x18\t \x01(\tR\tissueTime\x12*\n" +
+	"\x11invoice_type_code\x18\n" +
+	" \x01(\tR\x0finvoiceTypeCode\x122\n" +
+	"\x15transaction_type_code\x18\v \x01(\tR\x13transactionTypeCode\x12!\n" +
+	"\ftax_currency\x18\f \x01(\tR\vtaxCurrency\x12#\n" +
+	"\rexchange_rate\x18\r \x01(\tR\fexchangeRate\x12$\n" +
+	"\x0etax_point_date\x18\x0e \x01(\tR\ftaxPointDate\x12(\n" +
+	"\x10payment_due_date\x18\x0f \x01(\tR\x0epaymentDueDate\x12\x12\n" +
+	"\x04note\x18\x10 \x01(\tR\x04note\x125\n" +
+	"\x17credit_note_reason_code\x18\x11 \x01(\tR\x14creditNoteReasonCode\x127\n" +
+	"\aprocess\x18\x12 \x01(\v2\x1d.compliance.v1.ProcessControlR\aprocess\x12A\n" +
+	"\n" +
+	"references\x18\x13 \x01(\v2!.compliance.v1.DocumentReferencesR\n" +
+	"references\x12W\n" +
+	"\x12preceding_invoices\x18\x14 \x03(\v2(.compliance.v1.PrecedingInvoiceReferenceR\x11precedingInvoices\x12,\n" +
+	"\x06seller\x18\x15 \x01(\v2\x14.compliance.v1.PartyR\x06seller\x12*\n" +
+	"\x05buyer\x18\x16 \x01(\v2\x14.compliance.v1.PartyR\x05buyer\x12!\n" +
+	"\fprincipal_id\x18\x17 \x01(\tR\vprincipalId\x12%\n" +
+	"\x0ebeneficiary_id\x18\x18 \x01(\tR\rbeneficiaryId\x12*\n" +
+	"\x05payee\x18\x19 \x01(\v2\x14.compliance.v1.PayeeR\x05payee\x12O\n" +
+	"\x12tax_representative\x18\x1a \x01(\v2 .compliance.v1.TaxRepresentativeR\x11taxRepresentative\x123\n" +
+	"\bdelivery\x18\x1b \x01(\v2\x17.compliance.v1.DeliveryR\bdelivery\x12@\n" +
+	"\x10invoicing_period\x18\x1c \x01(\v2\x15.compliance.v1.PeriodR\x0finvoicingPeriod\x12+\n" +
+	"\x11billing_frequency\x18\x1d \x01(\tR\x10billingFrequency\x12U\n" +
+	"\x14payment_instructions\x18\x1e \x03(\v2\".compliance.v1.PaymentInstructionsR\x13paymentInstructions\x12@\n" +
+	"\rpayment_terms\x18\x1f \x03(\v2\x1b.compliance.v1.PaymentTermsR\fpaymentTerms\x12M\n" +
+	"\x12allowances_charges\x18  \x03(\v2\x1e.compliance.v1.AllowanceChargeR\x11allowancesCharges\x125\n" +
+	"\x06totals\x18! \x01(\v2\x1d.compliance.v1.DocumentTotalsR\x06totals\x12?\n" +
+	"\rtax_breakdown\x18\" \x03(\v2\x1a.compliance.v1.TaxSubtotalR\ftaxBreakdown\x12T\n" +
+	"\x14supporting_documents\x18# \x03(\v2!.compliance.v1.SupportingDocumentR\x13supportingDocuments\x120\n" +
+	"\x05lines\x18$ \x03(\v2\x1a.compliance.v1.InvoiceLineR\x05lines\"\x7f\n" +
+	"\x0eProcessControl\x122\n" +
+	"\x15business_process_type\x18\x01 \x01(\tR\x13businessProcessType\x129\n" +
+	"\x18specification_identifier\x18\x02 \x01(\tR\x17specificationIdentifier\"9\n" +
+	"\n" +
+	"Identifier\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tscheme_id\x18\x02 \x01(\tR\bschemeId\"\x8e\x05\n" +
+	"\x12DocumentReferences\x12'\n" +
+	"\x0fbuyer_reference\x18\x01 \x01(\tR\x0ebuyerReference\x12+\n" +
+	"\x11project_reference\x18\x02 \x01(\tR\x10projectReference\x12-\n" +
+	"\x12contract_reference\x18\x03 \x01(\tR\x11contractReference\x12%\n" +
+	"\x0econtract_value\x18\x04 \x01(\tR\rcontractValue\x128\n" +
+	"\x18purchase_order_reference\x18\x05 \x01(\tR\x16purchaseOrderReference\x122\n" +
+	"\x15sales_order_reference\x18\x06 \x01(\tR\x13salesOrderReference\x12<\n" +
+	"\x1areceiving_advice_reference\x18\a \x01(\tR\x18receivingAdviceReference\x12:\n" +
+	"\x19despatch_advice_reference\x18\b \x01(\tR\x17despatchAdviceReference\x125\n" +
+	"\x17tender_or_lot_reference\x18\t \x01(\tR\x14tenderOrLotReference\x12B\n" +
+	"\x0finvoiced_object\x18\n" +
+	" \x01(\v2\x19.compliance.v1.IdentifierR\x0einvoicedObject\x12<\n" +
+	"\x1abuyer_accounting_reference\x18\v \x01(\tR\x18buyerAccountingReference\x12+\n" +
+	"\x11customs_reference\x18\f \x01(\tR\x10customsReference\"J\n" +
+	"\x19PrecedingInvoiceReference\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"issue_date\x18\x02 \x01(\tR\tissueDate\"\x8f\x04\n" +
+	"\x05Party\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
+	"\ftrading_name\x18\x02 \x01(\tR\vtradingName\x12;\n" +
+	"\videntifiers\x18\x03 \x03(\v2\x19.compliance.v1.IdentifierR\videntifiers\x12O\n" +
+	"\x12legal_registration\x18\x04 \x01(\v2 .compliance.v1.LegalRegistrationR\x11legalRegistration\x12>\n" +
+	"\x1btax_registration_identifier\x18\x05 \x01(\tR\x19taxRegistrationIdentifier\x12@\n" +
+	"\x1cadditional_legal_information\x18\x06 \x01(\tR\x1aadditionalLegalInformation\x12H\n" +
+	"\x12electronic_address\x18\a \x01(\v2\x19.compliance.v1.IdentifierR\x11electronicAddress\x12C\n" +
+	"\x0epostal_address\x18\b \x01(\v2\x1c.compliance.v1.PostalAddressR\rpostalAddress\x120\n" +
+	"\acontact\x18\t \x01(\v2\x16.compliance.v1.ContactR\acontact\"\xb5\x01\n" +
+	"\x11LegalRegistration\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tscheme_id\x18\x02 \x01(\tR\bschemeId\x12\x12\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12%\n" +
+	"\x0eauthority_name\x18\x04 \x01(\tR\rauthorityName\x128\n" +
+	"\x18passport_issuing_country\x18\x05 \x01(\tR\x16passportIssuingCountry\"\xd6\x01\n" +
+	"\rPostalAddress\x12\x14\n" +
+	"\x05line1\x18\x01 \x01(\tR\x05line1\x12\x14\n" +
+	"\x05line2\x18\x02 \x01(\tR\x05line2\x12\x14\n" +
+	"\x05line3\x18\x03 \x01(\tR\x05line3\x12\x12\n" +
+	"\x04city\x18\x04 \x01(\tR\x04city\x12\x1b\n" +
+	"\tpost_code\x18\x05 \x01(\tR\bpostCode\x12/\n" +
+	"\x13country_subdivision\x18\x06 \x01(\tR\x12countrySubdivision\x12!\n" +
+	"\fcountry_code\x18\a \x01(\tR\vcountryCode\"Q\n" +
+	"\aContact\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n" +
+	"\ttelephone\x18\x02 \x01(\tR\ttelephone\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\"\xa0\x01\n" +
+	"\x05Payee\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x129\n" +
+	"\n" +
+	"identifier\x18\x02 \x01(\v2\x19.compliance.v1.IdentifierR\n" +
+	"identifier\x12H\n" +
+	"\x12legal_registration\x18\x03 \x01(\v2\x19.compliance.v1.IdentifierR\x11legalRegistration\"\x93\x01\n" +
+	"\x11TaxRepresentative\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12%\n" +
+	"\x0evat_identifier\x18\x02 \x01(\tR\rvatIdentifier\x12C\n" +
+	"\x0epostal_address\x18\x03 \x01(\v2\x1c.compliance.v1.PostalAddressR\rpostalAddress\"\xe8\x01\n" +
+	"\bDelivery\x12\x1d\n" +
+	"\n" +
+	"party_name\x18\x01 \x01(\tR\tpartyName\x12\x1c\n" +
+	"\tincoterms\x18\x02 \x01(\tR\tincoterms\x125\n" +
+	"\blocation\x18\x03 \x01(\v2\x19.compliance.v1.IdentifierR\blocation\x120\n" +
+	"\x14actual_delivery_date\x18\x04 \x01(\tR\x12actualDeliveryDate\x126\n" +
+	"\aaddress\x18\x05 \x01(\v2\x1c.compliance.v1.PostalAddressR\aaddress\"B\n" +
+	"\x06Period\x12\x1d\n" +
+	"\n" +
+	"start_date\x18\x01 \x01(\tR\tstartDate\x12\x19\n" +
+	"\bend_date\x18\x02 \x01(\tR\aendDate\"\xec\x02\n" +
+	"\x13PaymentInstructions\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"means_code\x18\x02 \x01(\tR\tmeansCode\x12\x1d\n" +
+	"\n" +
+	"means_text\x18\x03 \x01(\tR\tmeansText\x12P\n" +
+	"\x16remittance_information\x18\x04 \x03(\v2\x19.compliance.v1.IdentifierR\x15remittanceInformation\x12F\n" +
+	"\x0fcredit_transfer\x18\x05 \x01(\v2\x1d.compliance.v1.CreditTransferR\x0ecreditTransfer\x12.\n" +
+	"\x04card\x18\x06 \x01(\v2\x1a.compliance.v1.PaymentCardR\x04card\x12=\n" +
+	"\fdirect_debit\x18\a \x01(\v2\x1a.compliance.v1.DirectDebitR\vdirectDebit\"\xe7\x01\n" +
+	"\x0eCreditTransfer\x123\n" +
+	"\aaccount\x18\x01 \x01(\v2\x19.compliance.v1.IdentifierR\aaccount\x12!\n" +
+	"\faccount_name\x18\x02 \x01(\tR\vaccountName\x12.\n" +
+	"\x13service_provider_id\x18\x03 \x01(\tR\x11serviceProviderId\x12M\n" +
+	"\x13institution_address\x18\x04 \x01(\v2\x1c.compliance.v1.PostalAddressR\x12institutionAddress\"\x83\x01\n" +
+	"\vPaymentCard\x124\n" +
+	"\x16primary_account_number\x18\x01 \x01(\tR\x14primaryAccountNumber\x12\x1f\n" +
+	"\vholder_name\x18\x02 \x01(\tR\n" +
+	"holderName\x12\x1d\n" +
+	"\n" +
+	"network_id\x18\x03 \x01(\tR\tnetworkId\"\x94\x01\n" +
+	"\vDirectDebit\x12+\n" +
+	"\x11mandate_reference\x18\x01 \x01(\tR\x10mandateReference\x12/\n" +
+	"\x13creditor_identifier\x18\x02 \x01(\tR\x12creditorIdentifier\x12'\n" +
+	"\x0fdebited_account\x18\x03 \x01(\tR\x0edebitedAccount\"\x95\x01\n" +
+	"\fPaymentTerms\x12'\n" +
+	"\x0finstructions_id\x18\x01 \x01(\tR\x0einstructionsId\x12\x12\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\tR\x06amount\x120\n" +
+	"\x14installment_due_date\x18\x04 \x01(\tR\x12installmentDueDate\"\xbc\x01\n" +
+	"\vTaxCategory\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
+	"\x04rate\x18\x02 \x01(\tR\x04rate\x12\x1d\n" +
+	"\n" +
+	"tax_scheme\x18\x03 \x01(\tR\ttaxScheme\x122\n" +
+	"\x15exemption_reason_code\x18\x04 \x01(\tR\x13exemptionReasonCode\x122\n" +
+	"\x15exemption_reason_text\x18\x05 \x01(\tR\x13exemptionReasonText\"\xff\x01\n" +
+	"\x0fAllowanceCharge\x12\x1b\n" +
+	"\tis_charge\x18\x01 \x01(\bR\bisCharge\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\tR\x06amount\x12\x1f\n" +
+	"\vbase_amount\x18\x03 \x01(\tR\n" +
+	"baseAmount\x12\x1e\n" +
+	"\n" +
+	"percentage\x18\x04 \x01(\tR\n" +
+	"percentage\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x12\x1f\n" +
+	"\vreason_code\x18\x06 \x01(\tR\n" +
+	"reasonCode\x12=\n" +
+	"\ftax_category\x18\a \x01(\v2\x1a.compliance.v1.TaxCategoryR\vtaxCategory\"\xf3\x03\n" +
+	"\x0eDocumentTotals\x122\n" +
+	"\x15line_extension_amount\x18\x01 \x01(\tR\x13lineExtensionAmount\x124\n" +
+	"\x16allowance_total_amount\x18\x02 \x01(\tR\x14allowanceTotalAmount\x12.\n" +
+	"\x13charge_total_amount\x18\x03 \x01(\tR\x11chargeTotalAmount\x120\n" +
+	"\x14tax_exclusive_amount\x18\x04 \x01(\tR\x12taxExclusiveAmount\x12\x1f\n" +
+	"\vpaid_amount\x18\x05 \x01(\tR\n" +
+	"paidAmount\x12'\n" +
+	"\x0frounding_amount\x18\x06 \x01(\tR\x0eroundingAmount\x12%\n" +
+	"\x0epayable_amount\x18\a \x01(\tR\rpayableAmount\x122\n" +
+	"\x15tax_inclusive_pricing\x18\b \x01(\bR\x13taxInclusivePricing\x12C\n" +
+	"\x1etax_amount_accounting_currency\x18\t \x01(\tR\x1btaxAmountAccountingCurrency\x12+\n" +
+	"\x12total_with_tax_aed\x18\n" +
+	" \x01(\tR\x0ftotalWithTaxAed\"\x8b\x01\n" +
+	"\vTaxSubtotal\x12%\n" +
+	"\x0etaxable_amount\x18\x01 \x01(\tR\rtaxableAmount\x12\x1d\n" +
+	"\n" +
+	"tax_amount\x18\x02 \x01(\tR\ttaxAmount\x126\n" +
+	"\bcategory\x18\x03 \x01(\v2\x1a.compliance.v1.TaxCategoryR\bcategory\"\xb2\x01\n" +
+	"\x12SupportingDocument\x12\x1c\n" +
+	"\treference\x18\x01 \x01(\tR\treference\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12!\n" +
+	"\fexternal_uri\x18\x03 \x01(\tR\vexternalUri\x129\n" +
+	"\n" +
+	"attachment\x18\x04 \x01(\v2\x19.compliance.v1.AttachmentR\n" +
+	"attachment\"d\n" +
+	"\n" +
+	"Attachment\x12\x1d\n" +
+	"\n" +
+	"object_key\x18\x01 \x01(\tR\tobjectKey\x12\x1b\n" +
+	"\tmime_code\x18\x02 \x01(\tR\bmimeCode\x12\x1a\n" +
+	"\bfilename\x18\x03 \x01(\tR\bfilename\"\x84\x06\n" +
+	"\vInvoiceLine\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\x12F\n" +
+	"\x11object_identifier\x18\x03 \x01(\v2\x19.compliance.v1.IdentifierR\x10objectIdentifier\x12\x1a\n" +
+	"\bquantity\x18\x04 \x01(\tR\bquantity\x12\x1b\n" +
+	"\tunit_code\x18\x05 \x01(\tR\bunitCode\x12\x1d\n" +
+	"\n" +
+	"net_amount\x18\x06 \x01(\tR\tnetAmount\x12'\n" +
+	"\x0forder_reference\x18\a \x01(\tR\x0eorderReference\x120\n" +
+	"\x14order_line_reference\x18\b \x01(\tR\x12orderLineReference\x12:\n" +
+	"\x19despatch_advice_reference\x18\t \x01(\tR\x17despatchAdviceReference\x121\n" +
+	"\x14accounting_reference\x18\n" +
+	" \x01(\tR\x13accountingReference\x12!\n" +
+	"\fbatch_number\x18\v \x01(\tR\vbatchNumber\x12-\n" +
+	"\x06period\x18\f \x01(\v2\x15.compliance.v1.PeriodR\x06period\x12M\n" +
+	"\x12allowances_charges\x18\r \x03(\v2\x1e.compliance.v1.AllowanceChargeR\x11allowancesCharges\x12*\n" +
+	"\x05price\x18\x0e \x01(\v2\x14.compliance.v1.PriceR\x05price\x12,\n" +
+	"\x03tax\x18\x0f \x01(\v2\x1a.compliance.v1.TaxCategoryR\x03tax\x12\x1d\n" +
+	"\n" +
+	"amount_aed\x18\x10 \x01(\tR\tamountAed\x12$\n" +
+	"\x0evat_amount_aed\x18\x11 \x01(\tR\fvatAmountAed\x12'\n" +
+	"\x04item\x18\x12 \x01(\v2\x13.compliance.v1.ItemR\x04item\"\xbd\x01\n" +
+	"\x05Price\x12\x1b\n" +
+	"\tnet_price\x18\x01 \x01(\tR\bnetPrice\x12\x1a\n" +
+	"\bdiscount\x18\x02 \x01(\tR\bdiscount\x12\x1f\n" +
+	"\vgross_price\x18\x03 \x01(\tR\n" +
+	"grossPrice\x12#\n" +
+	"\rbase_quantity\x18\x04 \x01(\tR\fbaseQuantity\x125\n" +
+	"\x17base_quantity_unit_code\x18\x05 \x01(\tR\x14baseQuantityUnitCode\"\x94\x04\n" +
+	"\x04Item\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1b\n" +
+	"\titem_type\x18\x03 \x01(\tR\bitemType\x12,\n" +
+	"\x12goods_service_type\x18\x04 \x01(\tR\x10goodsServiceType\x12$\n" +
+	"\x0eseller_item_id\x18\x05 \x01(\tR\fsellerItemId\x12\"\n" +
+	"\rbuyer_item_id\x18\x06 \x01(\tR\vbuyerItemId\x12:\n" +
+	"\vstandard_id\x18\a \x01(\v2\x19.compliance.v1.IdentifierR\n" +
+	"standardId\x12G\n" +
+	"\x0fclassifications\x18\b \x03(\v2\x1d.compliance.v1.ClassificationR\x0fclassifications\x12W\n" +
+	"\x18service_accounting_codes\x18\t \x03(\v2\x1d.compliance.v1.ClassificationR\x16serviceAccountingCodes\x12%\n" +
+	"\x0eorigin_country\x18\n" +
+	" \x01(\tR\roriginCountry\x12<\n" +
+	"\n" +
+	"attributes\x18\v \x03(\v2\x1c.compliance.v1.ItemAttributeR\n" +
+	"attributes\"h\n" +
+	"\x0eClassification\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x1b\n" +
+	"\tscheme_id\x18\x02 \x01(\tR\bschemeId\x12%\n" +
+	"\x0escheme_version\x18\x03 \x01(\tR\rschemeVersion\"9\n" +
+	"\rItemAttribute\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05valueB\xc8\x01\n" +
 	"\x11com.compliance.v1B\fInvoiceProtoP\x01ZPgithub.com/menem2024/uae-platform/services/api-go/gen/compliance/v1;compliancev1\xa2\x02\x03CXX\xaa\x02\rCompliance.V1\xca\x02\rCompliance\\V1\xe2\x02\x19Compliance\\V1\\GPBMetadata\xea\x02\x0eCompliance::V1b\x06proto3"
 
 var (
@@ -144,16 +2818,90 @@ func file_compliance_v1_invoice_proto_rawDescGZIP() []byte {
 	return file_compliance_v1_invoice_proto_rawDescData
 }
 
-var file_compliance_v1_invoice_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_compliance_v1_invoice_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_compliance_v1_invoice_proto_goTypes = []any{
-	(*Invoice)(nil), // 0: compliance.v1.Invoice
+	(*Invoice)(nil),                   // 0: compliance.v1.Invoice
+	(*ProcessControl)(nil),            // 1: compliance.v1.ProcessControl
+	(*Identifier)(nil),                // 2: compliance.v1.Identifier
+	(*DocumentReferences)(nil),        // 3: compliance.v1.DocumentReferences
+	(*PrecedingInvoiceReference)(nil), // 4: compliance.v1.PrecedingInvoiceReference
+	(*Party)(nil),                     // 5: compliance.v1.Party
+	(*LegalRegistration)(nil),         // 6: compliance.v1.LegalRegistration
+	(*PostalAddress)(nil),             // 7: compliance.v1.PostalAddress
+	(*Contact)(nil),                   // 8: compliance.v1.Contact
+	(*Payee)(nil),                     // 9: compliance.v1.Payee
+	(*TaxRepresentative)(nil),         // 10: compliance.v1.TaxRepresentative
+	(*Delivery)(nil),                  // 11: compliance.v1.Delivery
+	(*Period)(nil),                    // 12: compliance.v1.Period
+	(*PaymentInstructions)(nil),       // 13: compliance.v1.PaymentInstructions
+	(*CreditTransfer)(nil),            // 14: compliance.v1.CreditTransfer
+	(*PaymentCard)(nil),               // 15: compliance.v1.PaymentCard
+	(*DirectDebit)(nil),               // 16: compliance.v1.DirectDebit
+	(*PaymentTerms)(nil),              // 17: compliance.v1.PaymentTerms
+	(*TaxCategory)(nil),               // 18: compliance.v1.TaxCategory
+	(*AllowanceCharge)(nil),           // 19: compliance.v1.AllowanceCharge
+	(*DocumentTotals)(nil),            // 20: compliance.v1.DocumentTotals
+	(*TaxSubtotal)(nil),               // 21: compliance.v1.TaxSubtotal
+	(*SupportingDocument)(nil),        // 22: compliance.v1.SupportingDocument
+	(*Attachment)(nil),                // 23: compliance.v1.Attachment
+	(*InvoiceLine)(nil),               // 24: compliance.v1.InvoiceLine
+	(*Price)(nil),                     // 25: compliance.v1.Price
+	(*Item)(nil),                      // 26: compliance.v1.Item
+	(*Classification)(nil),            // 27: compliance.v1.Classification
+	(*ItemAttribute)(nil),             // 28: compliance.v1.ItemAttribute
 }
 var file_compliance_v1_invoice_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1,  // 0: compliance.v1.Invoice.process:type_name -> compliance.v1.ProcessControl
+	3,  // 1: compliance.v1.Invoice.references:type_name -> compliance.v1.DocumentReferences
+	4,  // 2: compliance.v1.Invoice.preceding_invoices:type_name -> compliance.v1.PrecedingInvoiceReference
+	5,  // 3: compliance.v1.Invoice.seller:type_name -> compliance.v1.Party
+	5,  // 4: compliance.v1.Invoice.buyer:type_name -> compliance.v1.Party
+	9,  // 5: compliance.v1.Invoice.payee:type_name -> compliance.v1.Payee
+	10, // 6: compliance.v1.Invoice.tax_representative:type_name -> compliance.v1.TaxRepresentative
+	11, // 7: compliance.v1.Invoice.delivery:type_name -> compliance.v1.Delivery
+	12, // 8: compliance.v1.Invoice.invoicing_period:type_name -> compliance.v1.Period
+	13, // 9: compliance.v1.Invoice.payment_instructions:type_name -> compliance.v1.PaymentInstructions
+	17, // 10: compliance.v1.Invoice.payment_terms:type_name -> compliance.v1.PaymentTerms
+	19, // 11: compliance.v1.Invoice.allowances_charges:type_name -> compliance.v1.AllowanceCharge
+	20, // 12: compliance.v1.Invoice.totals:type_name -> compliance.v1.DocumentTotals
+	21, // 13: compliance.v1.Invoice.tax_breakdown:type_name -> compliance.v1.TaxSubtotal
+	22, // 14: compliance.v1.Invoice.supporting_documents:type_name -> compliance.v1.SupportingDocument
+	24, // 15: compliance.v1.Invoice.lines:type_name -> compliance.v1.InvoiceLine
+	2,  // 16: compliance.v1.DocumentReferences.invoiced_object:type_name -> compliance.v1.Identifier
+	2,  // 17: compliance.v1.Party.identifiers:type_name -> compliance.v1.Identifier
+	6,  // 18: compliance.v1.Party.legal_registration:type_name -> compliance.v1.LegalRegistration
+	2,  // 19: compliance.v1.Party.electronic_address:type_name -> compliance.v1.Identifier
+	7,  // 20: compliance.v1.Party.postal_address:type_name -> compliance.v1.PostalAddress
+	8,  // 21: compliance.v1.Party.contact:type_name -> compliance.v1.Contact
+	2,  // 22: compliance.v1.Payee.identifier:type_name -> compliance.v1.Identifier
+	2,  // 23: compliance.v1.Payee.legal_registration:type_name -> compliance.v1.Identifier
+	7,  // 24: compliance.v1.TaxRepresentative.postal_address:type_name -> compliance.v1.PostalAddress
+	2,  // 25: compliance.v1.Delivery.location:type_name -> compliance.v1.Identifier
+	7,  // 26: compliance.v1.Delivery.address:type_name -> compliance.v1.PostalAddress
+	2,  // 27: compliance.v1.PaymentInstructions.remittance_information:type_name -> compliance.v1.Identifier
+	14, // 28: compliance.v1.PaymentInstructions.credit_transfer:type_name -> compliance.v1.CreditTransfer
+	15, // 29: compliance.v1.PaymentInstructions.card:type_name -> compliance.v1.PaymentCard
+	16, // 30: compliance.v1.PaymentInstructions.direct_debit:type_name -> compliance.v1.DirectDebit
+	2,  // 31: compliance.v1.CreditTransfer.account:type_name -> compliance.v1.Identifier
+	7,  // 32: compliance.v1.CreditTransfer.institution_address:type_name -> compliance.v1.PostalAddress
+	18, // 33: compliance.v1.AllowanceCharge.tax_category:type_name -> compliance.v1.TaxCategory
+	18, // 34: compliance.v1.TaxSubtotal.category:type_name -> compliance.v1.TaxCategory
+	23, // 35: compliance.v1.SupportingDocument.attachment:type_name -> compliance.v1.Attachment
+	2,  // 36: compliance.v1.InvoiceLine.object_identifier:type_name -> compliance.v1.Identifier
+	12, // 37: compliance.v1.InvoiceLine.period:type_name -> compliance.v1.Period
+	19, // 38: compliance.v1.InvoiceLine.allowances_charges:type_name -> compliance.v1.AllowanceCharge
+	25, // 39: compliance.v1.InvoiceLine.price:type_name -> compliance.v1.Price
+	18, // 40: compliance.v1.InvoiceLine.tax:type_name -> compliance.v1.TaxCategory
+	26, // 41: compliance.v1.InvoiceLine.item:type_name -> compliance.v1.Item
+	2,  // 42: compliance.v1.Item.standard_id:type_name -> compliance.v1.Identifier
+	27, // 43: compliance.v1.Item.classifications:type_name -> compliance.v1.Classification
+	27, // 44: compliance.v1.Item.service_accounting_codes:type_name -> compliance.v1.Classification
+	28, // 45: compliance.v1.Item.attributes:type_name -> compliance.v1.ItemAttribute
+	46, // [46:46] is the sub-list for method output_type
+	46, // [46:46] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_compliance_v1_invoice_proto_init() }
@@ -167,7 +2915,7 @@ func file_compliance_v1_invoice_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_compliance_v1_invoice_proto_rawDesc), len(file_compliance_v1_invoice_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

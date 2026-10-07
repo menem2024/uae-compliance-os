@@ -6,6 +6,12 @@
 # Label on every pod and object this chart owns (k3d-check waits on it).
 partOf: compliance
 
+global:
+  # Where this release runs: local (k3d, the default), staging or production.
+  # Checked at render (templates/ai-py.yaml): any other value fails, and so does
+  # staging/production while ai-py would run the fake model gateway.
+  environment: local
+
 # The four service images (api-go, validator-rs, ai-py, web) and the bootstrap
 # tools image. Built from the repo root; see the Makefile target images-k3d.
 image:
@@ -13,13 +19,17 @@ image:
   pullPolicy: Never
 
 # Browser-facing entrypoint: Traefik behind the k3d load balancer (host port
-# 8081). Both hostnames are *.localhost, which browsers resolve to loopback.
+# 8081). All hostnames are *.localhost, which browsers resolve to loopback.
 # Must agree with zitadel.zitadel.configmapConfig.External* (checked at render).
+# storageHost is MinIO's S3 API only (templates/minio-ingress.yaml): browsers PUT
+# and GET presigned document URLs there, so apiGo.env.STORAGE_PUBLIC_ENDPOINT must
+# be "<storageHost>:<port>" (checked at render while minio.enabled).
 public:
   secure: false
   port: 8081
   webHost: compliance.localhost
   zitadelHost: zitadel.compliance.localhost
+  storageHost: storage.compliance.localhost
 
 ingress:
   className: traefik
@@ -72,6 +82,11 @@ apiGo:
     VALKEY_ADDR: valkey:6379
     MINIO_ENDPOINT: minio:9000
     MINIO_USE_SSL: "false"
+    # Host the browser reaches MinIO's S3 API on (presigned URLs are signed for
+    # it); must equal public.storageHost[:public.port]. The three Track B rate
+    # limits stay at their code defaults (uploads 20, writes 120, reads 600/min).
+    STORAGE_PUBLIC_ENDPOINT: storage.compliance.localhost:8081
+    STORAGE_REGION: auto
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
     OTEL_SERVICE_NAME: api-go
   resources:
@@ -97,8 +112,23 @@ validatorRs:
 
 aiPy:
   replicas: 1
+  # S3_ACCESS_KEY/S3_SECRET_KEY come from Secret minio-credentials (the same
+  # keys api-go uses), not from here. AI_GATEWAY is left unset (= fake: a fresh
+  # dev stack never calls a real model) and the Langfuse variables are unset
+  # (tracing ships disabled).
+  # The fake gateway answers every document with canned output (FAKE-0001), not
+  # a reading of the file. ai-py publishes such results as needs_review
+  # (extraction_failed, invoices escalated; AI_FAKE_RESULTS=review, its default),
+  # and rendering fails when global.environment is staging or production while
+  # AI_GATEWAY is fake or unset: set AI_GATEWAY=anthropic there.
   env:
     NATS_URL: nats://nats:4222
+    S3_ENDPOINT: minio:9000
+    S3_USE_SSL: "false"
+    S3_BUCKET: documents
+    S3_REGION: us-east-1
+    AI_CACHE: valkey
+    VALKEY_URL: redis://valkey:6379/0
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4317
     OTEL_EXPORTER_OTLP_TIMEOUT: "2"
     OTEL_SERVICE_NAME: ai-py

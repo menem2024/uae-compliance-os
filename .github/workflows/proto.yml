@@ -30,6 +30,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      # A pull request checkout has no local `main`; buf's breaking check clones this repo and needs the branch.
+      - name: create local main for buf breaking
+        if: github.event_name == 'pull_request'
+        run: git branch --force main origin/main
+
       - uses: bufbuild/buf-action@v1
         with:
           version: 1.73.0

@@ -64,9 +64,9 @@ jobs:
           PGPASSWORD: pg
         run: psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f deploy/compose/postgres/init.sql
 
-      - name: go test (RLS integration)
+      - name: go test (integration, all packages)
         working-directory: services/api-go
         env:
           TEST_OWNER_URL: postgres://compliance_owner:owner_dev_pw@localhost:5432/compliance?sslmode=disable
           TEST_APP_URL: postgres://compliance_app:app_dev_pw@localhost:5432/compliance?sslmode=disable
-        run: go test -tags integration ./internal/db/...
+        run: go test -tags integration -p 1 ./...

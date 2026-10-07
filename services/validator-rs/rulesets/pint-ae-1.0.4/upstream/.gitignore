@@ -1,0 +1,4 @@
+# Downloaded by scripts/fetch-upstream.sh (owner decision D-3: not vendored). SHA256SUMS and rules-*.tsv are committed.
+/schematron/
+/examples/
+/xsd/

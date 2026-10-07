@@ -1,11 +1,13 @@
 // Command api is the api-go server. Subcommands: `migrate` applies database
 // migrations with DATABASE_OWNER_URL; `healthcheck` probes /readyz (the
-// distroless image has no curl).
+// distroless image has no curl); `revalidate` re-validates the invoices whose
+// latest run used another RuleSet (ADR 010).
 package main
 
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net"
@@ -16,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/minio/minio-go/v7"
 	"github.com/nats-io/nats.go"
@@ -26,10 +29,15 @@ import (
 	"github.com/menem2024/uae-platform/services/api-go/internal/config"
 	"github.com/menem2024/uae-platform/services/api-go/internal/db"
 	"github.com/menem2024/uae-platform/services/api-go/internal/events"
+	"github.com/menem2024/uae-platform/services/api-go/internal/exportclient"
+	"github.com/menem2024/uae-platform/services/api-go/internal/exports"
 	"github.com/menem2024/uae-platform/services/api-go/internal/httpapi"
 	"github.com/menem2024/uae-platform/services/api-go/internal/ratelimit"
 	"github.com/menem2024/uae-platform/services/api-go/internal/storage"
 	"github.com/menem2024/uae-platform/services/api-go/internal/telemetry"
+	"github.com/menem2024/uae-platform/services/api-go/internal/trackb"
+	"github.com/menem2024/uae-platform/services/api-go/internal/trackc"
+	"github.com/menem2024/uae-platform/services/api-go/internal/validation"
 	"github.com/menem2024/uae-platform/services/api-go/internal/validator"
 )
 
@@ -81,10 +89,12 @@ func main() {
 		err = migrate(ctx)
 	case "healthcheck":
 		err = healthcheck()
+	case "revalidate":
+		err = revalidate(ctx, os.Args[2:])
 	case "", "serve":
 		err = serve(ctx)
 	default:
-		err = fmt.Errorf("unknown command %q (want serve, migrate or healthcheck)", cmd)
+		err = fmt.Errorf("unknown command %q (want serve, migrate, healthcheck or revalidate)", cmd)
 	}
 	if err != nil {
 		slog.Error("api exited with error", "cmd", cmd, "err", err)
@@ -102,6 +112,80 @@ func migrate(ctx context.Context) error {
 	}
 	slog.Info("migrations applied")
 	return nil
+}
+
+// revalidateArgs are the flags of `api revalidate`.
+type revalidateArgs struct {
+	ruleset string
+	firm    uuid.UUID // uuid.Nil = every Firm
+	rate    int
+	report  string
+}
+
+func parseRevalidateArgs(args []string) (revalidateArgs, error) {
+	var a revalidateArgs
+	var firm string
+	fs := flag.NewFlagSet("revalidate", flag.ContinueOnError)
+	fs.StringVar(&a.ruleset, "ruleset", "", "RuleSet id to move every invoice to (required)")
+	fs.StringVar(&firm, "firm", "", "only this Firm (uuid); default every Firm")
+	fs.IntVar(&a.rate, "rate", 50, "invoices re-validated per second")
+	fs.StringVar(&a.report, "report", "", "write one JSON line per invoice to this file")
+	if err := fs.Parse(args); err != nil {
+		return a, err
+	}
+	switch {
+	case fs.NArg() > 0:
+		return a, fmt.Errorf("revalidate: unexpected argument %q", fs.Arg(0))
+	case a.ruleset == "":
+		return a, errors.New("revalidate: --ruleset is required")
+	case a.rate <= 0:
+		return a, errors.New("revalidate: --rate must be positive")
+	}
+	if firm != "" {
+		id, err := uuid.Parse(firm)
+		if err != nil {
+			return a, fmt.Errorf("revalidate: --firm: %w", err)
+		}
+		a.firm = id
+	}
+	return a, nil
+}
+
+// revalidate is `api revalidate`: it needs only DATABASE_URL and VALIDATOR_ADDR.
+func revalidate(ctx context.Context, args []string) (err error) {
+	a, err := parseRevalidateArgs(args)
+	if err != nil {
+		return err
+	}
+	dbURL, addr := os.Getenv("DATABASE_URL"), os.Getenv("VALIDATOR_ADDR")
+	if dbURL == "" || addr == "" {
+		return errors.New("revalidate: DATABASE_URL and VALIDATOR_ADDR are required")
+	}
+	pool, err := db.Open(ctx, dbURL)
+	if err != nil {
+		return fmt.Errorf("postgres: %w", err)
+	}
+	defer pool.Close()
+	vc, err := validator.New(addr)
+	if err != nil {
+		return err
+	}
+	o := trackc.RevalidateOpts{Pool: pool, Svc: &validation.Service{Pool: pool, Validator: vc}, Ruleset: a.ruleset, Firm: a.firm, Rate: a.rate}
+	if a.report != "" {
+		f, ferr := os.Create(a.report)
+		if ferr != nil {
+			return fmt.Errorf("revalidate: report: %w", ferr)
+		}
+		defer func() {
+			if cerr := f.Close(); cerr != nil && err == nil {
+				err = fmt.Errorf("revalidate: close report: %w", cerr)
+			}
+		}()
+		o.Report = f
+	}
+	tot, err := trackc.Revalidate(ctx, o)
+	tot.Print(os.Stdout)
+	return err
 }
 
 func healthcheck() error {
@@ -194,6 +278,14 @@ func serve(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
+	ec, err := exportclient.New(cfg.ValidatorAddr)
+	if err != nil {
+		return err
+	}
+	tcCfg, err := trackc.LoadConfig(os.Getenv)
+	if err != nil {
+		return err
+	}
 
 	rdb := redis.NewClient(&redis.Options{Addr: cfg.ValkeyAddr, DialTimeout: 3 * time.Second})
 	defer func() { _ = rdb.Close() }()
@@ -208,6 +300,14 @@ func serve(ctx context.Context) (err error) {
 		return startupAborted(err)
 	}
 
+	if tcCfg.ExportsBucket != storage.DocumentsBucket {
+		if err := retry(ctx, "minio exports bucket", func(c context.Context) error {
+			return storage.EnsureBucket(c, mc, tcCfg.ExportsBucket)
+		}); err != nil {
+			return startupAborted(err)
+		}
+	}
+
 	if len(cfg.ZitadelAudience) == 0 {
 		slog.Warn("ZITADEL_AUDIENCE is unset: JWT audience validation is disabled")
 	}
@@ -217,20 +317,61 @@ func serve(ctx context.Context) (err error) {
 	}
 
 	store := httpapi.PGStore{Pool: pool}
+	tc, err := trackc.New(trackc.Deps{
+		Pool: pool, Validator: vc, Exporter: ec,
+		Store:        &exports.MinioStore{Client: mc, Bucket: tcCfg.ExportsBucket},
+		Firms:        store,
+		ReadLimiter:  trackc.NamedLimiter("c-read", ratelimit.New(rdb, tcCfg.ReadPerMinute)),
+		WriteLimiter: trackc.NamedLimiter("c-write", ratelimit.New(rdb, tcCfg.WritePerMinute)),
+		Config:       tcCfg,
+		JS:           jsh,
+	})
+	if err != nil {
+		return err
+	}
 	// The consumer re-creates its streams and durable whenever consumption
 	// stops (e.g. the durable was deleted or the server lost its state).
-	consumer := events.NewValidationConsumer(jsh, httpapi.HandleExtracted(store, vc), startupRetryInterval)
+	consumer := events.NewValidationConsumer(jsh, httpapi.HandleExtracted(tc.Validation), startupRetryInterval)
 	consumerCtx, stopConsumer := context.WithCancel(ctx)
 	defer stopConsumer()
 	var wg sync.WaitGroup
-	wg.Add(1)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		consumer.Run(consumerCtx)
 	}()
+	go func() {
+		defer wg.Done()
+		tc.Sweeper().Run(consumerCtx)
+	}()
+	go func() {
+		defer wg.Done()
+		tc.Run(consumerCtx) // the Fix agent's api-fix-tasks consumer and task sweeper
+	}()
+
+	app, err := trackb.Build(ctx, trackb.Deps{
+		Pool: pool, NatsConn: nc, JS: jsh, Redis: rdb, InternalMinio: mc,
+		StoragePublicEndpoint: cfg.StoragePublicEndpoint, StorageAccessKey: cfg.MinioAccessKey,
+		StorageSecretKey: cfg.MinioSecretKey, StorageRegion: cfg.StorageRegion,
+		StorageBucket: storage.DocumentsBucket, StorageUseSSL: cfg.MinioUseSSL,
+		UploadPerMinute: cfg.UploadRateLimitPerMinute, WritePerMinute: cfg.BWriteRateLimitPerMinute,
+		ReadPerMinute: cfg.BReadRateLimitPerMinute, RetryInterval: startupRetryInterval,
+	})
+	if err != nil {
+		return err
+	}
+	appErr := make(chan error, 1)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if rerr := app.Run(consumerCtx); rerr != nil {
+			appErr <- rerr
+		}
+	}()
 
 	srv := newHTTPServer(cfg.HTTPAddr,
-		httpapi.NewRouter(verifier, store, events.NewPublisher(jsh), ratelimit.New(rdb, cfg.RateLimitPerMinute), readiness(pool, nc, rdb, mc, consumer)))
+		httpapi.NewRouter(verifier, store, events.NewPublisher(jsh), ratelimit.New(rdb, cfg.RateLimitPerMinute),
+			readiness(pool, nc, rdb, mc, consumer, app, tc), httpapi.WithTrackB(app), httpapi.WithTrackC(tc)))
 	srvErr := make(chan error, 1)
 	go func() {
 		slog.Info("http server listening", "addr", cfg.HTTPAddr)
@@ -245,10 +386,14 @@ func serve(ctx context.Context) (err error) {
 		slog.Info("shutdown signal received")
 	case err = <-srvErr:
 		slog.Error("http server failed", "err", err)
+	case err = <-appErr:
+		slog.Error("track b failed", "err", err)
 	}
 
-	// Stop HTTP and drain the consumer concurrently to stay within budget.
+	// Stop HTTP and drain the consumers concurrently to stay within budget. Track B closes its live
+	// SSE streams first, so no handler outlives the HTTP shutdown deadline.
 	stopConsumer()
+	app.Shutdown()
 	sctx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
 	defer cancel()
 	if serr := srv.Shutdown(sctx); serr != nil {
@@ -281,7 +426,7 @@ func connectNATS(ctx context.Context, url string) (*nats.Conn, jetstream.JetStre
 }
 
 // readiness checks every dependency the API needs to serve traffic.
-func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.Client, consumer *events.ValidationConsumer) func(context.Context) error {
+func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.Client, consumer *events.ValidationConsumer, app *trackb.App, tc *trackc.Module) func(context.Context) error {
 	return func(ctx context.Context) error {
 		if err := pool.Ping(ctx); err != nil {
 			return fmt.Errorf("postgres: %w", err)
@@ -291,6 +436,12 @@ func readiness(pool *pgxpool.Pool, nc *nats.Conn, rdb *redis.Client, mc *minio.C
 		}
 		if err := consumer.Ready(ctx); err != nil {
 			return fmt.Errorf("nats: %w", err)
+		}
+		if err := app.Ready(ctx); err != nil {
+			return fmt.Errorf("track b: %w", err)
+		}
+		if err := tc.Ready(ctx); err != nil {
+			return fmt.Errorf("track c: %w", err)
 		}
 		if err := rdb.Ping(ctx).Err(); err != nil {
 			return fmt.Errorf("valkey: %w", err)

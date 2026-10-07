@@ -30,3 +30,25 @@ func TestNewHTTPServerSetsHardenedTimeouts(t *testing.T) {
 		t.Errorf("ReadTimeout %s is shorter than ReadHeaderTimeout %s", srv.ReadTimeout, srv.ReadHeaderTimeout)
 	}
 }
+
+func TestParseRevalidateArgs(t *testing.T) {
+	a, err := parseRevalidateArgs([]string{"--ruleset", "pint-ae@1.0.4+r1"})
+	if err != nil || a.ruleset != "pint-ae@1.0.4+r1" || a.rate != 50 || a.firm.String() != "00000000-0000-0000-0000-000000000000" || a.report != "" {
+		t.Errorf("defaults: %+v, %v", a, err)
+	}
+	a, err = parseRevalidateArgs([]string{"--ruleset=x", "--firm", "6f1a1c1e-7d1f-4b36-9e56-5b5c2b8f0a11", "--rate", "5", "--report", "/tmp/r.jsonl"})
+	if err != nil || a.ruleset != "x" || a.rate != 5 || a.report != "/tmp/r.jsonl" || a.firm.String() != "6f1a1c1e-7d1f-4b36-9e56-5b5c2b8f0a11" {
+		t.Errorf("explicit: %+v, %v", a, err)
+	}
+	for name, args := range map[string][]string{
+		"no ruleset": {},
+		"bad firm":   {"--ruleset", "x", "--firm", "nope"},
+		"zero rate":  {"--ruleset", "x", "--rate", "0"},
+		"junk":       {"--ruleset", "x", "extra"},
+		"unknown":    {"--ruleset", "x", "--nope"},
+	} {
+		if _, err := parseRevalidateArgs(args); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+}

@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1b\x63ompliance/v1/invoice.proto\x12\rcompliance.v1\"\x98\x01\n\x07Invoice\x12\x16\n\x0einvoice_number\x18\x01 \x01(\t\x12\x12\n\nissue_date\x18\x02 \x01(\t\x12\x12\n\nseller_trn\x18\x03 \x01(\t\x12\x11\n\tbuyer_trn\x18\x04 \x01(\t\x12\x10\n\x08\x63urrency\x18\x05 \x01(\t\x12\x14\n\x0ctotal_amount\x18\x06 \x01(\t\x12\x12\n\nvat_amount\x18\x07 \x01(\tb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1b\x63ompliance/v1/invoice.proto\x12\rcompliance.v1\"\x82\n\n\x07Invoice\x12\x16\n\x0einvoice_number\x18\x01 \x01(\t\x12\x12\n\nissue_date\x18\x02 \x01(\t\x12\x12\n\nseller_trn\x18\x03 \x01(\t\x12\x11\n\tbuyer_trn\x18\x04 \x01(\t\x12\x10\n\x08\x63urrency\x18\x05 \x01(\t\x12\x14\n\x0ctotal_amount\x18\x06 \x01(\t\x12\x12\n\nvat_amount\x18\x07 \x01(\t\x12\x0c\n\x04uuid\x18\x08 \x01(\t\x12\x12\n\nissue_time\x18\t \x01(\t\x12\x19\n\x11invoice_type_code\x18\n \x01(\t\x12\x1d\n\x15transaction_type_code\x18\x0b \x01(\t\x12\x14\n\x0ctax_currency\x18\x0c \x01(\t\x12\x15\n\rexchange_rate\x18\r \x01(\t\x12\x16\n\x0etax_point_date\x18\x0e \x01(\t\x12\x18\n\x10payment_due_date\x18\x0f \x01(\t\x12\x0c\n\x04note\x18\x10 \x01(\t\x12\x1f\n\x17\x63redit_note_reason_code\x18\x11 \x01(\t\x12.\n\x07process\x18\x12 \x01(\x0b\x32\x1d.compliance.v1.ProcessControl\x12\x35\n\nreferences\x18\x13 \x01(\x0b\x32!.compliance.v1.DocumentReferences\x12\x44\n\x12preceding_invoices\x18\x14 \x03(\x0b\x32(.compliance.v1.PrecedingInvoiceReference\x12$\n\x06seller\x18\x15 \x01(\x0b\x32\x14.compliance.v1.Party\x12#\n\x05\x62uyer\x18\x16 \x01(\x0b\x32\x14.compliance.v1.Party\x12\x14\n\x0cprincipal_id\x18\x17 \x01(\t\x12\x16\n\x0e\x62\x65neficiary_id\x18\x18 \x01(\t\x12#\n\x05payee\x18\x19 \x01(\x0b\x32\x14.compliance.v1.Payee\x12<\n\x12tax_representative\x18\x1a \x01(\x0b\x32 .compliance.v1.TaxRepresentative\x12)\n\x08\x64\x65livery\x18\x1b \x01(\x0b\x32\x17.compliance.v1.Delivery\x12/\n\x10invoicing_period\x18\x1c \x01(\x0b\x32\x15.compliance.v1.Period\x12\x19\n\x11\x62illing_frequency\x18\x1d \x01(\t\x12@\n\x14payment_instructions\x18\x1e \x03(\x0b\x32\".compliance.v1.PaymentInstructions\x12\x32\n\rpayment_terms\x18\x1f \x03(\x0b\x32\x1b.compliance.v1.PaymentTerms\x12:\n\x12\x61llowances_charges\x18  \x03(\x0b\x32\x1e.compliance.v1.AllowanceCharge\x12-\n\x06totals\x18! \x01(\x0b\x32\x1d.compliance.v1.DocumentTotals\x12\x31\n\rtax_breakdown\x18\" \x03(\x0b\x32\x1a.compliance.v1.TaxSubtotal\x12?\n\x14supporting_documents\x18# \x03(\x0b\x32!.compliance.v1.SupportingDocument\x12)\n\x05lines\x18$ \x03(\x0b\x32\x1a.compliance.v1.InvoiceLine\"Q\n\x0eProcessControl\x12\x1d\n\x15\x62usiness_process_type\x18\x01 \x01(\t\x12 \n\x18specification_identifier\x18\x02 \x01(\t\"+\n\nIdentifier\x12\n\n\x02id\x18\x01 \x01(\t\x12\x11\n\tscheme_id\x18\x02 \x01(\t\"\x98\x03\n\x12\x44ocumentReferences\x12\x17\n\x0f\x62uyer_reference\x18\x01 \x01(\t\x12\x19\n\x11project_reference\x18\x02 \x01(\t\x12\x1a\n\x12\x63ontract_reference\x18\x03 \x01(\t\x12\x16\n\x0e\x63ontract_value\x18\x04 \x01(\t\x12 \n\x18purchase_order_reference\x18\x05 \x01(\t\x12\x1d\n\x15sales_order_reference\x18\x06 \x01(\t\x12\"\n\x1areceiving_advice_reference\x18\x07 \x01(\t\x12!\n\x19\x64\x65spatch_advice_reference\x18\x08 \x01(\t\x12\x1f\n\x17tender_or_lot_reference\x18\t \x01(\t\x12\x32\n\x0finvoiced_object\x18\n \x01(\x0b\x32\x19.compliance.v1.Identifier\x12\"\n\x1a\x62uyer_accounting_reference\x18\x0b \x01(\t\x12\x19\n\x11\x63ustoms_reference\x18\x0c \x01(\t\";\n\x19PrecedingInvoiceReference\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\nissue_date\x18\x02 \x01(\t\"\xfa\x02\n\x05Party\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x14\n\x0ctrading_name\x18\x02 \x01(\t\x12.\n\x0bidentifiers\x18\x03 \x03(\x0b\x32\x19.compliance.v1.Identifier\x12<\n\x12legal_registration\x18\x04 \x01(\x0b\x32 .compliance.v1.LegalRegistration\x12#\n\x1btax_registration_identifier\x18\x05 \x01(\t\x12$\n\x1c\x61\x64\x64itional_legal_information\x18\x06 \x01(\t\x12\x35\n\x12\x65lectronic_address\x18\x07 \x01(\x0b\x32\x19.compliance.v1.Identifier\x12\x34\n\x0epostal_address\x18\x08 \x01(\x0b\x32\x1c.compliance.v1.PostalAddress\x12\'\n\x07\x63ontact\x18\t \x01(\x0b\x32\x16.compliance.v1.Contact\"z\n\x11LegalRegistration\x12\n\n\x02id\x18\x01 \x01(\t\x12\x11\n\tscheme_id\x18\x02 \x01(\t\x12\x0c\n\x04type\x18\x03 \x01(\t\x12\x16\n\x0e\x61uthority_name\x18\x04 \x01(\t\x12 \n\x18passport_issuing_country\x18\x05 \x01(\t\"\x90\x01\n\rPostalAddress\x12\r\n\x05line1\x18\x01 \x01(\t\x12\r\n\x05line2\x18\x02 \x01(\t\x12\r\n\x05line3\x18\x03 \x01(\t\x12\x0c\n\x04\x63ity\x18\x04 \x01(\t\x12\x11\n\tpost_code\x18\x05 \x01(\t\x12\x1b\n\x13\x63ountry_subdivision\x18\x06 \x01(\t\x12\x14\n\x0c\x63ountry_code\x18\x07 \x01(\t\"9\n\x07\x43ontact\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\ttelephone\x18\x02 \x01(\t\x12\r\n\x05\x65mail\x18\x03 \x01(\t\"{\n\x05Payee\x12\x0c\n\x04name\x18\x01 \x01(\t\x12-\n\nidentifier\x18\x02 \x01(\x0b\x32\x19.compliance.v1.Identifier\x12\x35\n\x12legal_registration\x18\x03 \x01(\x0b\x32\x19.compliance.v1.Identifier\"o\n\x11TaxRepresentative\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x16\n\x0evat_identifier\x18\x02 \x01(\t\x12\x34\n\x0epostal_address\x18\x03 \x01(\x0b\x32\x1c.compliance.v1.PostalAddress\"\xab\x01\n\x08\x44\x65livery\x12\x12\n\nparty_name\x18\x01 \x01(\t\x12\x11\n\tincoterms\x18\x02 \x01(\t\x12+\n\x08location\x18\x03 \x01(\x0b\x32\x19.compliance.v1.Identifier\x12\x1c\n\x14\x61\x63tual_delivery_date\x18\x04 \x01(\t\x12-\n\x07\x61\x64\x64ress\x18\x05 \x01(\x0b\x32\x1c.compliance.v1.PostalAddress\".\n\x06Period\x12\x12\n\nstart_date\x18\x01 \x01(\t\x12\x10\n\x08\x65nd_date\x18\x02 \x01(\t\"\x98\x02\n\x13PaymentInstructions\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\nmeans_code\x18\x02 \x01(\t\x12\x12\n\nmeans_text\x18\x03 \x01(\t\x12\x39\n\x16remittance_information\x18\x04 \x03(\x0b\x32\x19.compliance.v1.Identifier\x12\x36\n\x0f\x63redit_transfer\x18\x05 \x01(\x0b\x32\x1d.compliance.v1.CreditTransfer\x12(\n\x04\x63\x61rd\x18\x06 \x01(\x0b\x32\x1a.compliance.v1.PaymentCard\x12\x30\n\x0c\x64irect_debit\x18\x07 \x01(\x0b\x32\x1a.compliance.v1.DirectDebit\"\xaa\x01\n\x0e\x43reditTransfer\x12*\n\x07\x61\x63\x63ount\x18\x01 \x01(\x0b\x32\x19.compliance.v1.Identifier\x12\x14\n\x0c\x61\x63\x63ount_name\x18\x02 \x01(\t\x12\x1b\n\x13service_provider_id\x18\x03 \x01(\t\x12\x39\n\x13institution_address\x18\x04 \x01(\x0b\x32\x1c.compliance.v1.PostalAddress\"V\n\x0bPaymentCard\x12\x1e\n\x16primary_account_number\x18\x01 \x01(\t\x12\x13\n\x0bholder_name\x18\x02 \x01(\t\x12\x12\n\nnetwork_id\x18\x03 \x01(\t\"^\n\x0b\x44irectDebit\x12\x19\n\x11mandate_reference\x18\x01 \x01(\t\x12\x1b\n\x13\x63reditor_identifier\x18\x02 \x01(\t\x12\x17\n\x0f\x64\x65\x62ited_account\x18\x03 \x01(\t\"c\n\x0cPaymentTerms\x12\x17\n\x0finstructions_id\x18\x01 \x01(\t\x12\x0c\n\x04note\x18\x02 \x01(\t\x12\x0e\n\x06\x61mount\x18\x03 \x01(\t\x12\x1c\n\x14installment_due_date\x18\x04 \x01(\t\"{\n\x0bTaxCategory\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x0c\n\x04rate\x18\x02 \x01(\t\x12\x12\n\ntax_scheme\x18\x03 \x01(\t\x12\x1d\n\x15\x65xemption_reason_code\x18\x04 \x01(\t\x12\x1d\n\x15\x65xemption_reason_text\x18\x05 \x01(\t\"\xb4\x01\n\x0f\x41llowanceCharge\x12\x11\n\tis_charge\x18\x01 \x01(\x08\x12\x0e\n\x06\x61mount\x18\x02 \x01(\t\x12\x13\n\x0b\x62\x61se_amount\x18\x03 \x01(\t\x12\x12\n\npercentage\x18\x04 \x01(\t\x12\x0e\n\x06reason\x18\x05 \x01(\t\x12\x13\n\x0breason_code\x18\x06 \x01(\t\x12\x30\n\x0ctax_category\x18\x07 \x01(\x0b\x32\x1a.compliance.v1.TaxCategory\"\xb3\x02\n\x0e\x44ocumentTotals\x12\x1d\n\x15line_extension_amount\x18\x01 \x01(\t\x12\x1e\n\x16\x61llowance_total_amount\x18\x02 \x01(\t\x12\x1b\n\x13\x63harge_total_amount\x18\x03 \x01(\t\x12\x1c\n\x14tax_exclusive_amount\x18\x04 \x01(\t\x12\x13\n\x0bpaid_amount\x18\x05 \x01(\t\x12\x17\n\x0frounding_amount\x18\x06 \x01(\t\x12\x16\n\x0epayable_amount\x18\x07 \x01(\t\x12\x1d\n\x15tax_inclusive_pricing\x18\x08 \x01(\x08\x12&\n\x1etax_amount_accounting_currency\x18\t \x01(\t\x12\x1a\n\x12total_with_tax_aed\x18\n \x01(\t\"g\n\x0bTaxSubtotal\x12\x16\n\x0etaxable_amount\x18\x01 \x01(\t\x12\x12\n\ntax_amount\x18\x02 \x01(\t\x12,\n\x08\x63\x61tegory\x18\x03 \x01(\x0b\x32\x1a.compliance.v1.TaxCategory\"\x81\x01\n\x12SupportingDocument\x12\x11\n\treference\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x14\n\x0c\x65xternal_uri\x18\x03 \x01(\t\x12-\n\nattachment\x18\x04 \x01(\x0b\x32\x19.compliance.v1.Attachment\"E\n\nAttachment\x12\x12\n\nobject_key\x18\x01 \x01(\t\x12\x11\n\tmime_code\x18\x02 \x01(\t\x12\x10\n\x08\x66ilename\x18\x03 \x01(\t\"\xa4\x04\n\x0bInvoiceLine\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04note\x18\x02 \x01(\t\x12\x34\n\x11object_identifier\x18\x03 \x01(\x0b\x32\x19.compliance.v1.Identifier\x12\x10\n\x08quantity\x18\x04 \x01(\t\x12\x11\n\tunit_code\x18\x05 \x01(\t\x12\x12\n\nnet_amount\x18\x06 \x01(\t\x12\x17\n\x0forder_reference\x18\x07 \x01(\t\x12\x1c\n\x14order_line_reference\x18\x08 \x01(\t\x12!\n\x19\x64\x65spatch_advice_reference\x18\t \x01(\t\x12\x1c\n\x14\x61\x63\x63ounting_reference\x18\n \x01(\t\x12\x14\n\x0c\x62\x61tch_number\x18\x0b \x01(\t\x12%\n\x06period\x18\x0c \x01(\x0b\x32\x15.compliance.v1.Period\x12:\n\x12\x61llowances_charges\x18\r \x03(\x0b\x32\x1e.compliance.v1.AllowanceCharge\x12#\n\x05price\x18\x0e \x01(\x0b\x32\x14.compliance.v1.Price\x12\'\n\x03tax\x18\x0f \x01(\x0b\x32\x1a.compliance.v1.TaxCategory\x12\x12\n\namount_aed\x18\x10 \x01(\t\x12\x16\n\x0evat_amount_aed\x18\x11 \x01(\t\x12!\n\x04item\x18\x12 \x01(\x0b\x32\x13.compliance.v1.Item\"y\n\x05Price\x12\x11\n\tnet_price\x18\x01 \x01(\t\x12\x10\n\x08\x64iscount\x18\x02 \x01(\t\x12\x13\n\x0bgross_price\x18\x03 \x01(\t\x12\x15\n\rbase_quantity\x18\x04 \x01(\t\x12\x1f\n\x17\x62\x61se_quantity_unit_code\x18\x05 \x01(\t\"\xfa\x02\n\x04Item\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x11\n\titem_type\x18\x03 \x01(\t\x12\x1a\n\x12goods_service_type\x18\x04 \x01(\t\x12\x16\n\x0eseller_item_id\x18\x05 \x01(\t\x12\x15\n\rbuyer_item_id\x18\x06 \x01(\t\x12.\n\x0bstandard_id\x18\x07 \x01(\x0b\x32\x19.compliance.v1.Identifier\x12\x36\n\x0f\x63lassifications\x18\x08 \x03(\x0b\x32\x1d.compliance.v1.Classification\x12?\n\x18service_accounting_codes\x18\t \x03(\x0b\x32\x1d.compliance.v1.Classification\x12\x16\n\x0eorigin_country\x18\n \x01(\t\x12\x30\n\nattributes\x18\x0b \x03(\x0b\x32\x1c.compliance.v1.ItemAttribute\"I\n\x0e\x43lassification\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x11\n\tscheme_id\x18\x02 \x01(\t\x12\x16\n\x0escheme_version\x18\x03 \x01(\t\",\n\rItemAttribute\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\tb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,5 +32,61 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'compliance.v1.invoice_pb2',
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_INVOICE']._serialized_start=47
-  _globals['_INVOICE']._serialized_end=199
+  _globals['_INVOICE']._serialized_end=1329
+  _globals['_PROCESSCONTROL']._serialized_start=1331
+  _globals['_PROCESSCONTROL']._serialized_end=1412
+  _globals['_IDENTIFIER']._serialized_start=1414
+  _globals['_IDENTIFIER']._serialized_end=1457
+  _globals['_DOCUMENTREFERENCES']._serialized_start=1460
+  _globals['_DOCUMENTREFERENCES']._serialized_end=1868
+  _globals['_PRECEDINGINVOICEREFERENCE']._serialized_start=1870
+  _globals['_PRECEDINGINVOICEREFERENCE']._serialized_end=1929
+  _globals['_PARTY']._serialized_start=1932
+  _globals['_PARTY']._serialized_end=2310
+  _globals['_LEGALREGISTRATION']._serialized_start=2312
+  _globals['_LEGALREGISTRATION']._serialized_end=2434
+  _globals['_POSTALADDRESS']._serialized_start=2437
+  _globals['_POSTALADDRESS']._serialized_end=2581
+  _globals['_CONTACT']._serialized_start=2583
+  _globals['_CONTACT']._serialized_end=2640
+  _globals['_PAYEE']._serialized_start=2642
+  _globals['_PAYEE']._serialized_end=2765
+  _globals['_TAXREPRESENTATIVE']._serialized_start=2767
+  _globals['_TAXREPRESENTATIVE']._serialized_end=2878
+  _globals['_DELIVERY']._serialized_start=2881
+  _globals['_DELIVERY']._serialized_end=3052
+  _globals['_PERIOD']._serialized_start=3054
+  _globals['_PERIOD']._serialized_end=3100
+  _globals['_PAYMENTINSTRUCTIONS']._serialized_start=3103
+  _globals['_PAYMENTINSTRUCTIONS']._serialized_end=3383
+  _globals['_CREDITTRANSFER']._serialized_start=3386
+  _globals['_CREDITTRANSFER']._serialized_end=3556
+  _globals['_PAYMENTCARD']._serialized_start=3558
+  _globals['_PAYMENTCARD']._serialized_end=3644
+  _globals['_DIRECTDEBIT']._serialized_start=3646
+  _globals['_DIRECTDEBIT']._serialized_end=3740
+  _globals['_PAYMENTTERMS']._serialized_start=3742
+  _globals['_PAYMENTTERMS']._serialized_end=3841
+  _globals['_TAXCATEGORY']._serialized_start=3843
+  _globals['_TAXCATEGORY']._serialized_end=3966
+  _globals['_ALLOWANCECHARGE']._serialized_start=3969
+  _globals['_ALLOWANCECHARGE']._serialized_end=4149
+  _globals['_DOCUMENTTOTALS']._serialized_start=4152
+  _globals['_DOCUMENTTOTALS']._serialized_end=4459
+  _globals['_TAXSUBTOTAL']._serialized_start=4461
+  _globals['_TAXSUBTOTAL']._serialized_end=4564
+  _globals['_SUPPORTINGDOCUMENT']._serialized_start=4567
+  _globals['_SUPPORTINGDOCUMENT']._serialized_end=4696
+  _globals['_ATTACHMENT']._serialized_start=4698
+  _globals['_ATTACHMENT']._serialized_end=4767
+  _globals['_INVOICELINE']._serialized_start=4770
+  _globals['_INVOICELINE']._serialized_end=5318
+  _globals['_PRICE']._serialized_start=5320
+  _globals['_PRICE']._serialized_end=5441
+  _globals['_ITEM']._serialized_start=5444
+  _globals['_ITEM']._serialized_end=5822
+  _globals['_CLASSIFICATION']._serialized_start=5824
+  _globals['_CLASSIFICATION']._serialized_end=5897
+  _globals['_ITEMATTRIBUTE']._serialized_start=5899
+  _globals['_ITEMATTRIBUTE']._serialized_end=5943
 # @@protoc_insertion_point(module_scope)

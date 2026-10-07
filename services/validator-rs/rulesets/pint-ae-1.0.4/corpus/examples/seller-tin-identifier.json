@@ -1,0 +1,130 @@
+{
+  "invoice_number": "AE-SELLER-TIN-01",
+  "issue_date": "2025-03-15",
+  "seller_trn": "198765432102003",
+  "buyer_trn": "134567890123003",
+  "currency": "AED",
+  "total_amount": "1050",
+  "vat_amount": "50",
+  "uuid": "a1b2c3d4-e5f6-7890-abcd-100000000010",
+  "invoice_type_code": "380",
+  "transaction_type_code": "00000000",
+  "tax_point_date": "2025-03-10",
+  "payment_due_date": "2025-03-30",
+  "note": "Tax invoice",
+  "process": {
+    "business_process_type": "urn:peppol:bis:billing",
+    "specification_identifier": "urn:peppol:pint:billing-1@ae-1"
+  },
+  "seller": {
+    "name": "Seller Legal Name",
+    "trading_name": "Seller Trade Name",
+    "legal_registration": {
+      "id": "112345678900003",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "tax_registration_identifier": "1234567890",
+    "additional_legal_information": "Merchant",
+    "electronic_address": {
+      "id": "1987654321",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Al Maktoum Road",
+      "city": "Dubai",
+      "country_subdivision": "DXB",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Contact Name",
+      "telephone": "+971501234567",
+      "email": "seller@example.ae"
+    }
+  },
+  "buyer": {
+    "name": "Buyer Legal Name",
+    "trading_name": "Buyer Trade Name",
+    "legal_registration": {
+      "id": "112345679000001",
+      "type": "TL",
+      "authority_name": "Trade License issuing Authority"
+    },
+    "electronic_address": {
+      "id": "1345678901",
+      "scheme_id": "0235"
+    },
+    "postal_address": {
+      "line1": "Khalifa Street",
+      "city": "Abu Dhabi",
+      "country_subdivision": "AUH",
+      "country_code": "AE"
+    },
+    "contact": {
+      "name": "Buyer Contact",
+      "telephone": "+971502345678",
+      "email": "buyer@example.ae"
+    }
+  },
+  "payment_instructions": [
+    {
+      "means_code": "30",
+      "means_text": "Credit transfer",
+      "credit_transfer": {
+        "account": {
+          "id": "AE070331234567890123456",
+          "scheme_id": "IBAN"
+        },
+        "account_name": "current account",
+        "service_provider_id": "ABORAEADXXX"
+      }
+    }
+  ],
+  "payment_terms": [
+    {
+      "note": "Net 15 days"
+    }
+  ],
+  "totals": {
+    "line_extension_amount": "1000",
+    "tax_exclusive_amount": "1000",
+    "payable_amount": "1050"
+  },
+  "tax_breakdown": [
+    {
+      "taxable_amount": "1000",
+      "tax_amount": "50",
+      "category": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      }
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "quantity": "10",
+      "unit_code": "H87",
+      "net_amount": "1000",
+      "price": {
+        "net_price": "100",
+        "discount": "0",
+        "gross_price": "100",
+        "base_quantity": "1",
+        "base_quantity_unit_code": "H87"
+      },
+      "tax": {
+        "code": "S",
+        "rate": "5",
+        "tax_scheme": "VAT"
+      },
+      "amount_aed": "1050",
+      "vat_amount_aed": "50",
+      "item": {
+        "name": "Electronic Components",
+        "description": "Standard rated goods"
+      }
+    }
+  ]
+}

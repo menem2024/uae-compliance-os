@@ -1,0 +1,446 @@
+{
+ "dataset": "importer-v1",
+ "version": 1,
+ "cases": [
+  {
+   "case_id": "import-ar-xlsx-000",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-000.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "e3453acf7f28c08cec992f1c3d9f930559ec0829db7cec76c59f0a4d5cdc7c80"
+  },
+  {
+   "case_id": "import-en-xlsx-001",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-001.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "2da159f70b65215c47b3287e0a8843cb8d5b1938a3ac0413eba5a849ad2f63ed"
+  },
+  {
+   "case_id": "import-ar-xlsx-002",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-002.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "dc2a5ca10803400133083eb458e31640c646844038ffa69b9a9991edeac5ce97"
+  },
+  {
+   "case_id": "import-en-xlsx-003",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-003.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "0ae46460722e862d143d2ded84824ea7cabb2fc06374108d96e5672f8ca984e5"
+  },
+  {
+   "case_id": "import-ar-xlsx-004",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-004.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "da8dcaf71acb62e871a8fe102a063bbf6594ce40e57694e067c5424e22411a24"
+  },
+  {
+   "case_id": "import-en-xlsx-005",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-005.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "8870099b71a0eed94ec8949f1f1efb2126a9569a35283f71fab5445b64b77fea"
+  },
+  {
+   "case_id": "import-ar-xlsx-006",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-006.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "2e2831069aa94e7681c5dc01fb661692dc954179c7c702a4214c1bcb12838b95"
+  },
+  {
+   "case_id": "import-en-xlsx-007",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-007.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "cbeb293bf2488c788d7c23ce89eb1e690bc2f27ea35b1c2b3a74a917dfda712f"
+  },
+  {
+   "case_id": "import-ar-xlsx-008",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-008.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "25ccbd674f69e267c4cdd548e98a4f25ff55707472dff913f92194bb5c4badaf"
+  },
+  {
+   "case_id": "import-en-xlsx-009",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-009.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "93db78e22e8018d38d0623eca6efa95449c081ec956e37b6a9e44b1f0cf87130"
+  },
+  {
+   "case_id": "import-ar-xlsx-010",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-010.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "010a1553fb1332ca51b3d3d22ba3f2aafcdeccc46cd99b99217cda2770b23338"
+  },
+  {
+   "case_id": "import-en-xlsx-011",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-011.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "a4b454764de6f1ae6808a3fb5bf992d35e1f7f1806bf927f5c5ebacd9f1f38ec"
+  },
+  {
+   "case_id": "import-ar-xlsx-012",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-012.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "0f499928c1097ae40bcbbd1a6d53c284f27bf0ab1bb9843a365152cb5eb1925e"
+  },
+  {
+   "case_id": "import-en-xlsx-013",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-013.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "1edf23f1211a77ff8f9894977be61f998292d9004aa3b673722eee19ed9b7de3"
+  },
+  {
+   "case_id": "import-ar-xlsx-014",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-014.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "d73b8dfa844882e1e1a94e38143a93edd34bdbcef9f6af44a4d80ebdecf21293"
+  },
+  {
+   "case_id": "import-en-xlsx-015",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-015.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "5158765d7419ee8999128275e1c77917cccf03a070ef666ad42e3c237324ec1e"
+  },
+  {
+   "case_id": "import-ar-xlsx-016",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-016.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "8f07eadd86ba88bb3346ea3a1569f9f49761bc0df118aa1a0c105bf7bb147c49"
+  },
+  {
+   "case_id": "import-en-xlsx-017",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-017.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "cf528caaffa5d07ab6e94bf801c6dc83639a2b44cb44a44aa96b17e21e49e68e"
+  },
+  {
+   "case_id": "import-ar-xlsx-018",
+   "tags": [
+    "lang:ar",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-xlsx-018.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "eec354005acaa2ceed70fd395317ec427bd6b6af8be91a0f807fcd386e85c07f"
+  },
+  {
+   "case_id": "import-en-xlsx-019",
+   "tags": [
+    "lang:en",
+    "format:xlsx",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-xlsx-019.xlsx",
+   "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "sha256": "f33eeb14350057d0855289c12b382d2c03f0d2be808b14de3c4506abf725a2c7"
+  },
+  {
+   "case_id": "import-ar-csv-020",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:cp1256"
+   ],
+   "file": "files/import-ar-csv-020.csv",
+   "media_type": "text/csv",
+   "sha256": "e748e2ec4edbfe572cb86c5c1c81ce0f745692a49c4595c890fb48e19a648cff"
+  },
+  {
+   "case_id": "import-en-csv-021",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-021.csv",
+   "media_type": "text/csv",
+   "sha256": "1ee74a2548763f0df4ad165ef9f7edf075e767ece8ca15ca14a3524b8b391c86"
+  },
+  {
+   "case_id": "import-ar-csv-022",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-csv-022.csv",
+   "media_type": "text/csv",
+   "sha256": "ac01749732d4e584cebb86c3757579afd418152a70afd2314c7dfaf2da2beeea"
+  },
+  {
+   "case_id": "import-en-csv-023",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-023.csv",
+   "media_type": "text/csv",
+   "sha256": "36c9f03c56738e0b8a28b09bd0fa224ffcfcb6658ccadd10c9b02ee1f0153836"
+  },
+  {
+   "case_id": "import-ar-csv-024",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:cp1256"
+   ],
+   "file": "files/import-ar-csv-024.csv",
+   "media_type": "text/csv",
+   "sha256": "0062caf17131dafc124145be4356789bba804247c5f732d3b1757d31d62ca62c"
+  },
+  {
+   "case_id": "import-en-csv-025",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-025.csv",
+   "media_type": "text/csv",
+   "sha256": "5aa2e629a84d5a1497e027e6c32045b076636b93783e7a192aee840174d4de14"
+  },
+  {
+   "case_id": "import-ar-csv-026",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-csv-026.csv",
+   "media_type": "text/csv",
+   "sha256": "73f6d846ea50e4cc7779ea387713c22871f9d9dd33e157ed5903053f5beeea95"
+  },
+  {
+   "case_id": "import-en-csv-027",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-027.csv",
+   "media_type": "text/csv",
+   "sha256": "ce5f51f7d81aa018c95105c2ff48d37c5f8f088a88e9352923af21e26bce51ae"
+  },
+  {
+   "case_id": "import-ar-csv-028",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:cp1256"
+   ],
+   "file": "files/import-ar-csv-028.csv",
+   "media_type": "text/csv",
+   "sha256": "f2eec4ae61118396e0210f90ba049038033ac3ac46ed54bdeacf65449e50a1f7"
+  },
+  {
+   "case_id": "import-en-csv-029",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-029.csv",
+   "media_type": "text/csv",
+   "sha256": "1b05bbb24330450f7745848b92c335d34806205b68881a5d73cf997ca991ce39"
+  },
+  {
+   "case_id": "import-ar-csv-030",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-csv-030.csv",
+   "media_type": "text/csv",
+   "sha256": "9b700d4587dfea9cc10edeb086899ab27d9ce0ff6706e5ab825a475a3fb73a2b"
+  },
+  {
+   "case_id": "import-en-csv-031",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-031.csv",
+   "media_type": "text/csv",
+   "sha256": "b0fe8bde6d7e2d2a4ea657bde9e57491de635ed5c502ff01d678c516a45eec1f"
+  },
+  {
+   "case_id": "import-ar-csv-032",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:cp1256"
+   ],
+   "file": "files/import-ar-csv-032.csv",
+   "media_type": "text/csv",
+   "sha256": "e95454082726be17cbd3be59fa5160b18512c11b3d4e240a5548b582f772be6a"
+  },
+  {
+   "case_id": "import-en-csv-033",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-033.csv",
+   "media_type": "text/csv",
+   "sha256": "f6818d33692ad1f1fa9cb734c6e1df1361ad0e52e706fe4685ab2dc0a19c8e3a"
+  },
+  {
+   "case_id": "import-ar-csv-034",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-csv-034.csv",
+   "media_type": "text/csv",
+   "sha256": "d83748dd88f15810110c239abe0f903c20f9f252f3c38a52b7dfe40dfeee98db"
+  },
+  {
+   "case_id": "import-en-csv-035",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-035.csv",
+   "media_type": "text/csv",
+   "sha256": "d7b2e50ac82cda2f31ba7f85dc9cbcae62176010e54fc259a291efb1a28adb00"
+  },
+  {
+   "case_id": "import-ar-csv-036",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:cp1256"
+   ],
+   "file": "files/import-ar-csv-036.csv",
+   "media_type": "text/csv",
+   "sha256": "bec68ea4205d59cca0076d08260d6e0fc33a2b4a383ebefe93eb3124c5f29ecd"
+  },
+  {
+   "case_id": "import-en-csv-037",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-037.csv",
+   "media_type": "text/csv",
+   "sha256": "100994af413cb4a0ae6a200dff0faa0adacbaeb8be94042384d31429e1985cc7"
+  },
+  {
+   "case_id": "import-ar-csv-038",
+   "tags": [
+    "lang:ar",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-ar-csv-038.csv",
+   "media_type": "text/csv",
+   "sha256": "500ad844223569f90d3e16358e5e544c477016b97b932ff35bf1610e250aa21b"
+  },
+  {
+   "case_id": "import-en-csv-039",
+   "tags": [
+    "lang:en",
+    "format:csv",
+    "encoding:utf-8-sig"
+   ],
+   "file": "files/import-en-csv-039.csv",
+   "media_type": "text/csv",
+   "sha256": "ba0a461dd01005198d19093358912f00b9aef3fed71cbe112c4704ade535523e"
+  }
+ ]
+}

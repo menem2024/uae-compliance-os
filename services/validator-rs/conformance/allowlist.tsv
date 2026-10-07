@@ -1,0 +1,3 @@
+rule_id	document_kind	reason
+ibr-co-14	credit_note	CI upstream defect 2: the official context is /cn:CreditNote/cac:Taxtotal (lower-case t), so the official schematron never fires this rule for credit notes; the platform applies it to credit notes too
+ibr-124	credit_note	CI upstream defect 2: the official context is /cn:CreditNote/cac:Taxtotal (lower-case t), so the official schematron never fires this rule for credit notes; the platform applies it to credit notes too

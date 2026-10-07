@@ -1,0 +1,570 @@
+{
+  "intake.classify": [
+    {
+      "kind": "invoice",
+      "language": "en",
+      "invoice_count": 1,
+      "seller_trn": "100000000000003",
+      "buyer_trn": "100000000000011",
+      "confidence": 0.97
+    }
+  ],
+  "extraction.invoice": [
+    {
+      "invoice": {
+        "invoice_number": "FAKE-0001",
+        "issue_date": "2026-01-15",
+        "invoice_type_code": "380",
+        "currency": "AED",
+        "seller": {
+          "name": "Scenario Supplies LLC",
+          "postal_address": {
+            "country_subdivision": "DXB"
+          }
+        },
+        "seller_trn": "100000000000003",
+        "buyer": {
+          "name": "Scenario Buyer LLC"
+        },
+        "buyer_trn": "100000000000011",
+        "payment_due_date": "2026-02-14",
+        "totals": {
+          "line_extension_amount": "1050.00",
+          "tax_exclusive_amount": "1050.00",
+          "payable_amount": "1102.50"
+        },
+        "vat_amount": "52.50",
+        "total_amount": "1102.50",
+        "note": "",
+        "tax_breakdown": [
+          {
+            "taxable_amount": "1050.00",
+            "tax_amount": "52.50",
+            "category": {
+              "code": "S",
+              "rate": "5"
+            }
+          }
+        ],
+        "lines": [
+          {
+            "item": {
+              "name": "Office chair"
+            },
+            "quantity": "4",
+            "unit_code": "C62",
+            "price": {
+              "net_price": "250.00"
+            },
+            "net_amount": "1000.00",
+            "tax": {
+              "code": "S",
+              "rate": "5"
+            }
+          },
+          {
+            "item": {
+              "name": "Delivery"
+            },
+            "quantity": "1",
+            "unit_code": "C62",
+            "price": {
+              "net_price": "50.00"
+            },
+            "net_amount": "50.00",
+            "tax": {
+              "code": "S",
+              "rate": "5"
+            }
+          }
+        ]
+      },
+      "field_confidence": [
+        {
+          "path": "invoice_number",
+          "confidence": 0.95
+        },
+        {
+          "path": "issue_date",
+          "confidence": 0.95
+        },
+        {
+          "path": "seller_trn",
+          "confidence": 0.95
+        },
+        {
+          "path": "buyer_trn",
+          "confidence": 0.95
+        },
+        {
+          "path": "currency",
+          "confidence": 0.95
+        },
+        {
+          "path": "vat_amount",
+          "confidence": 0.95
+        },
+        {
+          "path": "total_amount",
+          "confidence": 0.95
+        }
+      ],
+      "language": "en"
+    }
+  ],
+  "extraction.revise": [
+    {
+      "invoice": {
+        "invoice_number": "FAKE-0001",
+        "issue_date": "2026-01-15",
+        "invoice_type_code": "380",
+        "currency": "AED",
+        "seller": {
+          "name": "Scenario Supplies LLC",
+          "postal_address": {
+            "country_subdivision": "DXB"
+          }
+        },
+        "seller_trn": "100000000000003",
+        "buyer": {
+          "name": "Scenario Buyer LLC"
+        },
+        "buyer_trn": "100000000000011",
+        "payment_due_date": "2026-02-14",
+        "totals": {
+          "line_extension_amount": "1050.00",
+          "tax_exclusive_amount": "1050.00",
+          "payable_amount": "1102.50"
+        },
+        "vat_amount": "52.50",
+        "total_amount": "1102.50",
+        "note": "",
+        "tax_breakdown": [
+          {
+            "taxable_amount": "1050.00",
+            "tax_amount": "52.50",
+            "category": {
+              "code": "S",
+              "rate": "5"
+            }
+          }
+        ],
+        "lines": [
+          {
+            "item": {
+              "name": "Office chair"
+            },
+            "quantity": "4",
+            "unit_code": "C62",
+            "price": {
+              "net_price": "250.00"
+            },
+            "net_amount": "1000.00",
+            "tax": {
+              "code": "S",
+              "rate": "5"
+            }
+          },
+          {
+            "item": {
+              "name": "Delivery"
+            },
+            "quantity": "1",
+            "unit_code": "C62",
+            "price": {
+              "net_price": "50.00"
+            },
+            "net_amount": "50.00",
+            "tax": {
+              "code": "S",
+              "rate": "5"
+            }
+          }
+        ]
+      },
+      "field_confidence": [
+        {
+          "path": "invoice_number",
+          "confidence": 0.95
+        },
+        {
+          "path": "issue_date",
+          "confidence": 0.95
+        },
+        {
+          "path": "seller_trn",
+          "confidence": 0.95
+        },
+        {
+          "path": "buyer_trn",
+          "confidence": 0.95
+        },
+        {
+          "path": "currency",
+          "confidence": 0.95
+        },
+        {
+          "path": "vat_amount",
+          "confidence": 0.95
+        },
+        {
+          "path": "total_amount",
+          "confidence": 0.95
+        }
+      ],
+      "language": "en"
+    }
+  ],
+  "verifier.critic": [
+    {
+      "reviews": [
+        {
+          "path": "invoice_number",
+          "document_value": "FAKE-0001",
+          "matches": true
+        },
+        {
+          "path": "issue_date",
+          "document_value": "2026-01-15",
+          "matches": true
+        },
+        {
+          "path": "invoice_type_code",
+          "document_value": "380",
+          "matches": true
+        },
+        {
+          "path": "currency",
+          "document_value": "AED",
+          "matches": true
+        },
+        {
+          "path": "seller.name",
+          "document_value": "Scenario Supplies LLC",
+          "matches": true
+        },
+        {
+          "path": "seller_trn",
+          "document_value": "100000000000003",
+          "matches": true
+        },
+        {
+          "path": "seller.postal_address.country_subdivision",
+          "document_value": "DXB",
+          "matches": true
+        },
+        {
+          "path": "buyer.name",
+          "document_value": "Scenario Buyer LLC",
+          "matches": true
+        },
+        {
+          "path": "buyer_trn",
+          "document_value": "100000000000011",
+          "matches": true
+        },
+        {
+          "path": "payment_due_date",
+          "document_value": "2026-02-14",
+          "matches": true
+        },
+        {
+          "path": "totals.line_extension_amount",
+          "document_value": "1050.00",
+          "matches": true
+        },
+        {
+          "path": "totals.tax_exclusive_amount",
+          "document_value": "1050.00",
+          "matches": true
+        },
+        {
+          "path": "vat_amount",
+          "document_value": "52.50",
+          "matches": true
+        },
+        {
+          "path": "total_amount",
+          "document_value": "1102.50",
+          "matches": true
+        },
+        {
+          "path": "totals.payable_amount",
+          "document_value": "1102.50",
+          "matches": true
+        },
+        {
+          "path": "note",
+          "document_value": "",
+          "matches": true
+        },
+        {
+          "path": "tax_breakdown[0].taxable_amount",
+          "document_value": "1050.00",
+          "matches": true
+        },
+        {
+          "path": "tax_breakdown[0].tax_amount",
+          "document_value": "52.50",
+          "matches": true
+        },
+        {
+          "path": "tax_breakdown[0].category.code",
+          "document_value": "S",
+          "matches": true
+        },
+        {
+          "path": "tax_breakdown[0].category.rate",
+          "document_value": "5",
+          "matches": true
+        },
+        {
+          "path": "lines[0].item.name",
+          "document_value": "Office chair",
+          "matches": true
+        },
+        {
+          "path": "lines[0].quantity",
+          "document_value": "4",
+          "matches": true
+        },
+        {
+          "path": "lines[0].unit_code",
+          "document_value": "C62",
+          "matches": true
+        },
+        {
+          "path": "lines[0].price.net_price",
+          "document_value": "250.00",
+          "matches": true
+        },
+        {
+          "path": "lines[0].net_amount",
+          "document_value": "1000.00",
+          "matches": true
+        },
+        {
+          "path": "lines[0].tax.code",
+          "document_value": "S",
+          "matches": true
+        },
+        {
+          "path": "lines[0].tax.rate",
+          "document_value": "5",
+          "matches": true
+        },
+        {
+          "path": "lines[1].item.name",
+          "document_value": "Delivery",
+          "matches": true
+        },
+        {
+          "path": "lines[1].quantity",
+          "document_value": "1",
+          "matches": true
+        },
+        {
+          "path": "lines[1].unit_code",
+          "document_value": "C62",
+          "matches": true
+        },
+        {
+          "path": "lines[1].price.net_price",
+          "document_value": "50.00",
+          "matches": true
+        },
+        {
+          "path": "lines[1].net_amount",
+          "document_value": "50.00",
+          "matches": true
+        },
+        {
+          "path": "lines[1].tax.code",
+          "document_value": "S",
+          "matches": true
+        },
+        {
+          "path": "lines[1].tax.rate",
+          "document_value": "5",
+          "matches": true
+        }
+      ]
+    }
+  ],
+  "verifier.escalate": [
+    {
+      "reviews": [
+        {
+          "path": "invoice_number",
+          "document_value": "FAKE-0001",
+          "matches": true
+        },
+        {
+          "path": "issue_date",
+          "document_value": "2026-01-15",
+          "matches": true
+        },
+        {
+          "path": "invoice_type_code",
+          "document_value": "380",
+          "matches": true
+        },
+        {
+          "path": "currency",
+          "document_value": "AED",
+          "matches": true
+        },
+        {
+          "path": "seller.name",
+          "document_value": "Scenario Supplies LLC",
+          "matches": true
+        },
+        {
+          "path": "seller_trn",
+          "document_value": "100000000000003",
+          "matches": true
+        },
+        {
+          "path": "seller.postal_address.country_subdivision",
+          "document_value": "DXB",
+          "matches": true
+        },
+        {
+          "path": "buyer.name",
+          "document_value": "Scenario Buyer LLC",
+          "matches": true
+        },
+        {
+          "path": "buyer_trn",
+          "document_value": "100000000000011",
+          "matches": true
+        },
+        {
+          "path": "payment_due_date",
+          "document_value": "2026-02-14",
+          "matches": true
+        },
+        {
+          "path": "totals.line_extension_amount",
+          "document_value": "1050.00",
+          "matches": true
+        },
+        {
+          "path": "totals.tax_exclusive_amount",
+          "document_value": "1050.00",
+          "matches": true
+        },
+        {
+          "path": "vat_amount",
+          "document_value": "52.50",
+          "matches": true
+        },
+        {
+          "path": "total_amount",
+          "document_value": "1102.50",
+          "matches": true
+        },
+        {
+          "path": "totals.payable_amount",
+          "document_value": "1102.50",
+          "matches": true
+        },
+        {
+          "path": "note",
+          "document_value": "",
+          "matches": true
+        },
+        {
+          "path": "tax_breakdown[0].taxable_amount",
+          "document_value": "1050.00",
+          "matches": true
+        },
+        {
+          "path": "tax_breakdown[0].tax_amount",
+          "document_value": "52.50",
+          "matches": true
+        },
+        {
+          "path": "tax_breakdown[0].category.code",
+          "document_value": "S",
+          "matches": true
+        },
+        {
+          "path": "tax_breakdown[0].category.rate",
+          "document_value": "5",
+          "matches": true
+        },
+        {
+          "path": "lines[0].item.name",
+          "document_value": "Office chair",
+          "matches": true
+        },
+        {
+          "path": "lines[0].quantity",
+          "document_value": "4",
+          "matches": true
+        },
+        {
+          "path": "lines[0].unit_code",
+          "document_value": "C62",
+          "matches": true
+        },
+        {
+          "path": "lines[0].price.net_price",
+          "document_value": "250.00",
+          "matches": true
+        },
+        {
+          "path": "lines[0].net_amount",
+          "document_value": "1000.00",
+          "matches": true
+        },
+        {
+          "path": "lines[0].tax.code",
+          "document_value": "S",
+          "matches": true
+        },
+        {
+          "path": "lines[0].tax.rate",
+          "document_value": "5",
+          "matches": true
+        },
+        {
+          "path": "lines[1].item.name",
+          "document_value": "Delivery",
+          "matches": true
+        },
+        {
+          "path": "lines[1].quantity",
+          "document_value": "1",
+          "matches": true
+        },
+        {
+          "path": "lines[1].unit_code",
+          "document_value": "C62",
+          "matches": true
+        },
+        {
+          "path": "lines[1].price.net_price",
+          "document_value": "50.00",
+          "matches": true
+        },
+        {
+          "path": "lines[1].net_amount",
+          "document_value": "50.00",
+          "matches": true
+        },
+        {
+          "path": "lines[1].tax.code",
+          "document_value": "S",
+          "matches": true
+        },
+        {
+          "path": "lines[1].tax.rate",
+          "document_value": "5",
+          "matches": true
+        }
+      ]
+    }
+  ]
+}

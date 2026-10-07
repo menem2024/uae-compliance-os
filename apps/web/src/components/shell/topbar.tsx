@@ -8,6 +8,7 @@ import { usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { LocaleSwitch } from "./locale-switch";
 import { LogoMark } from "./logo";
+import { activeNavItem } from "./nav-items";
 import { control, iconButton } from "./styles";
 import { ThemeToggle } from "./theme-toggle";
 import type { ShellUser } from "./types";
@@ -15,13 +16,12 @@ import type { ShellUser } from "./types";
 /** Title and subtitle for the current route. */
 function usePageHeading() {
   const pathname = usePathname();
-  const tDash = useTranslations("Dashboard");
-  const tDemo = useTranslations("Demo");
-  const tDemoPage = useTranslations("DemoPage");
-  if (pathname === "/demo" || pathname.startsWith("/demo/")) {
-    return { title: tDemo("title"), subtitle: tDemoPage("subtitle") };
-  }
-  return { title: tDash("title"), subtitle: tDash("subtitle") };
+  const item = activeNavItem(pathname);
+  const t = useTranslations();
+  return {
+    title: t(item?.titleKey ?? item?.labelKey ?? "Dashboard.title"),
+    subtitle: item?.subtitleKey ? t(item.subtitleKey) : "",
+  };
 }
 
 export function Topbar({ user, onOpenPalette }: { user?: ShellUser; onOpenPalette: () => void }) {
